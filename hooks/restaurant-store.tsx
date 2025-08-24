@@ -9,7 +9,7 @@ import { aggregateRestaurantData, getUserLocation } from '@/services/api';
 import { dbHelpers, Database } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
 
-type Plan = Database['public']['Tables']['plans']['Row'];
+type Plan = Database['public']['Tables']['collections']['Row'];
 
 interface RestaurantStore {
   restaurants: Restaurant[];
@@ -41,6 +41,13 @@ interface RestaurantStore {
   updatePlanSettings: (planId: string, settings: Partial<Plan>) => Promise<void>;
   switchToCity: (city: 'New York' | 'Los Angeles') => void;
   shareablePlanUrl: (planId: string) => string;
+  // Collection operations (aliases for backward compatibility)
+  addRestaurantToCollection: (collectionId: string, restaurantId: string) => Promise<void>;
+  removeRestaurantFromCollection: (collectionId: string, restaurantId: string) => Promise<void>;
+  deleteCollection: (collectionId: string) => Promise<void>;
+  getCollectionDiscussions: (collectionId: string, restaurantId?: string) => Promise<any[]>;
+  inviteToCollection: (collectionId: string, email: string, message?: string) => Promise<void>;
+  updateCollectionSettings: (collectionId: string, settings: any) => Promise<void>;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -167,7 +174,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const addRestaurantToPlan = useCallback(async (planId: string, restaurantId: string) => {
     if (!user?.id) return;
     
-    const plan = plansQuery.data?.find(p => p.id === planId);
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
     if (!plan) return;
 
     const updatedRestaurantIds = [...new Set([...plan.restaurant_ids, restaurantId])];
@@ -182,7 +189,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const removeRestaurantFromPlan = useCallback(async (planId: string, restaurantId: string) => {
     if (!user?.id) return;
     
-    const plan = plansQuery.data?.find(p => p.id === planId);
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
     if (!plan) return;
 
     const updatedRestaurantIds = plan.restaurant_ids.filter((id: string) => id !== restaurantId);
@@ -200,6 +207,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     await dbHelpers.createPlan({
       name: planData.name,
       description: planData.description,
+      created_by: user.id,
       creator_id: user.id,
       collaborators: [],
       restaurant_ids: [],
@@ -241,10 +249,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user?.id, queryClient]);
 
   const shareablePlanUrl = useCallback((planId: string) => {
-    const plan = plansQuery.data?.find(p => p.id === planId);
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
     if (!plan) return '';
     return `https://yourapp.com/join/${plan.unique_code}`;
   }, [plansQuery.data]);
+
+  // Collection operations (aliases for backward compatibility)
+  const addRestaurantToCollection = addRestaurantToPlan;
+  const removeRestaurantFromCollection = removeRestaurantFromPlan;
+  const deleteCollection = deletePlan;
+  const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
+    return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+  }, []);
+  const inviteToCollection = useCallback(async (collectionId: string, email: string, message?: string) => {
+    if (!user?.id) return;
+    return await dbHelpers.inviteToCollection(collectionId, user.id, email, message);
+  }, [user?.id]);
+  const updateCollectionSettings = useCallback(async (collectionId: string, settings: any) => {
+    return await dbHelpers.updateCollectionSettings(collectionId, settings);
+  }, []);
 
   // Other operations
   const toggleFavorite = useCallback((restaurantId: string) => {
@@ -255,7 +278,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [favoriteRestaurants, mutateFavorites]);
 
   const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
-    const existingVoteIndex = userVotes.findIndex(v => 
+    const existingVoteIndex = userVotes.findIndex((v: any) => 
       v.restaurantId === restaurantId && 
       v.userId === 'currentUser' && 
       v.collectionId === planId
@@ -275,9 +298,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     if (existingVoteIndex >= 0) {
       if (userVotes[existingVoteIndex].vote === vote) {
-        updated = userVotes.filter((_, i) => i !== existingVoteIndex);
+        updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
       } else {
-        updated = userVotes.map((v, i) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
+        updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
       }
     } else {
       updated = [...userVotes, { ...base, vote }];
@@ -293,7 +316,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const addSearchQuery = useCallback((query: string) => {
     const q = query.trim();
     if (!q) return;
-    const updated = [q, ...searchHistory.filter(item => item.toLowerCase() !== q.toLowerCase())];
+    const updated = [q, ...searchHistory.filter((item: string) => item.toLowerCase() !== q.toLowerCase())];
     mutateSearchHistory(updated);
   }, [searchHistory, mutateSearchHistory]);
 
@@ -306,16 +329,16 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       ? ['Italian in Manhattan', 'Sushi in SoHo', 'Brunch in Brooklyn', 'Pizza in Queens']
       : ['Tacos in Hollywood', 'Sushi in Beverly Hills', 'Brunch in Santa Monica', 'Korean BBQ in Koreatown'];
     
-    const cuisines = restaurants.map(r => r.cuisine.split(/[,&]/)[0].trim());
-    const neighborhoods = restaurants.map(r => r.neighborhood);
+    const cuisines = restaurants.map((r: any) => r.cuisine.split(/[,&]/)[0].trim());
+    const neighborhoods = restaurants.map((r: any) => r.neighborhood);
     const popular = [...cuisines, ...neighborhoods]
-      .reduce<Record<string, number>>((acc, cur) => {
+      .reduce<Record<string, number>>((acc: any, cur: string) => {
         acc[cur] = (acc[cur] ?? 0) + 1;
         return acc;
       }, {});
     const sorted = Object.entries(popular)
-      .sort((a, b) => b[1] - a[1])
-      .map(([k]) => k);
+      .sort((a: any, b: any) => b[1] - a[1])
+      .map(([k]: any) => k);
     
     return [...searchHistory, ...locationSuggestions, ...sorted].slice(0, 8);
   }, [restaurants, searchHistory, userLocation]);
@@ -336,18 +359,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [discussions, persistDiscussions.mutate]);
 
   const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
-    const plan = planId ? plansQuery.data?.find(p => p.id === planId) : undefined;
+    const plan = planId ? plansQuery.data?.find((p: any) => p.id === planId) : undefined;
     const pool = planId
-      ? restaurants.filter(r => (plan?.restaurant_ids ?? []).includes(r.id))
+      ? restaurants.filter((r: any) => (plan?.restaurant_ids ?? []).includes(r.id))
       : restaurants;
     
     const planVotes = planId 
-      ? userVotes.filter(v => v.collectionId === planId)
+      ? userVotes.filter((v: any) => v.collectionId === planId)
       : userVotes;
     
     const discussionCounts = discussions
-      .filter(d => !planId || d.collectionId === planId)
-      .reduce<Record<string, number>>((acc, d) => {
+      .filter((d: any) => !planId || d.collectionId === planId)
+      .reduce<Record<string, number>>((acc: any, d: any) => {
         acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
         return acc;
       }, {});
@@ -361,14 +384,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [plansQuery.data, restaurants, userVotes, discussions]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
-    const plan = plansQuery.data?.find(p => p.id === planId);
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
     if (!plan) return [];
     
-    const pool = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
-    const planVotes = userVotes.filter(v => v.collectionId === planId);
+    const pool = restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
+    const planVotes = userVotes.filter((v: any) => v.collectionId === planId);
     const discussionCounts = discussions
-      .filter(d => d.collectionId === planId)
-      .reduce<Record<string, number>>((acc, d) => {
+      .filter((d: any) => d.collectionId === planId)
+      .reduce<Record<string, number>>((acc: any, d: any) => {
         acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
         return acc;
       }, {});
@@ -385,10 +408,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [plansQuery.data, restaurants, userVotes, discussions]);
 
   const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
-    return discussions.filter(d => 
+    return discussions.filter((d: any) => 
       d.collectionId === planId && 
       (!restaurantId || d.restaurantId === restaurantId)
-    ).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    ).sort((a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [discussions]);
 
   const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
@@ -425,11 +448,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       }));
 
       // Add to local restaurants if not already present
-      const existingIds = new Set(restaurants.map(r => r.id));
-      const newRestaurants = formattedResults.filter(r => !existingIds.has(r.id));
+      const existingIds = new Set(restaurants.map((r: any) => r.id));
+      const newRestaurants = formattedResults.filter((r: any) => !existingIds.has(r.id));
       
       if (newRestaurants.length > 0) {
-        setRestaurants(prev => [...prev, ...newRestaurants]);
+        setRestaurants((prev: any) => [...prev, ...newRestaurants]);
       }
 
       return formattedResults;
@@ -488,6 +511,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     updatePlanSettings,
     switchToCity,
     shareablePlanUrl,
+    // Collection operations
+    addRestaurantToCollection,
+    removeRestaurantFromCollection,
+    deleteCollection,
+    getCollectionDiscussions,
+    inviteToCollection,
+    updateCollectionSettings,
   }), [
     restaurants,
     plansQuery.data,
@@ -518,6 +548,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     updatePlanSettings,
     switchToCity,
     shareablePlanUrl,
+    // Collection operations
+    addRestaurantToCollection,
+    removeRestaurantFromCollection,
+    deleteCollection,
+    getCollectionDiscussions,
+    inviteToCollection,
+    updateCollectionSettings,
   ]);
 
   return storeValue;
@@ -526,12 +563,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 // Helper hooks
 export function useRestaurantById(id: string) {
   const { restaurants } = useRestaurants();
-  return restaurants.find(r => r.id === id);
+  return restaurants.find((r: any) => r.id === id);
 }
 
 export function usePlanById(id: string) {
   const { plans } = useRestaurants();
-  return plans.find(p => p.id === id);
+  return plans.find((p: any) => p.id === id);
 }
 
 export function usePlanRestaurants(planId: string) {
@@ -540,21 +577,21 @@ export function usePlanRestaurants(planId: string) {
   
   return useMemo(() => {
     if (!plan) return [];
-    return restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    return restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
   }, [restaurants, plan]);
 }
 
 export function useRestaurantVotes(restaurantId: string, planId?: string) {
   const { userVotes } = useRestaurants();
-  const votes = userVotes.filter(v => 
+  const votes = userVotes.filter((v: any) => 
     v.restaurantId === restaurantId && 
     (!planId || v.collectionId === planId)
   );
   
   return {
-    likes: votes.filter(v => v.vote === 'like').length,
-    dislikes: votes.filter(v => v.vote === 'dislike').length,
-    userVote: votes.find(v => v.userId === 'currentUser')?.vote,
+    likes: votes.filter((v: any) => v.vote === 'like').length,
+    dislikes: votes.filter((v: any) => v.vote === 'dislike').length,
+    userVote: votes.find((v: any) => v.userId === 'currentUser')?.vote,
     allVotes: votes
   };
 }
@@ -564,10 +601,15 @@ export function useCollectionRestaurants(collectionId: string) {
   
   return useMemo(() => {
     // Find the plan/collection
-    const plan = plans.find(p => p.id === collectionId);
+    const plan = plans.find((p: any) => p.id === collectionId);
     if (!plan) return [];
     
     // Return restaurants that are in this collection
-    return restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    return restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
   }, [restaurants, plans, collectionId]);
+}
+
+// Alias for backward compatibility
+export function useCollectionById(id: string) {
+  return usePlanById(id);
 }
