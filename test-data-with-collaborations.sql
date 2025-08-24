@@ -148,7 +148,7 @@ INSERT INTO restaurant_discussions (id, restaurant_id, collection_id, user_id, m
 INSERT INTO user_activities (id, user_id, type, restaurant_id, collection_id, content, timestamp) VALUES
 ('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'collection', NULL, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Created Date Night Winners collection', NOW() - INTERVAL '5 days'),
 ('33333333-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Liked Le Bernardin', NOW() - INTERVAL '2 days'),
-('44444444-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'discussion', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Started discussion about tasting menu', NOW() - INTERVAL '2 days'),
+('44444444-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'collection', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Started discussion about tasting menu', NOW() - INTERVAL '2 days'),
 ('55555555-eeee-eeee-eeee-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Disliked Le Bernardin (too expensive)', NOW() - INTERVAL '1 day'),
 ('66666666-ffff-ffff-ffff-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'collection', NULL, 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'Created Business Lunch Spots collection', NOW() - INTERVAL '4 days'),
 ('77777777-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'collection', NULL, 'cccccccc-dddd-eeee-ffff-aaaaaaaaaaaa', 'Created Foodie Adventures collection', NOW() - INTERVAL '3 days'),
