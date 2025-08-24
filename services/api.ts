@@ -233,9 +233,13 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
     
     const data = await response.json();
     const tags = data.completion?.split(',').map((tag: string) => {
-      // Ensure single word and capitalize
-      const singleWord = tag.trim().split(' ')[0];
-      return singleWord.charAt(0).toUpperCase() + singleWord.slice(1).toLowerCase();
+      // Ensure single word and capitalize with safety checks
+      if (!tag || typeof tag !== 'string') return null;
+      const trimmed = tag.trim();
+      if (!trimmed) return null;
+      const singleWord = trimmed.split(' ')[0];
+      if (!singleWord) return null;
+      return singleWord.charAt(0)?.toUpperCase() + singleWord.slice(1)?.toLowerCase() || singleWord;
     }).filter(Boolean) || [];
     
     const finalTags = tags.slice(0, 5);
@@ -286,7 +290,10 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
     }
     
     const data = await response.json();
-    const picks = data.completion?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    const picks = data.completion?.split(',').map((item: string) => {
+      if (!item || typeof item !== 'string') return null;
+      return item.trim();
+    }).filter(Boolean) || [];
     const finalPicks = picks.slice(0, 8);
     
     // Cache the result
@@ -1048,7 +1055,10 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
     }
     
     const data = await response.json();
-    const items = data.completion?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    const items = data.completion?.split(',').map((item: string) => {
+      if (!item || typeof item !== 'string') return null;
+      return item.trim();
+    }).filter(Boolean) || [];
     const finalItems = items.slice(0, 8);
     
     // If no items generated, use fallback

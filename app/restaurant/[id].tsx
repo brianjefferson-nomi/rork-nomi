@@ -111,7 +111,11 @@ export default function RestaurantDetailScreen() {
   };
 
   const handleAddToCollection = () => {
-    const availableCollections = collections.filter(c => !c.restaurants.includes(restaurant.id));
+    const availableCollections = collections.filter(c => {
+      // Handle both restaurant_ids and restaurants fields, and ensure they exist
+      const restaurantIds = c.restaurant_ids || c.restaurants || [];
+      return !restaurantIds.includes(restaurant.id);
+    });
     
     if (availableCollections.length === 0) {
       Alert.alert('No Collections', 'This restaurant is already in all your collections or you have no collections.');
