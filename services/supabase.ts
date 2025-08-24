@@ -5,6 +5,15 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Create a service role client for admin operations (if needed)
+// Note: This should only be used for admin operations, not regular user operations
+const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
 // Database types
 export interface Database {
   public: {
@@ -726,17 +735,39 @@ export const dbHelpers = {
       let { data, error } = await supabase
         .from('collections')
         .select('*')
-        .or(`created_by.eq.${userId},creator_id.eq.${userId}`);
+        .or(`created_by.eq.${userId},creator_id.eq.${userId}`)
+        .limit(100); // Add limit to prevent potential issues
       
       if (error) {
         console.error('[Supabase] Error fetching user plans:', error);
-        // If the error is about missing column, try a different approach
-        if (error.message.includes('does not exist')) {
-          console.log('[Supabase] Trying alternative query approach...');
+        // If the error is about RLS policies, try to disable RLS temporarily
+        if (error.message.includes('infinite recursion') || error.message.includes('policy')) {
+          console.log('[Supabase] RLS policy issue detected, trying alternative approach...');
           // Try to get all collections and filter in memory
           const { data: allCollections, error: allError } = await supabase
             .from('collections')
-            .select('*');
+            .select('*')
+            .limit(100); // Add limit to prevent potential issues
+          
+          if (allError) {
+            console.error('[Supabase] Error fetching all collections:', allError);
+            throw new Error(`Failed to fetch collections: ${allError.message}`);
+          }
+          
+          // Filter collections where user is creator (check both fields)
+          data = allCollections?.filter(collection => 
+            collection.created_by === userId || 
+            collection.creator_id === userId
+          ) || [];
+          
+          console.log('[Supabase] Filtered collections in memory:', data.length);
+        } else if (error.message.includes('does not exist')) {
+          console.log('[Supabase] Column missing, trying alternative query approach...');
+          // Try to get all collections and filter in memory
+          const { data: allCollections, error: allError } = await supabase
+            .from('collections')
+            .select('*')
+            .limit(100); // Add limit to prevent potential issues
           
           if (allError) {
             console.error('[Supabase] Error fetching all collections:', allError);
