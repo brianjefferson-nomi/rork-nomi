@@ -23,7 +23,7 @@ INSERT INTO restaurants (id, restaurant_code, name, cuisine, price_range, image_
 ('77777777-aaaa-bbbb-cccc-dddddddddddd', 'MOMOFUKU', 'Momofuku Ko', 'Asian', '$$$', 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400', '8 Extra Pl, New York, NY', 'East Village', 'Wed-Sun 5:30 PM - 10:00 PM', ARRAY['Innovative', 'Asian Fusion', 'Casual'], 'David Chang''s innovative tasting menu restaurant', 4.3, NOW()),
 ('88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'KATZ', 'Katz''s Delicatessen', 'Jewish', '$$', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400', '205 E Houston St, New York, NY', 'Lower East Side', 'Mon-Sun 8:00 AM - 10:45 PM', ARRAY['Historic', 'Casual', 'Iconic'], 'Famous Jewish deli known for pastrami sandwiches', 4.2, NOW()),
 ('99999999-cccc-dddd-eeee-ffffffffffff', 'PETER', 'Peter Luger Steak House', 'American', '$$$', 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400', '178 Broadway, Brooklyn, NY', 'Williamsburg', 'Mon-Sun 11:45 AM - 9:45 PM', ARRAY['Classic', 'Steakhouse', 'Historic'], 'Legendary steakhouse since 1887', 4.1, NOW()),
-('aaaaaaaa-dddd-eeee-ffff-gggggggggggg', 'ROBERTS', 'Roberta''s', 'Pizza', '$$', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400', '261 Moore St, Brooklyn, NY', 'Bushwick', 'Mon-Sun 11:00 AM - 12:00 AM', ARRAY['Artisanal', 'Pizza', 'Hip'], 'Artisanal pizza in a converted garage', 4.0, NOW());
+('aaaaaaaa-dddd-eeee-ffff-aaaaaaaaaaaa', 'ROBERTS', 'Roberta''s', 'Pizza', '$$', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400', '261 Moore St, Brooklyn, NY', 'Bushwick', 'Mon-Sun 11:00 AM - 12:00 AM', ARRAY['Artisanal', 'Pizza', 'Hip'], 'Artisanal pizza in a converted garage', 4.0, NOW());
 
 -- Create collaborative collections with multiple members
 INSERT INTO collections (id, collection_code, name, description, created_by, creator_id, occasion, is_public, likes, equal_voting, admin_weighted, expertise_weighted, minimum_participation, allow_vote_changes, anonymous_voting, vote_visibility, discussion_enabled, auto_ranking_enabled, consensus_threshold, restaurant_ids, collaborators, created_at, updated_at) VALUES
@@ -47,7 +47,7 @@ INSERT INTO collections (id, collection_code, name, description, created_by, cre
 
 -- Collection 4: Budget Eats (4 members)
 ('dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'BUDGET_001', 'Budget Eats', 'Great food without breaking the bank', '44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444', 'budget', true, 18, true, false, false, 2, true, false, 'public', true, true, 50, 
- ARRAY['88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'aaaaaaaa-dddd-eeee-ffff-gggggggggggg'], 
+ ARRAY['88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'aaaaaaaa-dddd-eeee-ffff-aaaaaaaaaaaa'], 
  ARRAY['11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '77777777-7777-7777-7777-777777777777'::uuid], 
  NOW(), NOW()),
 
@@ -158,13 +158,13 @@ INSERT INTO user_activities (id, user_id, type, restaurant_id, collection_id, co
 -- Update collection analytics (this would normally be computed, but we'll set some realistic values)
 UPDATE collections SET 
   likes = CASE 
-    WHEN id = 'coll-001' THEN 15
-    WHEN id = 'coll-002' THEN 23
-    WHEN id = 'coll-003' THEN 31
-    WHEN id = 'coll-004' THEN 18
-    WHEN id = 'coll-005' THEN 27
+    WHEN id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' THEN 15
+    WHEN id = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff' THEN 23
+    WHEN id = 'cccccccc-dddd-eeee-ffff-gggggggggggg' THEN 31
+    WHEN id = 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh' THEN 18
+    WHEN id = 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii' THEN 27
   END
-WHERE id IN ('coll-001', 'coll-002', 'coll-003', 'coll-004', 'coll-005');
+WHERE id IN ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii');
 
 -- Show the created data
 SELECT 'Users created:' as info, COUNT(*) as count FROM users WHERE id LIKE '11111111%' OR id LIKE '22222222%' OR id LIKE '33333333%' OR id LIKE '44444444%' OR id LIKE '55555555%' OR id LIKE '66666666%' OR id LIKE '77777777%' OR id LIKE '88888888%'
