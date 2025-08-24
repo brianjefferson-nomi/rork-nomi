@@ -108,7 +108,10 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
             const firstWord = v.split(' ')[0];
             if (!firstWord || firstWord.length === 0) return null;
-            const cleanTag = firstWord.charAt(0)?.toUpperCase() + firstWord.slice(1)?.toLowerCase() || firstWord;
+            const firstChar = firstWord.charAt(0);
+            const restOfWord = firstWord.slice(1);
+            const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+            if (!cleanTag || cleanTag.length === 0) return null;
             return (
               <View key={i} style={styles.vibeTag}>
                 <Text style={styles.vibeText}>{cleanTag}</Text>
