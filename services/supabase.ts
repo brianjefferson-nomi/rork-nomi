@@ -653,9 +653,15 @@ export const dbHelpers = {
 
   // Collection operations (alias for plans)
   async createPlan(planData: Database['public']['Tables']['collections']['Insert']) {
+    // Generate a unique collection code
+    const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     const { data, error } = await supabase
       .from('collections')
-      .insert(planData)
+      .insert({
+        ...planData,
+        collection_code: collectionCode
+      })
       .select()
       .single();
     
@@ -682,36 +688,21 @@ export const dbHelpers = {
 
   async getUserPlans(userId: string) {
     try {
-      // First get collections created by the user
-      const { data: userCollections, error: userError } = await supabase
+      console.log('[Supabase] Getting plans for user:', userId);
+      
+      // Get plans where user is creator or collaborator
+      const { data, error } = await supabase
         .from('collections')
         .select('*')
-        .eq('created_by', userId);
+        .or(`created_by.eq.${userId},collaborators.cs.{"${userId}"}`);
       
-      if (userError) {
-        console.error('[Supabase] Error fetching user collections:', userError);
-        throw userError;
+      if (error) {
+        console.error('[Supabase] Error fetching user plans:', error);
+        throw error;
       }
       
-      // Then get public collections
-      const { data: publicCollections, error: publicError } = await supabase
-        .from('collections')
-        .select('*')
-        .eq('is_public', true);
-      
-      if (publicError) {
-        console.error('[Supabase] Error fetching public collections:', publicError);
-        throw publicError;
-      }
-      
-      // Combine and remove duplicates
-      const allCollections = [...(userCollections || []), ...(publicCollections || [])];
-      const uniqueCollections = allCollections.filter((collection, index, self) => 
-        index === self.findIndex(c => c.id === collection.id)
-      );
-      
-      console.log('[Supabase] Fetched user plans:', uniqueCollections);
-      return uniqueCollections;
+      console.log('[Supabase] Found plans:', data?.length || 0);
+      return data || [];
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', error);
       throw error;

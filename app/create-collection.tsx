@@ -30,16 +30,27 @@ export default function CreatePlanScreen() {
     }
 
     try {
+      console.log('[CreatePlan] Creating plan with data:', {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        plannedDate: plannedDate.trim() || undefined,
+        isPublic
+      });
+      
       await createPlan({
         name: name.trim(),
         description: description.trim() || undefined,
         plannedDate: plannedDate.trim() || undefined,
         isPublic
       });
-      router.back();
+      
+      console.log('[CreatePlan] Plan created successfully');
+      Alert.alert('Success', 'Plan created successfully!', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create plan. Please try again.');
-      console.error('Create plan error:', error);
+      console.error('[CreatePlan] Error creating plan:', error);
+      Alert.alert('Error', `Failed to create plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
