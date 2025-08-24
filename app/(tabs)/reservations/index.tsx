@@ -124,7 +124,7 @@ export default function ReservationsScreen() {
               styles.filterButtonText,
               filter === filterType && styles.filterButtonTextActive
             ]}>
-              {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+              {filterType && typeof filterType === 'string' && filterType.length > 0 ? filterType.charAt(0).toUpperCase() + filterType.slice(1) : filterType}
             </Text>
           </TouchableOpacity>
         ))}

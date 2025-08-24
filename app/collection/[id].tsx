@@ -291,16 +291,16 @@ export default function CollectionDetailScreen() {
                   const isVerified = typeof member === 'string' ? false : member?.isVerified || false;
                   
                   return (
-                    <View key={memberId} style={styles.collaboratorItem}>
-                      <View style={styles.collaboratorAvatar}>
-                        <Text style={styles.collaboratorInitial}>
-                          {memberName && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
-                        </Text>
-                        {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                                          <View key={memberId} style={styles.collaboratorItem}>
+                        <View style={styles.collaboratorAvatar}>
+                          <Text style={styles.collaboratorInitial}>
+                            {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
+                          </Text>
+                          {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                        </View>
+                        <Text style={styles.collaboratorName}>{memberName || 'Unknown Member'}</Text>
+                        {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
                       </View>
-                      <Text style={styles.collaboratorName}>{memberName}</Text>
-                      {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
-                    </View>
                   );
                 })
               ) : (

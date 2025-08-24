@@ -201,7 +201,7 @@ export default function HomeScreen() {
                   />
                 ) : (
                   <Text style={styles.profileInitials}>
-                    {isAuthenticated && user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                    {isAuthenticated && user?.name && typeof user.name === 'string' && user.name.length > 0 ? user.name.charAt(0).toUpperCase() : '?'}
                   </Text>
                 )}
               </View>

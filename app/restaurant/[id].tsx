@@ -222,8 +222,10 @@ export default function RestaurantDetailScreen() {
           <View style={styles.vibeContainer}>
             {(restaurant.aiVibes || restaurant.vibe || []).map((v, i) => {
               // Ensure single word and capitalized with safety checks
-              if (!v || typeof v !== 'string') return null;
-              const cleanTag = v.split(' ')[0]?.charAt(0)?.toUpperCase() + v.split(' ')[0]?.slice(1)?.toLowerCase() || v;
+              if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
+              const firstWord = v.split(' ')[0];
+              if (!firstWord || firstWord.length === 0) return null;
+              const cleanTag = firstWord.charAt(0)?.toUpperCase() + firstWord.slice(1)?.toLowerCase() || firstWord;
               return (
                 <View key={i} style={styles.vibeTag}>
                   <Text style={styles.vibeText}>{cleanTag}</Text>
