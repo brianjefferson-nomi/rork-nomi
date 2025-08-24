@@ -52,7 +52,7 @@ export interface Collection {
   auto_ranking_enabled: boolean;
   consensus_threshold: number;
   restaurant_ids: string[];
-  collaborators: string[];
+  collaborators: string[] | CollectionMember[];
   unique_code?: string;
   planned_date?: string;
   created_at: string;

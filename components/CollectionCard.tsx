@@ -33,7 +33,9 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
         {collection.collaborators && collection.collaborators.length > 0 && (
           <View style={styles.stat}>
             <Users size={14} color="#FFF" />
-            <Text style={styles.statText}>{collection.collaborators.length + 1}</Text>
+            <Text style={styles.statText}>
+              {Array.isArray(collection.collaborators) ? collection.collaborators.length + 1 : 1}
+            </Text>
           </View>
         )}
       </View>
