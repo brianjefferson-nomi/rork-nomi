@@ -18,14 +18,14 @@ DROP POLICY IF EXISTS "Collection members can view rankings" ON restaurant_ranki
 -- Create simplified policies that don't cause circular references
 
 -- Collections policies (simplified)
-CREATE POLICY "Anyone can view public collections" ON collections FOR SELECT USING (is_public = true);
-CREATE POLICY "Users can view their own collections" ON collections FOR SELECT USING (auth.uid() = created_by);
-CREATE POLICY "Authenticated users can create collections" ON collections FOR INSERT WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "Collection creators can update collections" ON collections FOR UPDATE USING (auth.uid() = created_by);
+CREATE POLICY IF NOT EXISTS "Anyone can view public collections" ON collections FOR SELECT USING (is_public = true);
+CREATE POLICY IF NOT EXISTS "Users can view their own collections" ON collections FOR SELECT USING (auth.uid() = created_by);
+CREATE POLICY IF NOT EXISTS "Authenticated users can create collections" ON collections FOR INSERT WITH CHECK (auth.uid() = created_by);
+CREATE POLICY IF NOT EXISTS "Collection creators can update collections" ON collections FOR UPDATE USING (auth.uid() = created_by);
 
 -- Collection members policies (simplified)
-CREATE POLICY "Anyone can view collection members" ON collection_members FOR SELECT USING (true);
-CREATE POLICY "Collection creators can manage members" ON collection_members FOR ALL USING (
+CREATE POLICY IF NOT EXISTS "Anyone can view collection members" ON collection_members FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Collection creators can manage members" ON collection_members FOR ALL USING (
   EXISTS (
     SELECT 1 FROM collections 
     WHERE id = collection_members.collection_id AND created_by = auth.uid()
@@ -33,17 +33,17 @@ CREATE POLICY "Collection creators can manage members" ON collection_members FOR
 );
 
 -- Restaurant votes policies (simplified)
-CREATE POLICY "Anyone can view votes" ON restaurant_votes FOR SELECT USING (true);
-CREATE POLICY "Users can manage their own votes" ON restaurant_votes FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Anyone can view votes" ON restaurant_votes FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Users can manage their own votes" ON restaurant_votes FOR ALL USING (auth.uid() = user_id);
 
 -- User activities policies (simplified)
-CREATE POLICY "Anyone can view activities" ON user_activities FOR SELECT USING (true);
-CREATE POLICY "System can insert activities" ON user_activities FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Anyone can view activities" ON user_activities FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "System can insert activities" ON user_activities FOR INSERT WITH CHECK (true);
 
 -- Restaurant discussions policies (simplified)
-CREATE POLICY "Anyone can view discussions" ON restaurant_discussions FOR SELECT USING (true);
-CREATE POLICY "Users can create discussions" ON restaurant_discussions FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own discussions" ON restaurant_discussions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Anyone can view discussions" ON restaurant_discussions FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Users can create discussions" ON restaurant_discussions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Users can update their own discussions" ON restaurant_discussions FOR UPDATE USING (auth.uid() = user_id);
 
 -- Restaurant rankings policies (simplified)
-CREATE POLICY "Anyone can view rankings" ON restaurant_rankings FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Anyone can view rankings" ON restaurant_rankings FOR SELECT USING (true);
