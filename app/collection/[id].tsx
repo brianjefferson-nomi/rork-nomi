@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy } from 'lucide-react-native';
@@ -17,7 +17,7 @@ function getConsensusStyle(consensus: string) {
 
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const collection = useCollectionById(id);
+  const collection = useCollectionById(id) as any; // Type assertion for now to handle mixed data
   const { 
     removeRestaurantFromCollection, 
     deleteCollection, 
@@ -38,14 +38,43 @@ export default function CollectionDetailScreen() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   
-  const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators.length);
+  const [discussions, setDiscussions] = useState<any[]>([]);
+  const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
+  
+  const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
   const recommendations = collection ? getGroupRecommendations(id) : [];
-  const discussions = getCollectionDiscussions(id);
+  
+  // Load discussions asynchronously
+  useEffect(() => {
+    if (id) {
+      setIsLoadingDiscussions(true);
+      getCollectionDiscussions(id)
+        .then((data) => {
+          setDiscussions(data || []);
+        })
+        .catch((error) => {
+          console.error('[CollectionDetail] Error loading discussions:', error);
+          setDiscussions([]);
+        })
+        .finally(() => {
+          setIsLoadingDiscussions(false);
+        });
+    }
+  }, [id, getCollectionDiscussions]);
 
   if (!collection) {
     return (
       <View style={styles.errorContainer}>
         <Text>Collection not found</Text>
+      </View>
+    );
+  }
+
+  // Add safety checks for collection data
+  if (!collection.name) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text>Invalid collection data</Text>
       </View>
     );
   }
@@ -225,7 +254,9 @@ export default function CollectionDetailScreen() {
             </View>
             <View style={styles.stat}>
               <Users size={16} color="#666" />
-              <Text style={styles.statText}>{collection.collaborators.length} members</Text>
+              <Text style={styles.statText}>
+                {collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0} members
+              </Text>
             </View>
           </View>
           
@@ -251,35 +282,60 @@ export default function CollectionDetailScreen() {
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collaboratorsList}>
-              {collection.collaborators.map(member => (
-                <View key={member.userId} style={styles.collaboratorItem}>
+              {collection.collaborators && Array.isArray(collection.collaborators) ? (
+                collection.collaborators.map((member: any, index: number) => {
+                  // Handle both string and object formats for collaborators
+                  const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
+                  const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
+                  const memberRole = typeof member === 'string' ? 'member' : member?.role || 'member';
+                  const isVerified = typeof member === 'string' ? false : member?.isVerified || false;
+                  
+                  return (
+                    <View key={memberId} style={styles.collaboratorItem}>
+                      <View style={styles.collaboratorAvatar}>
+                        <Text style={styles.collaboratorInitial}>
+                          {memberName && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
+                        </Text>
+                        {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                      </View>
+                      <Text style={styles.collaboratorName}>{memberName}</Text>
+                      {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.collaboratorItem}>
                   <View style={styles.collaboratorAvatar}>
-                    <Text style={styles.collaboratorInitial}>{member.name.charAt(0)}</Text>
-                    {member.role === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                    <Text style={styles.collaboratorInitial}>?</Text>
                   </View>
-                  <Text style={styles.collaboratorName}>{member.name}</Text>
-                  {member.isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
+                  <Text style={styles.collaboratorName}>No members</Text>
                 </View>
-              ))}
+              )}
             </ScrollView>
           </View>
         </View>
 
         {/* Group Analytics */}
-        {collection?.analytics && (
+        {collection?.analytics && collection.analytics.participationRate !== undefined && (
           <View style={styles.analyticsSection}>
             <Text style={styles.sectionTitle}>Group Insights</Text>
             <View style={styles.analyticsGrid}>
               <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>{collection.analytics.participationRate * 100}%</Text>
+                <Text style={styles.analyticValue}>
+                  {collection.analytics.participationRate ? Math.round(collection.analytics.participationRate * 100) : 0}%
+                </Text>
                 <Text style={styles.analyticLabel}>Participation</Text>
               </View>
               <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>{collection.analytics.consensusScore * 100}%</Text>
+                <Text style={styles.analyticValue}>
+                  {collection.analytics.consensusScore ? Math.round(collection.analytics.consensusScore * 100) : 0}%
+                </Text>
                 <Text style={styles.analyticLabel}>Consensus</Text>
               </View>
               <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>{collection.analytics.totalVotes}</Text>
+                <Text style={styles.analyticValue}>
+                  {collection.analytics.totalVotes || 0}
+                </Text>
                 <Text style={styles.analyticLabel}>Total Votes</Text>
               </View>
             </View>
@@ -309,13 +365,13 @@ export default function CollectionDetailScreen() {
             </View>
           ) : (
             rankedRestaurants.map(({ restaurant, meta }, index) => (
-              <View key={restaurant.id} style={styles.restaurantItem}>
+              <View key={restaurant?.id || index} style={styles.restaurantItem}>
                 <View style={styles.rankingHeader}>
                   <View style={styles.rankBadge}>
-                    {meta.rank === 1 && meta.badge === 'top_choice' && <Crown size={16} color="#FFD700" />}
-                    {meta.rank === 2 && <Text style={styles.silverRank}>🥈</Text>}
-                    {meta.rank === 3 && <Text style={styles.bronzeRank}>🥉</Text>}
-                    <Text style={styles.rankNumber}>#{meta.rank}</Text>
+                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={16} color="#FFD700" />}
+                    {meta?.rank === 2 && <Text style={styles.silverRank}>🥈</Text>}
+                    {meta?.rank === 3 && <Text style={styles.bronzeRank}>🥉</Text>}
+                    <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
                   </View>
                   
                   <View style={styles.badges}>
@@ -411,7 +467,7 @@ export default function CollectionDetailScreen() {
         {discussions.length > 0 && (
           <View style={styles.discussionsSection}>
             <Text style={styles.sectionTitle}>Recent Discussions</Text>
-            {discussions.slice(0, 5).map(discussion => (
+            {discussions.slice(0, 5).map((discussion: any) => (
               <View key={discussion.id} style={styles.discussionItem}>
                 <Text style={styles.discussionUser}>{discussion.userName}</Text>
                 <Text style={styles.discussionMessage}>{discussion.message}</Text>
