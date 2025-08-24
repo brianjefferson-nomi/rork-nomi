@@ -1,15 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const OPENAI_API_KEY = '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';
+// Use the Rork AI API instead of direct OpenAI
+const AI_API_URL = 'https://toolkit.rork.com/text/llm/';
 const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
-  openai: {
-    baseUrl: 'https://api.openai.com/v1',
-    key: OPENAI_API_KEY
-  },
   rapidapi: {
     key: RAPIDAPI_KEY,
     hosts: {
@@ -151,7 +148,7 @@ export const assignRestaurantImages = async (restaurant: any): Promise<string[]>
   }
 };
 
-// OpenAI API for generating descriptions with caching
+// AI API for generating descriptions with caching
 export const generateRestaurantDescription = async (reviews: string[], name: string, restaurantId?: string) => {
   try {
     // Check cache first
@@ -162,14 +159,12 @@ export const generateRestaurantDescription = async (reviews: string[], name: str
       }
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
@@ -179,14 +174,16 @@ export const generateRestaurantDescription = async (reviews: string[], name: str
             role: 'user',
             content: `Generate a short description for ${name} based on these reviews: ${reviews.join('. ')}`
           }
-        ],
-        max_tokens: 150,
-        temperature: 0.7
+        ]
       })
     });
     
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+    
     const data = await response.json();
-    const description = data.choices[0]?.message?.content || 'A great dining experience awaits.';
+    const description = data.completion || 'A great dining experience awaits.';
     
     // Cache the result
     if (restaurantId) {
@@ -210,14 +207,12 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
       }
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
@@ -227,14 +222,16 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
             role: 'user',
             content: `Generate single-word vibe tags for a ${cuisine} restaurant based on these reviews: ${reviews.join('. ')}`
           }
-        ],
-        max_tokens: 50,
-        temperature: 0.5
+        ]
       })
     });
     
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+    
     const data = await response.json();
-    const tags = data.choices[0]?.message?.content?.split(',').map((tag: string) => {
+    const tags = data.completion?.split(',').map((tag: string) => {
       // Ensure single word and capitalize
       const singleWord = tag.trim().split(' ')[0];
       return singleWord.charAt(0).toUpperCase() + singleWord.slice(1).toLowerCase();
@@ -264,14 +261,12 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
       }
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
@@ -281,14 +276,16 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
             role: 'user',
             content: `Menu items: ${menuItems.join(', ')}. Reviews mentioning food: ${reviews.join('. ')}`
           }
-        ],
-        max_tokens: 150,
-        temperature: 0.3
+        ]
       })
     });
     
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+    
     const data = await response.json();
-    const picks = data.choices[0]?.message?.content?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    const picks = data.completion?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
     const finalPicks = picks.slice(0, 8);
     
     // Cache the result
@@ -393,12 +390,8 @@ export const getGooglePlaceDetails = async (placeId: string): Promise<any | null
 
 // Get Google Places photo URL - disabled for web (headers not supported by Image)
 export const getGooglePlacePhoto = async (_photoReference: string, _maxWidth: number = 800) => {
-  try {
-    return null;
-  } catch (error) {
-    console.error('Error getting place photo:', error);
-    return null;
-  }
+  // Disabled for web compatibility - headers not supported by Image component
+  return null;
 };
 
 // Enhanced Yelp API with better error handling and fallback
@@ -978,14 +971,12 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
       return generateFallbackMenuItems(cuisine || 'International');
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
@@ -995,18 +986,16 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
             role: 'user',
             content: `Restaurant: ${restaurantName}, Cuisine: ${cuisine}, Reviews: ${(reviews || []).join('. ')}`
           }
-        ],
-        max_tokens: 150,
-        temperature: 0.3
+        ]
       })
     });
     
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`AI API error: ${response.status}`);
     }
     
     const data = await response.json();
-    const items = data.choices?.[0]?.message?.content?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    const items = data.completion?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
     const finalItems = items.slice(0, 8);
     
     // If no items generated, use fallback

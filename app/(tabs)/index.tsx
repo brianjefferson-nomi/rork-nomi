@@ -9,7 +9,7 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { SearchWizard } from '@/components/SearchWizard';
 
 export default function HomeScreen() {
-  const { restaurants, collections, isLoading, userLocation } = useRestaurants();
+  const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
 
   if (isLoading) {
     return (
@@ -20,11 +20,23 @@ export default function HomeScreen() {
   }
 
   const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
-  const cityRestaurants = restaurants.filter(r => (city === 'Los Angeles' ? /Los Angeles|Hollywood|Beverly Hills|Santa Monica|West Hollywood|Downtown LA|Venice|Koreatown|Silver Lake/i.test(r.address || r.neighborhood) : /New York|Manhattan|Brooklyn|Queens|Bronx|SoHo|East Village|Upper East Side|Midtown/i.test(r.address || r.neighborhood)));
-  const trendingRestaurants = (cityRestaurants.length ? cityRestaurants : restaurants).slice(0, 6);
+  
+  // Filter restaurants by location with better matching
+  const cityRestaurants = restaurants.filter(r => {
+    const address = (r.address || r.neighborhood || '').toLowerCase();
+    if (city === 'Los Angeles') {
+      return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
+    } else {
+      return /new york|manhattan|brooklyn|queens|bronx|soho|east village|upper east side|midtown|ny|nyc/i.test(address);
+    }
+  });
+  
+  // Use city-specific restaurants when available, otherwise show all
+  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
+  const trendingRestaurants = availableRestaurants.slice(0, 6);
   const popularCollections = collections.sort((a, b) => b.likes - a.likes).slice(0, 4);
-  const newRestaurants = (cityRestaurants.length ? cityRestaurants : restaurants).slice(6, 10);
-  const localHighlights = (cityRestaurants.length ? cityRestaurants : restaurants).slice(0, 4);
+  const newRestaurants = availableRestaurants.slice(6, 10);
+  const localHighlights = availableRestaurants.slice(0, 4);
   
   // Mock contributors data
   const suggestedContributors = [
@@ -76,7 +88,13 @@ export default function HomeScreen() {
               <Text style={styles.greeting}>Find your next spot</Text>
               <View style={styles.locationIndicator}>
                 <MapPin size={14} color="#666" />
-                <Text style={styles.locationText}>{city}</Text>
+                <TouchableOpacity 
+                  style={styles.locationSwitcher}
+                  onPress={() => switchToCity(city === 'New York' ? 'Los Angeles' : 'New York')}
+                >
+                  <Text style={styles.locationText}>{city}</Text>
+                  <Text style={styles.switchText}>• Switch</Text>
+                </TouchableOpacity>
               </View>
             </View>
             <TouchableOpacity 
@@ -120,7 +138,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Sparkles size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>New & Notable</Text>
+            <Text style={styles.sectionTitle}>New & Notable in {city}</Text>
             <TouchableOpacity onPress={() => router.push('/discover' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -336,6 +354,16 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
+  },
+  locationSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  switchText: {
+    fontSize: 12,
+    color: '#FF6B6B',
     fontWeight: '500',
   },
 });

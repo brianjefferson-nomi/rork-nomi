@@ -65,7 +65,7 @@ export default function AIScreen() {
           messages: [
             {
               role: 'system',
-              content: `You are an expert restaurant recommendation assistant with access to comprehensive restaurant data from Google Places, Yelp, TripAdvisor, and Reddit reviews. 
+              content: `You are an expert restaurant recommendation assistant with access to comprehensive restaurant data from Google Places, Yelp, TripAdvisor, and real-time search capabilities. 
               
               Available restaurant data: ${JSON.stringify(allRestaurants.slice(0, 15))}
               
@@ -80,7 +80,8 @@ export default function AIScreen() {
               - If asked about a specific cuisine or area, focus on those restaurants
               - Mention specific dishes or specialties when available
               - Consider ratings, reviews, and vibe tags in your recommendations
-              - If user asks about switching cities, acknowledge that they can switch between NYC and LA`
+              - If user asks about switching cities, acknowledge that they can switch between NYC and LA
+              - When recommending restaurants, make sure to mention them by name so they can be linked`
             },
             {
               role: 'user',
@@ -219,7 +220,8 @@ export default function AIScreen() {
                     key={suggestion.id} 
                     style={styles.suggestionCard}
                     onPress={() => {
-                      router.push({ pathname: '/restaurant/[id]', params: { id: suggestion.id } });
+                      console.log('Navigating to restaurant:', suggestion.id);
+                      router.push(`/restaurant/${suggestion.id}` as any);
                     }}
                     activeOpacity={0.7}
                   >
