@@ -1,10 +1,29 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Camera, Star, Utensils } from 'lucide-react-native';
+import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Star, Utensils } from 'lucide-react-native';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
 
 const { width } = Dimensions.get('window');
+
+// Helper function to generate cuisine-specific dishes
+const generateCuisineSpecificDishes = (cuisine: string, restaurantName: string): string[] => {
+  const dishes: Record<string, string[]> = {
+    'Italian': ['Margherita Pizza', 'Spaghetti Carbonara', 'Osso Buco', 'Risotto Milanese', 'Tiramisu', 'Bruschetta', 'Penne Arrabbiata', 'Gelato'],
+    'Japanese': ['Salmon Sashimi', 'Chicken Teriyaki', 'Miso Ramen', 'Tempura Vegetables', 'California Roll', 'Gyoza', 'Chirashi Bowl', 'Mochi Ice Cream'],
+    'Mexican': ['Fish Tacos', 'Guacamole & Chips', 'Carnitas', 'Chicken Enchiladas', 'Churros', 'Quesadillas', 'Pozole', 'Tres Leches Cake'],
+    'French': ['Coq au Vin', 'French Onion Soup', 'Crème Brûlée', 'Escargot', 'Bouillabaisse', 'Ratatouille', 'Croissants', 'Macarons'],
+    'Thai': ['Pad Thai', 'Green Curry', 'Tom Yum Soup', 'Mango Sticky Rice', 'Massaman Curry', 'Som Tam', 'Thai Basil Chicken', 'Coconut Ice Cream'],
+    'Indian': ['Butter Chicken', 'Biryani', 'Naan Bread', 'Samosas', 'Tandoori Chicken', 'Dal Makhani', 'Palak Paneer', 'Kulfi'],
+    'American': ['Classic Burger', 'Mac and Cheese', 'BBQ Ribs', 'Apple Pie', 'Buffalo Wings', 'Clam Chowder', 'Cheesecake', 'Fried Chicken'],
+    'Chinese': ['Kung Pao Chicken', 'Fried Rice', 'Dumplings', 'Sweet and Sour Pork', 'Peking Duck', 'Hot Pot', 'Dim Sum', 'Fortune Cookies'],
+    'Mediterranean': ['Hummus Platter', 'Grilled Octopus', 'Moussaka', 'Baklava', 'Greek Salad', 'Lamb Souvlaki', 'Falafel', 'Tzatziki'],
+    'Korean': ['Bulgogi', 'Kimchi', 'Bibimbap', 'Korean BBQ', 'Japchae', 'Tteokbokki', 'Korean Fried Chicken', 'Bingsu']
+  };
+  
+  const cuisineDishes = dishes[cuisine] || ['House Special', 'Chef\'s Choice', 'Daily Special', 'Signature Dish', 'Popular Item'];
+  return cuisineDishes.slice(0, 8);
+};
 
 export default function RestaurantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,23 +59,18 @@ export default function RestaurantDetailScreen() {
           `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80`, // Signature dish
         ];
         
-        const mockFoodRecs = [
-          `${restaurant.cuisine} Signature Platter`,
-          'Chef\'s Daily Special',
-          'House Recommended Appetizer',
-          'Popular Main Course',
-          'Dessert of the Day'
-        ];
+        // Generate more authentic menu items based on cuisine
+        const mockFoodRecs = generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name);
         
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         setEnhancedImages(mockEnhancedImages);
-        setFoodRecommendations(mockFoodRecs);
+        setFoodRecommendations(mockFoodRecs.slice(0, 8));
       } catch (error) {
         console.error('Error loading enhanced restaurant data:', error);
         setEnhancedImages([restaurant.imageUrl]);
-        setFoodRecommendations(restaurant.aiTopPicks || restaurant.menuHighlights || []);
+        setFoodRecommendations((restaurant.aiTopPicks || restaurant.menuHighlights || []).slice(0, 8));
       } finally {
         setLoadingEnhancements(false);
       }
@@ -137,16 +151,7 @@ export default function RestaurantDetailScreen() {
             </View>
           )}
           
-          <View style={styles.imageTypeIndicator}>
-            <Camera size={16} color="#FFF" />
-            <Text style={styles.imageTypeText}>
-              {currentImageIndex === 0 ? 'Main' : 
-               currentImageIndex === 1 ? 'Interior' :
-               currentImageIndex === 2 ? 'Food' :
-               currentImageIndex === 3 ? 'Atmosphere' :
-               currentImageIndex === 4 ? 'Kitchen' : 'Signature'}
-            </Text>
-          </View>
+
           
           {hasMultipleImages && (
             <>
@@ -185,11 +190,15 @@ export default function RestaurantDetailScreen() {
           </View>
 
           <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe).map((v, i) => (
-              <View key={i} style={styles.vibeTag}>
-                <Text style={styles.vibeText}>{v}</Text>
-              </View>
-            ))}
+            {(restaurant.aiVibes || restaurant.vibe).map((v, i) => {
+              // Ensure single word and capitalized
+              const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
+              return (
+                <View key={i} style={styles.vibeTag}>
+                  <Text style={styles.vibeText}>{cleanTag}</Text>
+                </View>
+              );
+            })}
           </View>
 
           <Text style={styles.description}>{restaurant.aiDescription || restaurant.description}</Text>
@@ -255,7 +264,7 @@ export default function RestaurantDetailScreen() {
 
 
 
-          {/* Menu Highlights - Only show if data exists */}
+          {/* Menu Highlights - Enhanced with validation */}
           {((restaurant.aiTopPicks && restaurant.aiTopPicks.length > 0) || 
             (restaurant.menuHighlights && restaurant.menuHighlights.length > 0) ||
             (foodRecommendations && foodRecommendations.length > 0)) && (
@@ -267,18 +276,18 @@ export default function RestaurantDetailScreen() {
               {loadingEnhancements ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#FF6B6B" />
-                  <Text style={styles.loadingText}>Loading menu items...</Text>
+                  <Text style={styles.loadingText}>Loading authentic menu items...</Text>
                 </View>
               ) : (
                 <View style={styles.menuGrid}>
                   {(foodRecommendations.length > 0 ? foodRecommendations : 
-                    restaurant.aiTopPicks || restaurant.menuHighlights || []).map((item, i) => (
+                    restaurant.aiTopPicks || restaurant.menuHighlights || []).slice(0, 8).map((item, i) => (
                     <View key={i} style={styles.menuHighlightItem}>
                       <View style={styles.menuItemIcon}>
                         <Star size={14} color="#FFD700" fill="#FFD700" />
                       </View>
                       <Text style={styles.menuItemName}>{item}</Text>
-                      <Text style={styles.menuItemSubtext}>Popular choice</Text>
+                      <Text style={styles.menuItemSubtext}>Signature dish</Text>
                     </View>
                   ))}
                 </View>

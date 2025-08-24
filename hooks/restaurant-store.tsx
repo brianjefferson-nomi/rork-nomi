@@ -427,7 +427,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     voteRestaurant,
     addUserNote,
     addDiscussion,
-    getRankedRestaurants,
+    getRankedRestaurants: getRankedRestaurants,
     getGroupRecommendations,
     getCollectionDiscussions,
     refreshLocation,

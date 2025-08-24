@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { Send, Bot, User, MapPin, DollarSign, Star, ExternalLink } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { aggregateRestaurantData } from '@/services/api';
 import { router } from 'expo-router';
 
 interface Message {
@@ -23,11 +24,11 @@ interface RestaurantSuggestion {
 }
 
 export default function AIScreen() {
-  const { restaurants } = useRestaurants();
+  const { restaurants, userLocation } = useRestaurants();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm your restaurant recommendation assistant. I can help you find the perfect spot based on cuisine, vibe, location, or any specific preferences you have. What are you in the mood for?",
+      text: "Hi! I'm your restaurant recommendation assistant with access to Google Places, Yelp, TripAdvisor, and Reddit reviews. I can help you find the perfect spot based on cuisine, vibe, location, or any specific preferences you have. What are you in the mood for?",
       isUser: false,
       timestamp: new Date(),
     }
@@ -38,6 +39,23 @@ export default function AIScreen() {
 
   const generateAIResponse = async (userMessage: string): Promise<{ text: string; suggestions?: RestaurantSuggestion[] }> => {
     try {
+      // First, try to search for new restaurants if the query seems like a search
+      let searchResults: any[] = [];
+      const isSearchQuery = /\b(find|search|looking for|recommend|suggest|best|good|restaurant|food|cuisine|near|in)\b/i.test(userMessage);
+      
+      if (isSearchQuery && userLocation) {
+        try {
+          console.log('[AI] Searching for restaurants based on user query');
+          searchResults = await aggregateRestaurantData(userMessage, userLocation.city);
+          console.log(`[AI] Found ${searchResults.length} new restaurants`);
+        } catch (error) {
+          console.error('[AI] Error searching restaurants:', error);
+        }
+      }
+      
+      // Combine existing restaurants with search results
+      const allRestaurants = [...restaurants, ...searchResults.slice(0, 5)];
+      
       const response = await fetch('https://toolkit.rork.com/text/llm/', {
         method: 'POST',
         headers: {
@@ -47,11 +65,21 @@ export default function AIScreen() {
           messages: [
             {
               role: 'system',
-              content: `You are a restaurant recommendation assistant. Based on the user's request, provide helpful recommendations from this restaurant data: ${JSON.stringify(restaurants.slice(0, 10))}. 
+              content: `You are an expert restaurant recommendation assistant with access to comprehensive restaurant data from Google Places, Yelp, TripAdvisor, and Reddit reviews. 
               
-              Respond in a conversational, friendly tone. If the user asks for recommendations, suggest 2-3 specific restaurants from the data that match their criteria. Always explain why you're recommending each place.
+              Available restaurant data: ${JSON.stringify(allRestaurants.slice(0, 15))}
               
-              Keep responses concise but informative. Focus on cuisine, vibe, price range, and location when making recommendations.`
+              User location: ${userLocation?.city || 'New York'}
+              
+              Instructions:
+              - Provide personalized, detailed recommendations based on the user's specific request
+              - Always mention 2-4 specific restaurants by name when making recommendations
+              - Include details about cuisine, atmosphere, price range, and what makes each place special
+              - Use real data from the restaurant information provided
+              - Be conversational and enthusiastic
+              - If asked about a specific cuisine or area, focus on those restaurants
+              - Mention specific dishes or specialties when available
+              - Consider ratings, reviews, and vibe tags in your recommendations`
             },
             {
               role: 'user',
@@ -65,7 +93,7 @@ export default function AIScreen() {
       
       // Extract restaurant suggestions from the response
       const suggestions: RestaurantSuggestion[] = [];
-      const mentionedRestaurants = restaurants.filter(r => 
+      const mentionedRestaurants = allRestaurants.filter(r => 
         data.completion.toLowerCase().includes(r.name.toLowerCase())
       );
 
@@ -74,16 +102,17 @@ export default function AIScreen() {
           id: restaurant.id,
           name: restaurant.name,
           cuisine: restaurant.cuisine,
-          rating: restaurant.rating,
-          priceRange: restaurant.priceRange,
-          neighborhood: restaurant.neighborhood,
-          reason: `Great ${restaurant.cuisine.toLowerCase()} spot with ${restaurant.rating}★ rating`
+          rating: restaurant.rating || 4.0,
+          priceRange: restaurant.priceRange || '$'.repeat(restaurant.priceLevel || 2),
+          neighborhood: restaurant.neighborhood || restaurant.address?.split(',')[1]?.trim() || userLocation?.city || 'NYC',
+          reason: `${restaurant.cuisine} restaurant with ${restaurant.rating || 4.0}★ rating` + 
+                  (restaurant.vibeTags ? ` - ${restaurant.vibeTags.slice(0, 2).join(', ')}` : '')
         });
       });
 
       return {
         text: data.completion,
-        suggestions: suggestions.length > 0 ? suggestions : undefined
+        suggestions: suggestions.length > 0 ? suggestions.slice(0, 4) : undefined
       };
     } catch (error) {
       console.error('AI API Error:', error);
@@ -133,11 +162,16 @@ export default function AIScreen() {
     }
   };
 
-  const quickPrompts = [
-    "Best Italian restaurants nearby",
-    "Romantic date night spots",
-    "Casual lunch under $20",
-    "Trendy places with good vibes"
+  const quickPrompts = userLocation?.city === 'Los Angeles' ? [
+    "Best tacos in Hollywood",
+    "Romantic dinner in Beverly Hills", 
+    "Trendy brunch in Santa Monica",
+    "Korean BBQ in Koreatown"
+  ] : [
+    "Best Italian in Manhattan",
+    "Romantic spots in SoHo",
+    "Casual lunch in Brooklyn", 
+    "Trendy places in East Village"
   ];
 
   return (
@@ -221,7 +255,7 @@ export default function AIScreen() {
             <View style={[styles.message, styles.aiMessage]}>
               <View style={styles.messageHeader}>
                 <Bot size={16} color="#FF6B6B" />
-                <Text style={styles.loadingText}>Thinking...</Text>
+                <Text style={styles.loadingText}>Searching restaurants and analyzing data...</Text>
               </View>
             </View>
           </View>

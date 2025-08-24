@@ -103,11 +103,15 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
         <View style={styles.vibeContainer}>
-          {(restaurant.aiVibes || restaurant.vibe).slice(0, 3).map((v, i) => (
-            <View key={i} style={styles.vibeTag}>
-              <Text style={styles.vibeText}>{v}</Text>
-            </View>
-          ))}
+          {(restaurant.aiVibes || restaurant.vibe).slice(0, 3).map((v, i) => {
+            // Ensure single word and capitalized
+            const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
+            return (
+              <View key={i} style={styles.vibeTag}>
+                <Text style={styles.vibeText}>{cleanTag}</Text>
+              </View>
+            );
+          })}
         </View>
         
         <Text style={styles.description} numberOfLines={2}>

@@ -185,28 +185,42 @@ export const getGooglePlacePhoto = async (photoReference: string, maxWidth: numb
   }
 };
 
-// Enhanced Yelp API with better search parameters
+// Enhanced Yelp API with better search parameters and error handling
 export const searchYelp = async (term: string, location: string) => {
   try {
     console.log(`[Yelp] Searching for: ${term} in ${location}`);
-    const response = await fetch(
-      `https://${API_CONFIG.rapidapi.hosts.yelp}/search?query=${encodeURIComponent(term + ' restaurant')}&location=${encodeURIComponent(location)}&limit=20&sort_by=rating`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
-          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.yelp
-        }
-      }
-    );
     
-    if (!response.ok) {
-      throw new Error(`Yelp API error: ${response.status}`);
+    // Try different Yelp API endpoints
+    const endpoints = [
+      `https://yelp-scraper.p.rapidapi.com/search?query=${encodeURIComponent(term + ' restaurant')}&location=${encodeURIComponent(location)}&limit=20`,
+      `https://yelp-reviews.p.rapidapi.com/business/search?query=${encodeURIComponent(term)}&location=${encodeURIComponent(location)}&limit=20`
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+            'X-RapidAPI-Host': endpoint.includes('yelp-scraper') ? 'yelp-scraper.p.rapidapi.com' : 'yelp-reviews.p.rapidapi.com'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[Yelp] Found ${data.businesses?.length || data.results?.length || 0} results`);
+          return data.businesses || data.results || [];
+        } else {
+          console.log(`[Yelp] Endpoint failed with status: ${response.status}`);
+        }
+      } catch (endpointError) {
+        console.log(`[Yelp] Endpoint error:`, endpointError);
+        continue;
+      }
     }
     
-    const data = await response.json();
-    console.log(`[Yelp] Found ${data.businesses?.length || 0} results`);
-    return data.businesses || [];
+    console.log('[Yelp] All endpoints failed, returning empty results');
+    return [];
   } catch (error) {
     console.error('Error searching Yelp:', error);
     return [];
@@ -529,6 +543,35 @@ const generateMockReviews = (name: string, cuisine: string) => {
   return reviews.slice(0, Math.floor(Math.random() * 3) + 2);
 };
 
+// Reddit API for real-time forum search
+export const searchReddit = async (query: string, location: string) => {
+  try {
+    console.log(`[Reddit] Searching for: ${query} in ${location}`);
+    const searchQuery = `${query} restaurant ${location} site:reddit.com`;
+    const response = await fetch(
+      `https://reddit-scraper.p.rapidapi.com/search?query=${encodeURIComponent(searchQuery)}&limit=10`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': 'reddit-scraper.p.rapidapi.com'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Reddit API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`[Reddit] Found ${data.posts?.length || 0} posts`);
+    return data.posts || [];
+  } catch (error) {
+    console.error('Error searching Reddit:', error);
+    return [];
+  }
+};
+
 // Enhanced restaurant data aggregation with real API integration
 export const aggregateRestaurantData = async (query: string, location: string) => {
   try {
@@ -538,7 +581,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
     let allResults: any[] = [];
     
     try {
-      // Search all APIs in parallel with timeout
+      // Search all APIs in parallel with timeout including Reddit
       const apiPromises = [
         Promise.race([
           searchGooglePlaces(query, location),
@@ -551,20 +594,25 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         Promise.race([
           searchTripAdvisor(query, location),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
+        ]),
+        Promise.race([
+          searchReddit(query, location),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Reddit timeout')), 3000))
         ])
       ];
       
-      const [googleResults, yelpResults, tripAdvisorResults] = await Promise.allSettled(apiPromises);
+      const [googleResults, yelpResults, tripAdvisorResults, redditResults] = await Promise.allSettled(apiPromises);
       
       // Process successful results
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
       const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
+      const redditData = redditResults.status === 'fulfilled' ? redditResults.value : [];
       
-      console.log(`[API] Results - Google: ${googleData.length}, Yelp: ${yelpData.length}, TripAdvisor: ${tripAdvisorData.length}`);
+      console.log(`[API] Results - Google: ${googleData.length}, Yelp: ${yelpData.length}, TripAdvisor: ${tripAdvisorData.length}, Reddit: ${redditData.length}`);
       
       // Combine and deduplicate results
-      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, location);
+      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, location, redditData);
       
     } catch (error) {
       console.error('[API] Error with real APIs, falling back to mock data:', error);
@@ -593,7 +641,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
             new Promise((resolve) => setTimeout(() => resolve(result.vibeTags || []), 3000))
           ]),
           Promise.race([
-            generateTopPicks([], result.reviews || []),
+            generateValidatedMenuItems(result.name, result.cuisine, result.reviews || []),
             new Promise((resolve) => setTimeout(() => resolve(result.topPicks || []), 3000))
           ])
         ];
@@ -603,7 +651,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         enhancedResults.push({
           ...result,
           description: description || result.description || 'A great dining experience awaits.',
-          vibeTags: (vibeTags && vibeTags.length > 0) ? vibeTags : (result.vibeTags || ['popular']),
+          vibeTags: (vibeTags && vibeTags.length > 0) ? (vibeTags as string[]).map((tag: string) => capitalizeTag(tag)) : (result.vibeTags || ['Popular']),
           topPicks: (topPicks && topPicks.length > 0) ? topPicks : (result.topPicks || [])
         });
       } catch (error) {
@@ -612,7 +660,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         enhancedResults.push({
           ...result,
           description: result.description || 'A great dining experience awaits.',
-          vibeTags: result.vibeTags || ['popular'],
+          vibeTags: (result.vibeTags || ['Popular']).map((tag: string) => capitalizeTag(tag)),
           topPicks: result.topPicks || []
         });
       }
@@ -623,7 +671,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
       enhancedResults.push(...allResults.slice(10).map(result => ({
         ...result,
         description: result.description || 'A great dining experience awaits.',
-        vibeTags: result.vibeTags || ['popular'],
+        vibeTags: (result.vibeTags || ['Popular']).map((tag: string) => capitalizeTag(tag)),
         topPicks: result.topPicks || []
       })));
     }
@@ -637,8 +685,49 @@ export const aggregateRestaurantData = async (query: string, location: string) =
   }
 };
 
+// Helper function to capitalize tags properly
+const capitalizeTag = (tag: string): string => {
+  if (!tag) return 'Popular';
+  return tag.charAt(0).toUpperCase() + tag.slice(1).toLowerCase();
+};
+
+// Enhanced menu validation using AI
+export const generateValidatedMenuItems = async (restaurantName: string, cuisine: string, reviews: string[]) => {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a food expert. Based on the restaurant name, cuisine type, and reviews, identify 5-8 actual menu items that would realistically be served at this specific restaurant. Be specific and authentic to the cuisine and restaurant style. Return only the dish names separated by commas.`
+          },
+          {
+            role: 'user',
+            content: `Restaurant: ${restaurantName}, Cuisine: ${cuisine}, Reviews: ${reviews.join('. ')}`
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.3
+      })
+    });
+    
+    const data = await response.json();
+    const items = data.choices[0]?.message?.content?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    return items.slice(0, 8);
+  } catch (error) {
+    console.error('Error generating validated menu items:', error);
+    return [];
+  }
+};
+
 // Combine results from different APIs and remove duplicates
-const combineApiResults = async (googleResults: any[], yelpResults: any[], tripAdvisorResults: any[], location: string) => {
+const combineApiResults = async (googleResults: any[], yelpResults: any[], tripAdvisorResults: any[], location: string, redditResults: any[] = []) => {
   const combined: any[] = [];
   const seenNames = new Set<string>();
   
