@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { Send, Bot, User, MapPin, DollarSign, Star } from 'lucide-react-native';
+import { Send, Bot, User, MapPin, DollarSign, Star, ExternalLink } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { router } from 'expo-router';
 
 interface Message {
   id: string;
@@ -175,12 +176,22 @@ export default function AIScreen() {
               <View style={styles.suggestionsContainer}>
                 <Text style={styles.suggestionsTitle}>Recommended for you:</Text>
                 {message.suggestions.map((suggestion) => (
-                  <View key={suggestion.id} style={styles.suggestionCard}>
+                  <TouchableOpacity 
+                    key={suggestion.id} 
+                    style={styles.suggestionCard}
+                    onPress={() => {
+                      router.push({ pathname: '/restaurant/[id]', params: { id: suggestion.id } });
+                    }}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.suggestionHeader}>
                       <Text style={styles.suggestionName}>{suggestion.name}</Text>
-                      <View style={styles.suggestionRating}>
-                        <Star size={12} color="#FFD700" fill="#FFD700" />
-                        <Text style={styles.suggestionRatingText}>{suggestion.rating}</Text>
+                      <View style={styles.suggestionActions}>
+                        <View style={styles.suggestionRating}>
+                          <Star size={12} color="#FFD700" fill="#FFD700" />
+                          <Text style={styles.suggestionRatingText}>{suggestion.rating}</Text>
+                        </View>
+                        <ExternalLink size={14} color="#FF6B6B" />
                       </View>
                     </View>
                     <Text style={styles.suggestionCuisine}>{suggestion.cuisine}</Text>
@@ -195,7 +206,10 @@ export default function AIScreen() {
                       </View>
                     </View>
                     <Text style={styles.suggestionReason}>{suggestion.reason}</Text>
-                  </View>
+                    <View style={styles.suggestionFooter}>
+                      <Text style={styles.suggestionCTA}>Tap to view details →</Text>
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -335,6 +349,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  suggestionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   suggestionName: {
     fontSize: 16,
     fontWeight: '600',
@@ -374,6 +393,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  suggestionFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 8,
+    alignItems: 'center',
+  },
+  suggestionCTA: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   quickPromptsContainer: {
     marginTop: 16,

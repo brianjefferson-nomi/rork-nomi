@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye } from 'lucide-react-native';
+import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Camera, Star, Utensils } from 'lucide-react-native';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
 
 const { width } = Dimensions.get('window');
@@ -14,6 +14,60 @@ export default function RestaurantDetailScreen() {
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(restaurant?.userNotes || '');
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [enhancedImages, setEnhancedImages] = useState<string[]>([]);
+  const [foodRecommendations, setFoodRecommendations] = useState<string[]>([]);
+  const [loadingEnhancements, setLoadingEnhancements] = useState(true);
+  const [following, setFollowing] = useState<Record<string, boolean>>({});
+  
+  const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
+
+  // Enhanced restaurant data loading
+  useEffect(() => {
+    const loadData = async () => {
+      if (!restaurant) return;
+      
+      setLoadingEnhancements(true);
+      try {
+        // Simulate API calls to get enhanced images and recommendations
+        // In production, these would be real API calls to Google Places, Yelp, etc.
+        
+        const mockEnhancedImages = [
+          restaurant.imageUrl,
+          `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80`, // Restaurant interior
+          `https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80`, // Food plating
+          `https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80`, // Dining atmosphere
+          `https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80`, // Kitchen/chef
+          `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80`, // Signature dish
+        ];
+        
+        const mockFoodRecs = [
+          `${restaurant.cuisine} Signature Platter`,
+          'Chef\'s Daily Special',
+          'House Recommended Appetizer',
+          'Popular Main Course',
+          'Dessert of the Day'
+        ];
+        
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setEnhancedImages(mockEnhancedImages);
+        setFoodRecommendations(mockFoodRecs);
+      } catch (error) {
+        console.error('Error loading enhanced restaurant data:', error);
+        setEnhancedImages([restaurant.imageUrl]);
+        setFoodRecommendations(restaurant.aiTopPicks || restaurant.menuHighlights || []);
+      } finally {
+        setLoadingEnhancements(false);
+      }
+    };
+    
+    if (restaurant) {
+      loadData();
+    }
+  }, [restaurant]);
+
+
 
   if (!restaurant) {
     return (
@@ -54,10 +108,9 @@ export default function RestaurantDetailScreen() {
     );
   };
 
-  const images = restaurant.images || [restaurant.imageUrl];
+  const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || '']);
   const hasMultipleImages = images.length > 1;
-  const sortedContributors = useMemo(() => (restaurant.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant.contributors]);
-  const [following, setFollowing] = useState<Record<string, boolean>>({});
+  
   const toggleFollow = (id: string) => {
     setFollowing(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -77,6 +130,24 @@ export default function RestaurantDetailScreen() {
         <View style={styles.heroImageContainer}>
           <Image source={{ uri: images[currentImageIndex] }} style={styles.heroImage} />
           
+          {loadingEnhancements && (
+            <View style={styles.imageLoadingOverlay}>
+              <ActivityIndicator size="small" color="#FFF" />
+              <Text style={styles.imageLoadingText}>Loading gallery...</Text>
+            </View>
+          )}
+          
+          <View style={styles.imageTypeIndicator}>
+            <Camera size={16} color="#FFF" />
+            <Text style={styles.imageTypeText}>
+              {currentImageIndex === 0 ? 'Main' : 
+               currentImageIndex === 1 ? 'Interior' :
+               currentImageIndex === 2 ? 'Food' :
+               currentImageIndex === 3 ? 'Atmosphere' :
+               currentImageIndex === 4 ? 'Kitchen' : 'Signature'}
+            </Text>
+          </View>
+          
           {hasMultipleImages && (
             <>
               <TouchableOpacity onPress={prevImage} style={[styles.heroNavButton, styles.heroPrevButton]}>
@@ -88,12 +159,13 @@ export default function RestaurantDetailScreen() {
               
               <View style={styles.heroImageIndicators}>
                 {images.map((_, index) => (
-                  <View
+                  <TouchableOpacity
                     key={index}
                     style={[
                       styles.heroIndicator,
                       index === currentImageIndex && styles.heroActiveIndicator
                     ]}
+                    onPress={() => setCurrentImageIndex(index)}
                   />
                 ))}
               </View>
@@ -177,6 +249,59 @@ export default function RestaurantDetailScreen() {
                 <Text style={styles.infoText}>{restaurant.priceRange}</Text>
               </View>
             </View>
+          </View>
+
+          {/* Photo Gallery Section */}
+          {images.length > 1 && (
+            <View style={styles.gallerySection}>
+              <Text style={styles.sectionTitle}>Photo Gallery</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryScroll}>
+                {images.map((imageUrl, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.galleryImageContainer}
+                    onPress={() => setCurrentImageIndex(index)}
+                  >
+                    <Image source={{ uri: imageUrl }} style={styles.galleryImage} />
+                    <View style={styles.galleryImageOverlay}>
+                      <Text style={styles.galleryImageLabel}>
+                        {index === 0 ? 'Main' : 
+                         index === 1 ? 'Interior' :
+                         index === 2 ? 'Food' :
+                         index === 3 ? 'Atmosphere' :
+                         index === 4 ? 'Kitchen' : 'Signature'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Food Recommendations Section */}
+          <View style={styles.foodRecsSection}>
+            <View style={styles.foodRecsHeader}>
+              <Utensils size={20} color="#FF6B6B" />
+              <Text style={styles.sectionTitle}>Must-Try Dishes</Text>
+            </View>
+            {loadingEnhancements ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.loadingText}>Loading recommendations...</Text>
+              </View>
+            ) : (
+              <View style={styles.foodRecsGrid}>
+                {foodRecommendations.map((item, i) => (
+                  <View key={i} style={styles.foodRecItem}>
+                    <View style={styles.foodRecIcon}>
+                      <Star size={14} color="#FFD700" fill="#FFD700" />
+                    </View>
+                    <Text style={styles.foodRecText}>{item}</Text>
+                    <Text style={styles.foodRecSubtext}>Highly recommended</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           <View style={styles.menuSection}>
@@ -667,5 +792,126 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#50C878',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  imageLoadingText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  imageTypeIndicator: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  imageTypeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  gallerySection: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  galleryScroll: {
+    flexDirection: 'row',
+  },
+  galleryImageContainer: {
+    marginRight: 12,
+    position: 'relative',
+  },
+  galleryImage: {
+    width: 120,
+    height: 80,
+    borderRadius: 8,
+  },
+  galleryImageOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  galleryImageLabel: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  foodRecsSection: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  foodRecsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  foodRecsGrid: {
+    gap: 12,
+  },
+  foodRecItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    gap: 12,
+  },
+  foodRecIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFF3CD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  foodRecText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  foodRecSubtext: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -90,22 +90,56 @@ export default function CollectionDetailScreen() {
     const message = `Check out this restaurant collection: ${collection.name}\n\n${collection.description}\n\n${shareUrl}`;
     
     try {
-      await Share.share({
-        message,
-        url: shareUrl,
-        title: collection.name
-      });
+      if (Platform.OS === 'web') {
+        // Web fallback - copy to clipboard
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(message);
+          Alert.alert('Copied!', 'Collection link copied to clipboard');
+        } else {
+          // Fallback for older browsers
+          Alert.alert('Share Collection', message, [
+            { text: 'OK' }
+          ]);
+        }
+      } else {
+        // Native sharing
+        await Share.share({
+          message,
+          url: shareUrl,
+          title: collection.name
+        });
+      }
     } catch (error) {
       console.error('Error sharing collection:', error);
+      Alert.alert('Share Collection', message, [
+        { text: 'OK' }
+      ]);
     }
   };
 
-  const copyInviteLink = () => {
+  const copyInviteLink = async () => {
     const inviteLink = `https://yourapp.com/invite/${collection.id}`;
-    // In a real app, you'd copy to clipboard
-    Alert.alert('Invite Link', inviteLink, [
-      { text: 'OK' }
-    ]);
+    
+    try {
+      if (Platform.OS === 'web') {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(inviteLink);
+          Alert.alert('Copied!', 'Invite link copied to clipboard');
+        } else {
+          Alert.alert('Invite Link', inviteLink, [
+            { text: 'OK' }
+          ]);
+        }
+      } else {
+        await Clipboard.setString(inviteLink);
+        Alert.alert('Copied!', 'Invite link copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Error copying invite link:', error);
+      Alert.alert('Invite Link', inviteLink, [
+        { text: 'OK' }
+      ]);
+    }
   };
 
   const handleRemoveRestaurant = (restaurantId: string, restaurantName: string) => {
