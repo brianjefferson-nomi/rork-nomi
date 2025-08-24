@@ -23,11 +23,11 @@ interface RestaurantSuggestion {
 }
 
 export default function AIScreen() {
-  const { restaurants, userLocation, searchRestaurants } = useRestaurants();
+  const { restaurants, userLocation, searchRestaurants, switchToCity } = useRestaurants();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi! I'm your restaurant recommendation assistant with access to Google Places, Yelp, TripAdvisor, and Reddit reviews. I can help you find the perfect spot based on cuisine, vibe, location, or any specific preferences you have. What are you in the mood for?",
+      text: `Hi! I'm your restaurant recommendation assistant with access to Google Places, Yelp, TripAdvisor, and Reddit reviews. I can help you find the perfect spot in ${userLocation?.city || 'New York'} based on cuisine, vibe, location, or any specific preferences you have. What are you in the mood for?`,
       isUser: false,
       timestamp: new Date(),
     }
@@ -40,7 +40,7 @@ export default function AIScreen() {
     try {
       // First, try to search for new restaurants if the query seems like a search
       let searchResults: any[] = [];
-      const isSearchQuery = /\b(find|search|looking for|recommend|suggest|best|good|restaurant|food|cuisine|near|in)\b/i.test(userMessage);
+      const isSearchQuery = /\b(find|search|looking for|recommend|suggest|best|good|restaurant|food|cuisine|near|in|want|craving)\b/i.test(userMessage);
       
       if (isSearchQuery) {
         try {
@@ -79,7 +79,8 @@ export default function AIScreen() {
               - Be conversational and enthusiastic
               - If asked about a specific cuisine or area, focus on those restaurants
               - Mention specific dishes or specialties when available
-              - Consider ratings, reviews, and vibe tags in your recommendations`
+              - Consider ratings, reviews, and vibe tags in your recommendations
+              - If user asks about switching cities, acknowledge that they can switch between NYC and LA`
             },
             {
               role: 'user',
@@ -88,6 +89,10 @@ export default function AIScreen() {
           ]
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`AI API error: ${response.status}`);
+      }
 
       const data = await response.json();
       
@@ -103,10 +108,10 @@ export default function AIScreen() {
           name: restaurant.name,
           cuisine: restaurant.cuisine,
           rating: restaurant.rating || 4.0,
-          priceRange: restaurant.priceRange || '$'.repeat(restaurant.priceLevel || 2),
+          priceRange: restaurant.priceRange || '$'.repeat(Math.min(restaurant.priceLevel || 2, 4)),
           neighborhood: restaurant.neighborhood || restaurant.address?.split(',')[1]?.trim() || userLocation?.city || 'NYC',
           reason: `${restaurant.cuisine} restaurant with ${restaurant.rating || 4.0}★ rating` + 
-                  (restaurant.vibeTags ? ` - ${restaurant.vibeTags.slice(0, 2).join(', ')}` : '')
+                  (restaurant.vibe && restaurant.vibe.length > 0 ? ` - ${restaurant.vibe.slice(0, 2).join(', ')}` : '')
         });
       });
 
@@ -117,7 +122,7 @@ export default function AIScreen() {
     } catch (error) {
       console.error('AI API Error:', error);
       return {
-        text: "I'm having trouble connecting right now. In the meantime, I'd recommend checking out our trending restaurants in the Discover tab!"
+        text: `I'm having trouble connecting right now. In the meantime, I'd recommend checking out our trending restaurants in the Discover tab! You can also switch between NYC and LA using the location buttons.`
       };
     }
   };
@@ -263,6 +268,21 @@ export default function AIScreen() {
 
         {messages.length === 1 && (
           <View style={styles.quickPromptsContainer}>
+            <View style={styles.locationSwitcher}>
+              <Text style={styles.locationSwitcherTitle}>Current location:</Text>
+              <TouchableOpacity 
+                style={[styles.cityButton, userLocation?.city === 'New York' && styles.cityButtonActive]}
+                onPress={() => switchToCity('New York')}
+              >
+                <Text style={[styles.cityButtonText, userLocation?.city === 'New York' && styles.cityButtonTextActive]}>NYC</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.cityButton, userLocation?.city === 'Los Angeles' && styles.cityButtonActive]}
+                onPress={() => switchToCity('Los Angeles')}
+              >
+                <Text style={[styles.cityButtonText, userLocation?.city === 'Los Angeles' && styles.cityButtonTextActive]}>LA</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.quickPromptsTitle}>Try asking:</Text>
             {quickPrompts.map((prompt, index) => (
               <TouchableOpacity
@@ -491,5 +511,36 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#E0E0E0',
+  },
+  locationSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  locationSwitcherTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  cityButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  cityButtonActive: {
+    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
+  },
+  cityButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  cityButtonTextActive: {
+    color: '#FFF',
   },
 });

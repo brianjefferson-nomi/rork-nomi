@@ -16,7 +16,7 @@ interface SuggestionItem {
 }
 
 export function SearchWizard({ testID }: SearchWizardProps) {
-  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation } = useRestaurants();
+  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity } = useRestaurants();
   const [query, setQuery] = useState<string>('');
   const [openFilters, setOpenFilters] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
@@ -121,12 +121,28 @@ export function SearchWizard({ testID }: SearchWizardProps) {
 
   return (
     <View style={styles.wrapper} testID={testID}>
+      <View style={styles.locationSwitcher}>
+        <MapPin size={16} color="#666" />
+        <Text style={styles.locationLabel}>Search in:</Text>
+        <TouchableOpacity 
+          style={[styles.cityButton, userLocation?.city === 'New York' && styles.cityButtonActive]}
+          onPress={() => switchToCity('New York')}
+        >
+          <Text style={[styles.cityButtonText, userLocation?.city === 'New York' && styles.cityButtonTextActive]}>NYC</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.cityButton, userLocation?.city === 'Los Angeles' && styles.cityButtonActive]}
+          onPress={() => switchToCity('Los Angeles')}
+        >
+          <Text style={[styles.cityButtonText, userLocation?.city === 'Los Angeles' && styles.cityButtonTextActive]}>LA</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.searchRow}>
         <Search size={20} color="#999" />
         <TextInput
           ref={inputRef}
           style={styles.input}
-          placeholder="Search restaurants, cuisines, or locations..."
+          placeholder={`Search restaurants in ${userLocation?.city || 'NYC'}...`}
           placeholderTextColor="#999"
           value={query}
           onChangeText={(t) => {
@@ -354,4 +370,35 @@ const styles = StyleSheet.create({
   noResultsContainer: { padding: 20, alignItems: 'center' },
   noResults: { fontSize: 14, color: '#999', fontWeight: '600', textAlign: 'center' },
   noResultsSubtext: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 4 },
+  locationSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  cityButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  cityButtonActive: {
+    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
+  },
+  cityButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  cityButtonTextActive: {
+    color: '#FFF',
+  },
 });

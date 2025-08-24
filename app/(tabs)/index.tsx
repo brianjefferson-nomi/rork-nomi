@@ -74,6 +74,10 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <View style={styles.headerText}>
               <Text style={styles.greeting}>Find your next spot</Text>
+              <View style={styles.locationIndicator}>
+                <MapPin size={14} color="#666" />
+                <Text style={styles.locationText}>{city}</Text>
+              </View>
             </View>
             <TouchableOpacity 
               onPress={() => router.push('/profile' as any)}
@@ -96,7 +100,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <TrendingUp size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Trending Now</Text>
+            <Text style={styles.sectionTitle}>Trending in {city}</Text>
             <TouchableOpacity onPress={() => router.push('/discover' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -136,7 +140,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <MapPin size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Local Highlights</Text>
+            <Text style={styles.sectionTitle}>{city} Highlights</Text>
             <TouchableOpacity onPress={() => router.push('/discover' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -322,5 +326,16 @@ const styles = StyleSheet.create({
   },
   contributorsContainer: {
     paddingHorizontal: 16,
+  },
+  locationIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
 });

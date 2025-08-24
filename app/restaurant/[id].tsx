@@ -61,12 +61,18 @@ export default function RestaurantDetailScreen() {
         });
         
         // Generate validated menu items with caching
-        const validatedMenuItems = await generateValidatedMenuItems(
-          restaurant.name,
-          restaurant.cuisine,
-          restaurant.reviews || [],
-          restaurant.id
-        );
+        let validatedMenuItems: string[] = [];
+        try {
+          validatedMenuItems = await generateValidatedMenuItems(
+            restaurant.name,
+            restaurant.cuisine,
+            restaurant.reviews || [],
+            restaurant.id
+          );
+        } catch (error) {
+          console.error('Error generating menu items:', error);
+          validatedMenuItems = generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name);
+        }
         
         setEnhancedImages(assignedImages);
         setFoodRecommendations(validatedMenuItems.length > 0 ? validatedMenuItems : 
@@ -154,11 +160,13 @@ export default function RestaurantDetailScreen() {
             onError={() => {
               console.log('Image failed to load:', images[currentImageIndex]);
               const fallback = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=800&fit=crop&q=80';
-              setEnhancedImages(prev => {
-                const next = [...(prev.length ? prev : images)];
-                next[currentImageIndex] = fallback;
-                return next;
-              });
+              if (enhancedImages.length > 0) {
+                setEnhancedImages(prev => {
+                  const next = [...prev];
+                  next[currentImageIndex] = fallback;
+                  return next;
+                });
+              }
             }}
           />
           
@@ -208,7 +216,7 @@ export default function RestaurantDetailScreen() {
           </View>
 
           <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe).map((v, i) => {
+            {(restaurant.aiVibes || restaurant.vibe || []).map((v, i) => {
               // Ensure single word and capitalized - remove any extra text
               const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
               return (
@@ -258,15 +266,15 @@ export default function RestaurantDetailScreen() {
               <MapPin size={18} color="#666" />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Location</Text>
-                <Text style={styles.infoText}>{restaurant.address}</Text>
-                <Text style={styles.infoSubtext}>{restaurant.neighborhood}</Text>
+                <Text style={styles.infoText}>{restaurant.address || 'Address not available'}</Text>
+                <Text style={styles.infoSubtext}>{restaurant.neighborhood || ''}</Text>
               </View>
             </View>
             <View style={styles.infoItem}>
               <Clock size={18} color="#666" />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Hours</Text>
-                <Text style={styles.infoText}>{restaurant.hours}</Text>
+                <Text style={styles.infoText}>{restaurant.hours || 'Hours vary'}</Text>
               </View>
             </View>
             <View style={styles.infoItem}>

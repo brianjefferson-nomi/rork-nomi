@@ -34,6 +34,7 @@ interface RestaurantStore {
   refreshLocation: () => Promise<void>;
   inviteToCollection: (collectionId: string, email: string, message?: string) => void;
   updateCollectionSettings: (collectionId: string, settings: Partial<Collection>) => void;
+  switchToCity: (city: 'New York' | 'Los Angeles') => void;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -345,12 +346,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         id: result.id,
         name: result.name,
         cuisine: result.cuisine,
-        priceRange: '$'.repeat(Math.min(result.priceLevel, 4)) as '$' | '$$' | '$$$' | '$$$$',
+        priceRange: '$'.repeat(Math.min(result.priceLevel || 2, 4)) as '$' | '$$' | '$$$' | '$$$$',
         imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
         images: result.photos,
         address: result.address || '',
         neighborhood: result.address?.split(',')[1]?.trim() || location.city,
-        hours: 'Hours vary',
+        hours: result.hours || 'Hours vary',
         vibe: result.vibeTags || [],
         description: result.description || 'A great dining experience awaits.',
         menuHighlights: result.topPicks || [],
@@ -406,6 +407,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     persistCollections.mutate(updated);
   }, [collections, persistCollections.mutate]);
 
+  const switchToCity = useCallback((city: 'New York' | 'Los Angeles') => {
+    const coordinates = city === 'New York' 
+      ? { city: 'New York', lat: 40.7128, lng: -74.0060 }
+      : { city: 'Los Angeles', lat: 34.0522, lng: -118.2437 };
+    
+    setUserLocation(coordinates);
+    console.log(`[Location] Switched to ${city}`);
+  }, []);
+
   const storeValue = useMemo(() => ({
     restaurants,
     collections,
@@ -433,6 +443,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     refreshLocation,
     inviteToCollection,
     updateCollectionSettings,
+    switchToCity,
   }), [
     restaurants,
     collections,
@@ -460,6 +471,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     refreshLocation,
     inviteToCollection,
     updateCollectionSettings,
+    switchToCity,
   ]);
 
   return storeValue;

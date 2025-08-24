@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const OPENAI_API_KEY = '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';
 const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -435,21 +436,28 @@ export const getYelpDetails = async (businessId: string) => {
   }
 };
 
-// TripAdvisor API
+// TripAdvisor API with new API key
 export const searchTripAdvisor = async (query: string, location: string) => {
   try {
+    console.log(`[TripAdvisor] Searching for: ${query} in ${location}`);
     const response = await fetch(
       `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/searchRestaurants?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
+          'X-RapidAPI-Key': TRIPADVISOR_API_KEY,
           'X-RapidAPI-Host': 'tripadvisor16.p.rapidapi.com'
         }
       }
     );
     
+    if (!response.ok) {
+      console.log(`[TripAdvisor] API error: ${response.status}`);
+      return [];
+    }
+    
     const data = await response.json();
+    console.log(`[TripAdvisor] Found ${data.data?.data?.length || 0} results`);
     return data.data?.data || [];
   } catch (error) {
     console.error('Error searching TripAdvisor:', error);
@@ -459,22 +467,57 @@ export const searchTripAdvisor = async (query: string, location: string) => {
 
 export const getTripAdvisorDetails = async (restaurantId: string) => {
   try {
+    console.log(`[TripAdvisor] Getting details for: ${restaurantId}`);
     const response = await fetch(
       `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantDetails?id=${restaurantId}`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
+          'X-RapidAPI-Key': TRIPADVISOR_API_KEY,
           'X-RapidAPI-Host': 'tripadvisor16.p.rapidapi.com'
         }
       }
     );
+    
+    if (!response.ok) {
+      console.log(`[TripAdvisor] Details API error: ${response.status}`);
+      return null;
+    }
     
     const data = await response.json();
     return data.data;
   } catch (error) {
     console.error('Error getting TripAdvisor details:', error);
     return null;
+  }
+};
+
+// Get TripAdvisor restaurant photos
+export const getTripAdvisorPhotos = async (restaurantId: string): Promise<string[]> => {
+  try {
+    console.log(`[TripAdvisor] Getting photos for: ${restaurantId}`);
+    const response = await fetch(
+      `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantPhotos?id=${restaurantId}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': TRIPADVISOR_API_KEY,
+          'X-RapidAPI-Host': 'tripadvisor16.p.rapidapi.com'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.log(`[TripAdvisor] Photos API error: ${response.status}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    const photos = data.data?.photos || [];
+    return photos.map((photo: any) => photo.images?.large?.url || photo.images?.medium?.url).filter(Boolean);
+  } catch (error) {
+    console.error('Error getting TripAdvisor photos:', error);
+    return [];
   }
 };
 
@@ -666,7 +709,7 @@ const generateMockSearchResults = (query: string, location: string) => {
       cuisine: relevantCuisine,
       rating: Math.round(rating * 10) / 10,
       priceLevel,
-      address: `${Math.floor(Math.random() * 999) + 1} ${generateStreetName()} ${relevantNeighborhood}, ${location}`,
+      address: formatAddress(`${Math.floor(Math.random() * 999) + 1} ${generateStreetName()}, ${relevantNeighborhood}`, location),
       phone: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
       website: `https://${restaurantName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
       photos: [
@@ -677,6 +720,7 @@ const generateMockSearchResults = (query: string, location: string) => {
       description: `A ${getVibeAdjective()} ${relevantCuisine.toLowerCase()} restaurant in ${relevantNeighborhood}.`,
       vibeTags: generateMockVibeTags(relevantCuisine, priceLevel),
       topPicks: generateMockTopPicks(relevantCuisine),
+      hours: 'Daily 11:00 AM - 10:00 PM',
       source: 'search',
       location: { lat: 40.7128 + (Math.random() - 0.5) * 0.1, lng: -74.0060 + (Math.random() - 0.5) * 0.1 }
     });
@@ -771,19 +815,11 @@ const generateMockReviews = (name: string, cuisine: string) => {
 // Reddit/Forums search via RapidAPI wrappers with graceful fallback
 export const searchReddit = async (query: string, location: string) => {
   try {
-    const response = await fetch(
-      `https://real-time-forum-search.p.rapidapi.com/search?query=${encodeURIComponent(query + ' ' + location)}&limit=5`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'real-time-forum-search.p.rapidapi.com'
-        }
-      }
-    );
-    if (!response.ok) return [];
-    const data = await response.json();
-    return Array.isArray(data.results) ? data.results : [];
+    console.log(`[Reddit] Reddit API currently experiencing issues (404 errors)`);
+    // Reddit API is returning 404 errors, likely due to API endpoint changes
+    // Returning empty results to prevent app crashes
+    console.log(`[Reddit] Skipping Reddit search to maintain app stability`);
+    return [];
   } catch (error) {
     console.error('Error searching Reddit:', error);
     return [];
@@ -827,10 +863,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
           searchTripAdvisor(query, city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
-        Promise.race([
-          searchReddit(query, city),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Reddit timeout')), 5000))
-        ])
+        Promise.resolve([]) // Skip Reddit API due to 404 errors
       ];
 
       const [googleResults, yelpResults, tripAdvisorResults, redditResults] = await Promise.allSettled(apiPromises);
@@ -939,6 +972,12 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
       }
     }
     
+    // Ensure we have valid inputs
+    if (!restaurantName || !cuisine) {
+      console.log('[Menu] Missing required parameters, using fallback');
+      return generateFallbackMenuItems(cuisine || 'International');
+    }
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -954,7 +993,7 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
           },
           {
             role: 'user',
-            content: `Restaurant: ${restaurantName}, Cuisine: ${cuisine}, Reviews: ${reviews.join('. ')}`
+            content: `Restaurant: ${restaurantName}, Cuisine: ${cuisine}, Reviews: ${(reviews || []).join('. ')}`
           }
         ],
         max_tokens: 150,
@@ -962,9 +1001,22 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
       })
     });
     
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+    
     const data = await response.json();
-    const items = data.choices[0]?.message?.content?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
+    const items = data.choices?.[0]?.message?.content?.split(',').map((item: string) => item.trim()).filter(Boolean) || [];
     const finalItems = items.slice(0, 8);
+    
+    // If no items generated, use fallback
+    if (finalItems.length === 0) {
+      const fallbackItems = generateFallbackMenuItems(cuisine);
+      if (restaurantId) {
+        await setCachedContent(restaurantId, 'menu', fallbackItems);
+      }
+      return fallbackItems;
+    }
     
     // Cache the result
     if (restaurantId) {
@@ -974,8 +1026,34 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
     return finalItems;
   } catch (error) {
     console.error('Error generating validated menu items:', error);
-    return [];
+    const fallbackItems = generateFallbackMenuItems(cuisine || 'International');
+    if (restaurantId) {
+      try {
+        await setCachedContent(restaurantId, 'menu', fallbackItems);
+      } catch (cacheError) {
+        console.error('Error caching fallback menu items:', cacheError);
+      }
+    }
+    return fallbackItems;
   }
+};
+
+// Fallback menu items generator
+const generateFallbackMenuItems = (cuisine: string): string[] => {
+  const menuItems: Record<string, string[]> = {
+    'Italian': ['Margherita Pizza', 'Spaghetti Carbonara', 'Osso Buco', 'Risotto Milanese', 'Tiramisu', 'Bruschetta'],
+    'Japanese': ['Salmon Sashimi', 'Chicken Teriyaki', 'Miso Ramen', 'Tempura Vegetables', 'California Roll', 'Gyoza'],
+    'Mexican': ['Fish Tacos', 'Guacamole & Chips', 'Carnitas', 'Chicken Enchiladas', 'Churros', 'Quesadillas'],
+    'French': ['Coq au Vin', 'French Onion Soup', 'Crème Brûlée', 'Escargot', 'Bouillabaisse', 'Ratatouille'],
+    'Thai': ['Pad Thai', 'Green Curry', 'Tom Yum Soup', 'Mango Sticky Rice', 'Massaman Curry', 'Som Tam'],
+    'Indian': ['Butter Chicken', 'Biryani', 'Naan Bread', 'Samosas', 'Tandoori Chicken', 'Dal Makhani'],
+    'American': ['Classic Burger', 'Mac and Cheese', 'BBQ Ribs', 'Apple Pie', 'Buffalo Wings', 'Clam Chowder'],
+    'Chinese': ['Kung Pao Chicken', 'Fried Rice', 'Dumplings', 'Sweet and Sour Pork', 'Peking Duck', 'Hot Pot'],
+    'Mediterranean': ['Hummus Platter', 'Grilled Octopus', 'Moussaka', 'Baklava', 'Greek Salad', 'Lamb Souvlaki'],
+    'Korean': ['Bulgogi', 'Kimchi', 'Bibimbap', 'Korean BBQ', 'Japchae', 'Tteokbokki']
+  };
+  
+  return menuItems[cuisine] || ['House Special', 'Chef\'s Choice', 'Daily Special', 'Signature Dish', 'Popular Item', 'Seasonal Menu'];
 };
 
 // Combine results from different APIs and remove duplicates
@@ -1002,17 +1080,22 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     // Do not include Google photo endpoints (no headers). Images will be assigned later.
     const photos: string[] = [];
 
+    // Format address and parse hours
+    const formattedAddress = formatAddress(place.formatted_address || details?.formatted_address || '', location);
+    const hours = parseRestaurantHours(details?.opening_hours?.weekday_text || details?.current_opening_hours?.weekday_text);
+
     combined.push({
       id: `google_${place.place_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: place.name,
       cuisine: determineCuisineFromTypes(place.types || details?.types || []),
       rating: place.rating || details?.rating || 4.0,
       priceLevel: place.price_level || details?.price_level || 2,
-      address: place.formatted_address || details?.formatted_address || '',
+      address: formattedAddress,
       phone: details?.formatted_phone_number || '',
       website: details?.website || '',
       photos,
       reviews: (details?.reviews || []).map((r: any) => r.text).slice(0, 3),
+      hours: hours,
       source: 'google',
       location: place.geometry?.location || { lat: 40.7128, lng: -74.0060 }
     });
@@ -1025,46 +1108,126 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
 
     const photos = Array.isArray(business.photos) ? business.photos.slice(0, 3) : [];
 
+    // Format address and parse hours
+    const formattedAddress = formatAddress(business.location?.display_address?.join(', ') || '', location);
+    const hours = parseRestaurantHours(business.hours?.[0]);
+
     combined.push({
       id: `yelp_${business.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: business.name,
       cuisine: determineCuisineFromCategories(business.categories || []),
       rating: business.rating || 4.0,
       priceLevel: business.price ? business.price.length : 2,
-      address: business.location?.display_address?.join(', ') || '',
+      address: formattedAddress,
       phone: business.phone || '',
       website: business.url || '',
       photos,
       reviews: [],
+      hours: hours,
       source: 'yelp',
       location: business.coordinates || { lat: 40.7128, lng: -74.0060 }
     });
   }
 
-  // TripAdvisor
+  // TripAdvisor with enhanced photo support
   for (const restaurant of tripAdvisorResults) {
     if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
     seenNames.add(restaurant.name.toLowerCase());
 
-    const taPhoto = restaurant.photo?.images?.large?.url;
+    // Get additional photos from TripAdvisor
+    let photos: string[] = [];
+    if (restaurant.photo?.images?.large?.url) {
+      photos.push(restaurant.photo.images.large.url);
+    }
+    
+    // Try to get more photos if we have location_id
+    if (restaurant.location_id && combined.length < 5) {
+      try {
+        const additionalPhotos = await getTripAdvisorPhotos(restaurant.location_id);
+        photos.push(...additionalPhotos.slice(0, 3));
+      } catch (error) {
+        console.error('Error getting additional TripAdvisor photos:', error);
+      }
+    }
+
+    // Format address consistently
+    const formattedAddress = formatAddress(restaurant.address || '', location);
+    
+    // Parse hours if available
+    const hours = parseRestaurantHours(restaurant.hours || restaurant.open_hours);
 
     combined.push({
       id: `tripadvisor_${restaurant.location_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: restaurant.name,
       cuisine: restaurant.cuisine?.[0]?.name || 'International',
       rating: parseFloat(restaurant.rating) || 4.0,
-      priceLevel: restaurant.price_level ? parseInt(restaurant.price_level.replace(/\$/g, '').length) : 2,
-      address: restaurant.address || '',
+      priceLevel: restaurant.price_level ? restaurant.price_level.replace(/\$/g, '').length : 2,
+      address: formattedAddress,
       phone: restaurant.phone || '',
       website: restaurant.website || '',
-      photos: taPhoto ? [taPhoto] : [],
+      photos: [...new Set(photos)], // Remove duplicates
       reviews: [],
+      hours: hours,
       source: 'tripadvisor',
       location: { lat: 40.7128, lng: -74.0060 }
     });
   }
 
   return combined;
+};
+
+// Format address consistently across the app
+export const formatAddress = (address: string, city: string): string => {
+  if (!address) return '';
+  
+  // Remove extra whitespace and normalize
+  let formatted = address.trim().replace(/\s+/g, ' ');
+  
+  // Ensure city is included
+  if (!formatted.toLowerCase().includes(city.toLowerCase())) {
+    formatted += `, ${city}`;
+  }
+  
+  // Add state abbreviation if missing
+  if (city.toLowerCase().includes('new york') && !formatted.includes('NY')) {
+    formatted += ', NY';
+  } else if (city.toLowerCase().includes('los angeles') && !formatted.includes('CA')) {
+    formatted += ', CA';
+  }
+  
+  return formatted;
+};
+
+// Parse restaurant hours from various API formats
+export const parseRestaurantHours = (hoursData: any): string => {
+  if (!hoursData) return 'Hours vary';
+  
+  try {
+    // Handle Google Places format
+    if (Array.isArray(hoursData) && hoursData.length > 0) {
+      const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const todayHours = hoursData.find((h: any) => h.day === today);
+      if (todayHours) {
+        return `Today: ${todayHours.hours || 'Closed'}`;
+      }
+      return hoursData[0].hours || 'Hours vary';
+    }
+    
+    // Handle TripAdvisor format
+    if (typeof hoursData === 'object' && hoursData.today) {
+      return `Today: ${hoursData.today}`;
+    }
+    
+    // Handle string format
+    if (typeof hoursData === 'string') {
+      return hoursData;
+    }
+    
+    return 'Hours vary';
+  } catch (error) {
+    console.error('Error parsing restaurant hours:', error);
+    return 'Hours vary';
+  }
 };
 
 // Helper function to determine cuisine from Google Places types

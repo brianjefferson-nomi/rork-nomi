@@ -23,6 +23,10 @@ export interface Restaurant {
   savesCount?: number;
   sharesCount?: number;
   averageGroupStars?: number;
+  phone?: string;
+  website?: string;
+  priceLevel?: number;
+  vibeTags?: string[];
 }
 
 export interface Collection {
