@@ -188,6 +188,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          collection_code?: string;
           name: string;
           description?: string;
           cover_image?: string;
@@ -690,11 +691,11 @@ export const dbHelpers = {
     try {
       console.log('[Supabase] Getting plans for user:', userId);
       
-      // Get plans where user is creator or collaborator
+      // Get plans where user is creator
       const { data, error } = await supabase
         .from('collections')
         .select('*')
-        .or(`created_by.eq.${userId},collaborators.cs.{"${userId}"}`);
+        .eq('created_by', userId);
       
       if (error) {
         console.error('[Supabase] Error fetching user plans:', error);

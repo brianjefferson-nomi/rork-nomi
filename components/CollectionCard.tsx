@@ -22,13 +22,13 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
       
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{collection.name}</Text>
-        <Text style={styles.count}>{restaurants.length} places</Text>
+        <Text style={styles.count}>{restaurants?.length || 0} places</Text>
       </View>
       
       <View style={styles.footer}>
         <View style={styles.stat}>
           <Heart size={14} color="#FFF" fill="#FFF" />
-          <Text style={styles.statText}>{collection.likes}</Text>
+          <Text style={styles.statText}>{collection.likes || 0}</Text>
         </View>
         {collection.collaborators && collection.collaborators.length > 0 && (
           <View style={styles.stat}>

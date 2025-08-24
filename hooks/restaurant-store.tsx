@@ -27,7 +27,7 @@ interface RestaurantStore {
   getQuickSuggestions: () => string[];
   addRestaurantToPlan: (planId: string, restaurantId: string) => Promise<void>;
   removeRestaurantFromPlan: (planId: string, restaurantId: string) => Promise<void>;
-  createPlan: (plan: { name: string; description?: string; plannedDate?: string; isPublic?: boolean }) => Promise<void>;
+  createPlan: (plan: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
   toggleFavorite: (restaurantId: string) => void;
   voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => void;
@@ -263,7 +263,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
   }, [user?.id, plansQuery.data, queryClient]);
 
-  const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean }) => {
+  const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => {
     if (!user?.id) return;
 
     console.log('[RestaurantStore] Creating plan:', planData);
@@ -274,9 +274,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         description: planData.description,
         created_by: user.id,
         creator_id: user.id,
-        collaborators: [],
-        restaurant_ids: [],
+        occasion: planData.occasion,
         is_public: planData.isPublic || false,
+        likes: 0,
+        equal_voting: true,
+        admin_weighted: false,
+        expertise_weighted: false,
+        minimum_participation: 1,
+        allow_vote_changes: true,
+        anonymous_voting: false,
+        vote_visibility: 'public',
+        discussion_enabled: true,
+        auto_ranking_enabled: true,
+        consensus_threshold: 50,
+        restaurant_ids: [],
+        collaborators: [],
         planned_date: planData.plannedDate
       });
       

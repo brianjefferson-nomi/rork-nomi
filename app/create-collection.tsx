@@ -41,7 +41,8 @@ export default function CreatePlanScreen() {
         name: name.trim(),
         description: description.trim() || undefined,
         plannedDate: plannedDate.trim() || undefined,
-        isPublic
+        isPublic,
+        occasion: selectedOccasion || undefined
       });
       
       console.log('[CreatePlan] Plan created successfully');
