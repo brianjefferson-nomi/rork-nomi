@@ -31,18 +31,40 @@ export interface Restaurant {
 
 export interface Collection {
   id: string;
+  collection_code?: string;
   name: string;
-  description: string;
-  coverImage: string;
-  restaurants: string[];
-  createdBy: string;
-  collaborators: CollectionMember[];
-  createdAt: Date;
+  description?: string;
+  cover_image?: string;
+  created_by: string;
+  creator_id?: string;
   occasion?: string;
-  isPublic: boolean;
+  is_public: boolean;
   likes: number;
-  votingRules: VotingRules;
-  settings: CollectionSettings;
+  equal_voting: boolean;
+  admin_weighted: boolean;
+  expertise_weighted: boolean;
+  minimum_participation: number;
+  voting_deadline?: string;
+  allow_vote_changes: boolean;
+  anonymous_voting: boolean;
+  vote_visibility: 'public' | 'anonymous' | 'admin_only';
+  discussion_enabled: boolean;
+  auto_ranking_enabled: boolean;
+  consensus_threshold: number;
+  restaurant_ids: string[];
+  collaborators: string[];
+  unique_code?: string;
+  planned_date?: string;
+  created_at: string;
+  updated_at: string;
+  // Legacy fields for backward compatibility
+  coverImage?: string;
+  restaurants?: string[];
+  createdBy?: string;
+  createdAt?: Date;
+  isPublic?: boolean;
+  votingRules?: VotingRules;
+  settings?: CollectionSettings;
   analytics?: CollectionAnalytics;
 }
 

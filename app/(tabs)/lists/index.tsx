@@ -34,7 +34,7 @@ export default function ListsScreen() {
   }, [restaurants, favoriteRestaurants, sortBy]);
 
   const sortedCollections = useMemo(() => {
-    return collections.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return collections.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime());
   }, [collections]);
 
   const renderTabButton = (tab: TabType, icon: React.ReactNode, label: string, count: number) => (

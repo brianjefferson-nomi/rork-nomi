@@ -66,9 +66,16 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userPlans', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      return await dbHelpers.getUserPlans(user.id);
+      try {
+        return await dbHelpers.getUserPlans(user.id);
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading plans:', error);
+        return [];
+      }
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    retry: 3,
+    retryDelay: 1000
   });
 
   // Load restaurants from database

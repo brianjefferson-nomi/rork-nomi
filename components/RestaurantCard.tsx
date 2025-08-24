@@ -138,7 +138,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           </View>
           <View style={styles.infoItem}>
             <Clock size={14} color="#666" />
-            <Text style={styles.infoText}>{restaurant.hours.split(' ')[0]}</Text>
+            <Text style={styles.infoText}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
           </View>
         </View>
 

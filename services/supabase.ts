@@ -681,13 +681,41 @@ export const dbHelpers = {
   },
 
   async getUserPlans(userId: string) {
-    const { data, error } = await supabase
-      .from('collections')
-      .select('*')
-      .or(`created_by.eq.${userId},is_public.eq.true`);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      // First get collections created by the user
+      const { data: userCollections, error: userError } = await supabase
+        .from('collections')
+        .select('*')
+        .eq('created_by', userId);
+      
+      if (userError) {
+        console.error('[Supabase] Error fetching user collections:', userError);
+        throw userError;
+      }
+      
+      // Then get public collections
+      const { data: publicCollections, error: publicError } = await supabase
+        .from('collections')
+        .select('*')
+        .eq('is_public', true);
+      
+      if (publicError) {
+        console.error('[Supabase] Error fetching public collections:', publicError);
+        throw publicError;
+      }
+      
+      // Combine and remove duplicates
+      const allCollections = [...(userCollections || []), ...(publicCollections || [])];
+      const uniqueCollections = allCollections.filter((collection, index, self) => 
+        index === self.findIndex(c => c.id === collection.id)
+      );
+      
+      console.log('[Supabase] Fetched user plans:', uniqueCollections);
+      return uniqueCollections;
+    } catch (error) {
+      console.error('[Supabase] getUserPlans error:', error);
+      throw error;
+    }
   },
 
   async updatePlan(id: string, updates: Database['public']['Tables']['collections']['Update']) {

@@ -17,7 +17,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
-      <Image source={{ uri: collection.coverImage }} style={styles.image} />
+      <Image source={{ uri: collection.cover_image || collection.coverImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }} style={styles.image} />
       <View style={styles.overlay} />
       
       <View style={styles.content}>
@@ -30,7 +30,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
           <Heart size={14} color="#FFF" fill="#FFF" />
           <Text style={styles.statText}>{collection.likes}</Text>
         </View>
-        {collection.collaborators.length > 0 && (
+        {collection.collaborators && collection.collaborators.length > 0 && (
           <View style={styles.stat}>
             <Users size={14} color="#FFF" />
             <Text style={styles.statText}>{collection.collaborators.length + 1}</Text>
