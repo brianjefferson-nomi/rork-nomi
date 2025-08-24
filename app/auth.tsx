@@ -21,7 +21,8 @@ export default function AuthScreen() {
       await signIn(email.trim(), name.trim());
       router.back();
     } catch (error) {
-      Alert.alert('Error', 'Failed to sign in. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in. Please try again.';
+      Alert.alert('Sign In Error', errorMessage);
       console.error('Sign in error:', error);
     } finally {
       setIsLoading(false);

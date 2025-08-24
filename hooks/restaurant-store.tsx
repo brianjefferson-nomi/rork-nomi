@@ -71,6 +71,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     enabled: !!user?.id
   });
 
+  // Load restaurants from database
+  const restaurantsQuery = useQuery({
+    queryKey: ['restaurants'],
+    queryFn: async () => {
+      try {
+        // Try to load from database first
+        const dbRestaurants = await dbHelpers.getAllRestaurants();
+        if (dbRestaurants && dbRestaurants.length > 0) {
+          return dbRestaurants.map(mapDatabaseRestaurant);
+        }
+      } catch (error) {
+        console.log('No database restaurants found, using mock data');
+      }
+      
+      // Fallback to mock data
+      return mockRestaurants;
+    }
+  });
+
   // Load initial data and user location
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
@@ -85,7 +104,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       ]);
 
       const notes = storedNotes ? JSON.parse(storedNotes) : {};
-      const restaurantsWithNotes = mockRestaurants.map(r => ({
+      const restaurantsWithNotes = (restaurantsQuery.data || mockRestaurants).map((r: any) => ({
         ...r,
         userNotes: notes[r.id] || r.userNotes
       }));
@@ -98,8 +117,36 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
       };
-    }
+    },
+    enabled: !!restaurantsQuery.data
   });
+
+  // Helper function to map database restaurant format to component format
+  const mapDatabaseRestaurant = useCallback((dbRestaurant: any): Restaurant => ({
+    id: dbRestaurant.id,
+    name: dbRestaurant.name,
+    cuisine: dbRestaurant.cuisine,
+    priceRange: dbRestaurant.price_range as '$' | '$$' | '$$$' | '$$$$',
+    imageUrl: dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+    images: dbRestaurant.images || [dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
+    address: dbRestaurant.address,
+    neighborhood: dbRestaurant.neighborhood,
+    hours: dbRestaurant.hours || 'Hours vary',
+    vibe: dbRestaurant.vibe || [],
+    description: dbRestaurant.description || 'A great dining experience awaits.',
+    menuHighlights: dbRestaurant.menu_highlights || [],
+    rating: dbRestaurant.rating || 0,
+    reviews: dbRestaurant.reviews || [],
+    aiDescription: dbRestaurant.ai_description,
+    aiVibes: dbRestaurant.ai_vibes || [],
+    aiTopPicks: dbRestaurant.ai_top_picks || [],
+    contributors: [],
+    commentsCount: 0,
+    savesCount: 0,
+    sharesCount: 0,
+    averageGroupStars: dbRestaurant.rating || 0,
+    userNotes: dbRestaurant.userNotes || ''
+  }), []);
 
   useEffect(() => {
     if (dataQuery.data) {
@@ -488,7 +535,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     userVotes,
     discussions,
     favoriteRestaurants,
-    isLoading: dataQuery.isLoading || plansQuery.isLoading,
+    isLoading: dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading,
     searchHistory,
     userLocation,
     searchRestaurants,

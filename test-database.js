@@ -4,8 +4,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Replace these with your actual Supabase credentials
-const supabaseUrl = 'YOUR_SUPABASE_URL';
-const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = 'https://qlnllnqrdxjiigmzyhlu.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbmxsbnFyZHhqaWlnbXp5aGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwMTA3NDAsImV4cCI6MjA3MTU4Njc0MH0.xpAzHk2LGr39YZEMyR2JdRwpyhMKdFLsyrKhDieok-c';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -165,7 +165,7 @@ async function testDatabase() {
 }
 
 // Check if credentials are provided
-if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseKey === 'YOUR_SUPABASE_ANON_KEY') {
+if (supabaseUrl === 'https://qlnllnqrdxjiigmzyhlu.supabase.co' || supabaseKey === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbmxsbnFyZHhqaWlnbXp5aGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwMTA3NDAsImV4cCI6MjA3MTU4Njc0MH0.xpAzHk2LGr39YZEMyR2JdRwpyhMKdFLsyrKhDieok-c') {
   console.log('❌ Please update the Supabase credentials in this file before running the test.');
   console.log('1. Replace YOUR_SUPABASE_URL with your actual Supabase project URL');
   console.log('2. Replace YOUR_SUPABASE_ANON_KEY with your actual anon key');

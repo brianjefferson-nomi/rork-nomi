@@ -613,6 +613,16 @@ export const dbHelpers = {
     return data;
   },
 
+  async getAllRestaurants() {
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .order('rating', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async searchRestaurants(query: string, city: string) {
     const { data, error } = await supabase
       .from('restaurants')

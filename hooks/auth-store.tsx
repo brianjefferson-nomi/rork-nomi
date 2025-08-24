@@ -57,7 +57,12 @@ export const [AuthProvider, useAuth] = createContextHook<AuthStore>(() => {
       await AsyncStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
       console.error('Error signing in:', error);
-      throw error;
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        throw new Error(`Sign in failed: ${error.message}`);
+      } else {
+        throw new Error('Sign in failed: Unknown error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
