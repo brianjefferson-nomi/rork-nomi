@@ -332,14 +332,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [discussions]);
 
   const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
-    if (!userLocation) {
-      console.warn('User location not available, using default');
-      return [];
-    }
-
+    const location = userLocation || { city: 'New York', lat: 40.7128, lng: -74.0060 };
+    
     try {
-      console.log(`Searching for: ${query} in ${userLocation.city}`);
-      const results = await aggregateRestaurantData(query, userLocation.city);
+      console.log(`Searching for: ${query} in ${location.city}`);
+      const results = await aggregateRestaurantData(query, location.city);
       
       // Convert API results to Restaurant format
       const formattedResults: Restaurant[] = results.map(result => ({
@@ -350,7 +347,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
         images: result.photos,
         address: result.address || '',
-        neighborhood: result.address?.split(',')[1]?.trim() || userLocation.city,
+        neighborhood: result.address?.split(',')[1]?.trim() || location.city,
         hours: 'Hours vary',
         vibe: result.vibeTags || [],
         description: result.description || 'A great dining experience awaits.',
