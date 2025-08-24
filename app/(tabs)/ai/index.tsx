@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { Send, Bot, User, MapPin, DollarSign, Star, ExternalLink } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
-import { aggregateRestaurantData } from '@/services/api';
 import { router } from 'expo-router';
 
 interface Message {
@@ -24,7 +23,7 @@ interface RestaurantSuggestion {
 }
 
 export default function AIScreen() {
-  const { restaurants, userLocation } = useRestaurants();
+  const { restaurants, userLocation, searchRestaurants } = useRestaurants();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -43,18 +42,19 @@ export default function AIScreen() {
       let searchResults: any[] = [];
       const isSearchQuery = /\b(find|search|looking for|recommend|suggest|best|good|restaurant|food|cuisine|near|in)\b/i.test(userMessage);
       
-      if (isSearchQuery && userLocation) {
+      if (isSearchQuery) {
         try {
           console.log('[AI] Searching for restaurants based on user query');
-          searchResults = await aggregateRestaurantData(userMessage, userLocation.city);
-          console.log(`[AI] Found ${searchResults.length} new restaurants`);
+          const results = await searchRestaurants(userMessage);
+          searchResults = results;
+          console.log(`[AI] Found ${results.length} new restaurants`);
         } catch (error) {
           console.error('[AI] Error searching restaurants:', error);
         }
       }
       
-      // Combine existing restaurants with search results
-      const allRestaurants = [...restaurants, ...searchResults.slice(0, 5)];
+      // Combine existing restaurants with new results now in store
+      const allRestaurants = [...restaurants, ...searchResults.slice(0, 10)];
       
       const response = await fetch('https://toolkit.rork.com/text/llm/', {
         method: 'POST',

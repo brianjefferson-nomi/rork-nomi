@@ -9,7 +9,7 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { SearchWizard } from '@/components/SearchWizard';
 
 export default function HomeScreen() {
-  const { restaurants, collections, isLoading } = useRestaurants();
+  const { restaurants, collections, isLoading, userLocation } = useRestaurants();
 
   if (isLoading) {
     return (
@@ -19,10 +19,12 @@ export default function HomeScreen() {
     );
   }
 
-  const trendingRestaurants = restaurants.slice(0, 6);
+  const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
+  const cityRestaurants = restaurants.filter(r => (city === 'Los Angeles' ? /Los Angeles|Hollywood|Beverly Hills|Santa Monica|West Hollywood|Downtown LA|Venice|Koreatown|Silver Lake/i.test(r.address || r.neighborhood) : /New York|Manhattan|Brooklyn|Queens|Bronx|SoHo|East Village|Upper East Side|Midtown/i.test(r.address || r.neighborhood)));
+  const trendingRestaurants = (cityRestaurants.length ? cityRestaurants : restaurants).slice(0, 6);
   const popularCollections = collections.sort((a, b) => b.likes - a.likes).slice(0, 4);
-  const newRestaurants = restaurants.slice(6, 10);
-  const localHighlights = restaurants.filter(r => r.neighborhood === 'SoHo' || r.neighborhood === 'Greenwich Village').slice(0, 4);
+  const newRestaurants = (cityRestaurants.length ? cityRestaurants : restaurants).slice(6, 10);
+  const localHighlights = (cityRestaurants.length ? cityRestaurants : restaurants).slice(0, 4);
   
   // Mock contributors data
   const suggestedContributors = [

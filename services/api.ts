@@ -110,34 +110,40 @@ export const cleanupExpiredCache = async (): Promise<void> => {
   }
 };
 
-// Enhanced image assignment with fallback logic
+// Enhanced image assignment with robust fallbacks and URL validation
 export const assignRestaurantImages = async (restaurant: any): Promise<string[]> => {
   const images: string[] = [];
-  
+
   try {
-    // 1. Try Google Places photos first
-    if (restaurant.photos && restaurant.photos.length > 0) {
-      images.push(...restaurant.photos.slice(0, 3));
+    // 1) Accept only absolute, directly fetchable image URLs (no endpoints requiring headers)
+    if (Array.isArray(restaurant.photos)) {
+      for (const p of restaurant.photos.slice(0, 6)) {
+        const url = typeof p === 'string' ? p : p?.url || p?.image_url || '';
+        if (typeof url === 'string' && url.startsWith('http') && !url.includes('rapidapi.com')) {
+          images.push(url);
+        }
+      }
     }
-    
-    // 2. If we need more images, try Unsplash
+
+    // 2) If we need more images or photos are missing/invalid, use Unsplash based on cuisine/name
     if (images.length < 3) {
-      const unsplashImages = await getUnsplashImage(restaurant.cuisine || restaurant.name, 3 - images.length);
+      const searchTerm = (restaurant.cuisine || restaurant.name || 'restaurant').toString();
+      const needed = Math.max(0, 3 - images.length);
+      const unsplashImages = await getUnsplashImage(searchTerm, needed);
       if (Array.isArray(unsplashImages)) {
         images.push(...unsplashImages.filter(Boolean));
       } else if (unsplashImages) {
         images.push(unsplashImages);
       }
     }
-    
-    // 3. Fill remaining slots with default images
+
+    // 3) Ensure at least 3 images with themed placeholders
     while (images.length < 3) {
       images.push(getDefaultRestaurantImage(restaurant.cuisine));
     }
-    
-    // Remove duplicates and ensure no broken images
-    const uniqueImages = [...new Set(images)].filter(Boolean);
-    return uniqueImages.length > 0 ? uniqueImages : [getDefaultRestaurantImage(restaurant.cuisine)];
+
+    const unique = [...new Set(images)].filter(Boolean);
+    return unique.length > 0 ? unique : [getDefaultRestaurantImage(restaurant.cuisine)];
   } catch (error) {
     console.error('Error assigning restaurant images:', error);
     return [getDefaultRestaurantImage(restaurant.cuisine)];
@@ -299,17 +305,19 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
 // Enhanced Google Places API with better error handling and photo support
 export const searchGooglePlaces = async (query: string, location: string): Promise<any[]> => {
   try {
-    // Implement rate limiting
+    // Restrict to NYC and LA only for MVP
+    const city = /los angeles/i.test(location) ? 'Los Angeles' : 'New York';
+
     const now = Date.now();
     const timeSinceLastCall = now - lastGoogleApiCall;
     if (timeSinceLastCall < GOOGLE_API_DELAY) {
       await new Promise(resolve => setTimeout(resolve, GOOGLE_API_DELAY - timeSinceLastCall));
     }
     lastGoogleApiCall = Date.now();
-    
-    console.log(`[GooglePlaces] Searching for: ${query} in ${location}`);
+
+    console.log(`[GooglePlaces] Searching for: ${query} in ${city}`);
     const response = await fetch(
-      `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant ' + location)}&radius=10000&type=restaurant`,
+      `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant ' + city)}&radius=10000&type=restaurant`,
       {
         method: 'GET',
         headers: {
@@ -318,17 +326,17 @@ export const searchGooglePlaces = async (query: string, location: string): Promi
         }
       }
     );
-    
+
     if (response.status === 429) {
       console.log('[GooglePlaces] Rate limited, waiting and retrying...');
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      return await searchGooglePlaces(query, location); // Retry once
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return await searchGooglePlaces(query, city);
     }
-    
+
     if (!response.ok) {
       throw new Error(`Google Places API error: ${response.status}`);
     }
-    
+
     const data = await response.json();
     console.log(`[GooglePlaces] Found ${data.results?.length || 0} results`);
     return data.results || [];
@@ -382,11 +390,10 @@ export const getGooglePlaceDetails = async (placeId: string): Promise<any | null
   }
 };
 
-// Get Google Places photo URL
-export const getGooglePlacePhoto = async (photoReference: string, maxWidth: number = 800) => {
+// Get Google Places photo URL - disabled for web (headers not supported by Image)
+export const getGooglePlacePhoto = async (_photoReference: string, _maxWidth: number = 800) => {
   try {
-    const photoUrl = `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/photo?photoreference=${photoReference}&maxwidth=${maxWidth}`;
-    return photoUrl;
+    return null;
   } catch (error) {
     console.error('Error getting place photo:', error);
     return null;
@@ -761,13 +768,22 @@ const generateMockReviews = (name: string, cuisine: string) => {
   return reviews.slice(0, Math.floor(Math.random() * 3) + 2);
 };
 
-// Reddit API for real-time forum search - disabled due to API issues
+// Reddit/Forums search via RapidAPI wrappers with graceful fallback
 export const searchReddit = async (query: string, location: string) => {
   try {
-    console.log(`[Reddit] Reddit search temporarily disabled due to API limitations`);
-    // Reddit API endpoints are currently unreliable, returning empty results
-    // This prevents 404 errors and maintains app stability
-    return [];
+    const response = await fetch(
+      `https://real-time-forum-search.p.rapidapi.com/search?query=${encodeURIComponent(query + ' ' + location)}&limit=5`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': RAPIDAPI_KEY,
+          'X-RapidAPI-Host': 'real-time-forum-search.p.rapidapi.com'
+        }
+      }
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data.results) ? data.results : [];
   } catch (error) {
     console.error('Error searching Reddit:', error);
     return [];
@@ -777,62 +793,70 @@ export const searchReddit = async (query: string, location: string) => {
 // Enhanced restaurant data aggregation with real API integration
 export const aggregateRestaurantData = async (query: string, location: string) => {
   try {
-    console.log(`[API] Searching for restaurants: ${query} in ${location}`);
-    
-    // Use real APIs with fallback to mock data
+    // Restrict to NYC/LA only
+    const city = /los angeles/i.test(location) ? 'Los Angeles' : 'New York';
+    const cacheKey = `restaurant_search_${city}_${query.toLowerCase()}`;
+
+    // 90-day cache for aggregated restaurant data
+    const cachedRaw = await AsyncStorage.getItem(cacheKey);
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as { t: number; data: any[] };
+        if (Date.now() - cached.t < CACHE_DURATION) {
+          console.log(`[API] Using cached search results for ${city} :: ${query}`);
+          return cached.data;
+        }
+      } catch {}
+    }
+
+    console.log(`[API] Searching for restaurants: ${query} in ${city}`);
+
     let allResults: any[] = [];
-    
+
     try {
-      // Search all APIs in parallel with timeout including Reddit
       const apiPromises = [
         Promise.race([
-          searchGooglePlaces(query, location),
+          searchGooglePlaces(query, city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Google Places timeout')), 5000))
         ]),
         Promise.race([
-          searchYelp(query, location),
+          searchYelp(query, city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 5000))
         ]),
         Promise.race([
-          searchTripAdvisor(query, location),
+          searchTripAdvisor(query, city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
         Promise.race([
-          searchReddit(query, location),
+          searchReddit(query, city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Reddit timeout')), 5000))
         ])
       ];
-      
+
       const [googleResults, yelpResults, tripAdvisorResults, redditResults] = await Promise.allSettled(apiPromises);
-      
-      // Process successful results
+
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
       const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
       const redditData = redditResults.status === 'fulfilled' ? redditResults.value : [];
-      
+
       console.log(`[API] Results - Google: ${googleData.length}, Yelp: ${yelpData.length}, TripAdvisor: ${tripAdvisorData.length}, Reddit: ${redditData.length}`);
-      
-      // Combine and deduplicate results
-      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, location, redditData);
-      
+
+      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, city, redditData);
     } catch (error) {
       console.error('[API] Error with real APIs, falling back to mock data:', error);
     }
-    
-    // If no real results, use enhanced mock data
+
     if (allResults.length === 0) {
       console.log('[API] Using mock data as fallback');
-      allResults = generateMockSearchResults(query, location);
+      allResults = generateMockSearchResults(query, city);
     }
-    
-    // Enhance results with AI-generated content (limit to first 10 for performance)
+
     const resultsToEnhance = allResults.slice(0, 10);
-    const enhancedResults = [];
-    
+    const enhancedResults: any[] = [];
+
     for (const result of resultsToEnhance) {
       try {
-        // Generate AI-enhanced content with timeout
         const enhancementPromises = [
           Promise.race([
             generateRestaurantDescription(result.reviews || [], result.name),
@@ -847,22 +871,19 @@ export const aggregateRestaurantData = async (query: string, location: string) =
             new Promise((resolve) => setTimeout(() => resolve(result.topPicks || []), 3000))
           ])
         ];
-        
+
         const [description, vibeTags, topPicks] = await Promise.all(enhancementPromises);
-        
-        // Assign proper images with fallback logic
         const assignedImages = await assignRestaurantImages(result);
-        
+
         enhancedResults.push({
           ...result,
           description: description || result.description || 'A great dining experience awaits.',
-          vibeTags: (vibeTags && vibeTags.length > 0) ? (vibeTags as string[]).map((tag: string) => capitalizeTag(tag)) : (result.vibeTags || ['Popular']),
-          topPicks: (topPicks && topPicks.length > 0) ? topPicks : (result.topPicks || []),
+          vibeTags: (vibeTags && (vibeTags as string[]).length > 0) ? (vibeTags as string[]).map((tag: string) => capitalizeTag(tag)) : (result.vibeTags || ['Popular']),
+          topPicks: (Array.isArray(topPicks) && topPicks.length > 0) ? topPicks : (result.topPicks || []),
           photos: assignedImages
         });
       } catch (error) {
         console.error(`[API] Error enhancing result for ${result.name}:`, error);
-        // Use original result if enhancement fails
         const assignedImages = await assignRestaurantImages(result);
         enhancedResults.push({
           ...result,
@@ -873,8 +894,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         });
       }
     }
-    
-    // Add remaining results without enhancement
+
     if (allResults.length > 10) {
       const remainingResults = await Promise.all(
         allResults.slice(10).map(async (result) => {
@@ -890,12 +910,14 @@ export const aggregateRestaurantData = async (query: string, location: string) =
       );
       enhancedResults.push(...remainingResults);
     }
-    
+
+    // Store cache
+    await AsyncStorage.setItem(cacheKey, JSON.stringify({ t: Date.now(), data: enhancedResults }));
+
     console.log(`[API] Successfully processed ${enhancedResults.length} search results`);
     return enhancedResults;
   } catch (error) {
     console.error('[API] Error aggregating restaurant data:', error);
-    // Return mock data as final fallback
     return generateMockSearchResults(query, location);
   }
 };
@@ -960,18 +982,15 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
 const combineApiResults = async (googleResults: any[], yelpResults: any[], tripAdvisorResults: any[], location: string, redditResults: any[] = []) => {
   const combined: any[] = [];
   const seenNames = new Set<string>();
-  
-  // Process Google Places results
+
+  // Google Places
   for (const place of googleResults) {
     if (!place.name || seenNames.has(place.name.toLowerCase())) continue;
-    
     seenNames.add(place.name.toLowerCase());
-    
-    // Get additional details if available (with rate limiting)
+
     let details = null;
     if (place.place_id) {
       try {
-        // Only get details for first 5 places to avoid rate limiting
         if (combined.length < 5) {
           details = await getGooglePlaceDetails(place.place_id);
         }
@@ -979,18 +998,10 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
         console.error('Error getting place details:', error);
       }
     }
-    
-    // Process photos
-    const photos = [];
-    if (place.photos && place.photos.length > 0) {
-      for (const photo of place.photos.slice(0, 3)) {
-        if (photo.photo_reference) {
-          const photoUrl = await getGooglePlacePhoto(photo.photo_reference);
-          if (photoUrl) photos.push(photoUrl);
-        }
-      }
-    }
-    
+
+    // Do not include Google photo endpoints (no headers). Images will be assigned later.
+    const photos: string[] = [];
+
     combined.push({
       id: `google_${place.place_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: place.name,
@@ -1000,19 +1011,20 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       address: place.formatted_address || details?.formatted_address || '',
       phone: details?.formatted_phone_number || '',
       website: details?.website || '',
-      photos: photos.length > 0 ? photos : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
+      photos,
       reviews: (details?.reviews || []).map((r: any) => r.text).slice(0, 3),
       source: 'google',
       location: place.geometry?.location || { lat: 40.7128, lng: -74.0060 }
     });
   }
-  
-  // Process Yelp results
+
+  // Yelp
   for (const business of yelpResults) {
     if (!business.name || seenNames.has(business.name.toLowerCase())) continue;
-    
     seenNames.add(business.name.toLowerCase());
-    
+
+    const photos = Array.isArray(business.photos) ? business.photos.slice(0, 3) : [];
+
     combined.push({
       id: `yelp_${business.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: business.name,
@@ -1022,19 +1034,20 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       address: business.location?.display_address?.join(', ') || '',
       phone: business.phone || '',
       website: business.url || '',
-      photos: business.photos ? business.photos.slice(0, 3) : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
-      reviews: [], // Yelp reviews would need separate API call
+      photos,
+      reviews: [],
       source: 'yelp',
       location: business.coordinates || { lat: 40.7128, lng: -74.0060 }
     });
   }
-  
-  // Process TripAdvisor results (similar pattern)
+
+  // TripAdvisor
   for (const restaurant of tripAdvisorResults) {
     if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
-    
     seenNames.add(restaurant.name.toLowerCase());
-    
+
+    const taPhoto = restaurant.photo?.images?.large?.url;
+
     combined.push({
       id: `tripadvisor_${restaurant.location_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: restaurant.name,
@@ -1044,13 +1057,13 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       address: restaurant.address || '',
       phone: restaurant.phone || '',
       website: restaurant.website || '',
-      photos: restaurant.photo?.images ? [restaurant.photo.images.large.url] : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
+      photos: taPhoto ? [taPhoto] : [],
       reviews: [],
       source: 'tripadvisor',
       location: { lat: 40.7128, lng: -74.0060 }
     });
   }
-  
+
   return combined;
 };
 

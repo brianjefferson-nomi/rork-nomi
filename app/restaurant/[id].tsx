@@ -152,8 +152,13 @@ export default function RestaurantDetailScreen() {
             source={{ uri: images[currentImageIndex] }} 
             style={styles.heroImage}
             onError={() => {
-              // If image fails to load, try to use a fallback
               console.log('Image failed to load:', images[currentImageIndex]);
+              const fallback = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=800&fit=crop&q=80';
+              setEnhancedImages(prev => {
+                const next = [...(prev.length ? prev : images)];
+                next[currentImageIndex] = fallback;
+                return next;
+              });
             }}
           />
           
@@ -168,10 +173,10 @@ export default function RestaurantDetailScreen() {
           
           {hasMultipleImages && (
             <>
-              <TouchableOpacity onPress={prevImage} style={[styles.heroNavButton, styles.heroPrevButton]}>
+              <TouchableOpacity onPress={prevImage} style={[styles.heroNavButton, styles.heroPrevButton]} testID="hero-prev">
                 <ChevronLeft size={24} color="#FFF" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={nextImage} style={[styles.heroNavButton, styles.heroNextButton]}>
+              <TouchableOpacity onPress={nextImage} style={[styles.heroNavButton, styles.heroNextButton]} testID="hero-next">
                 <ChevronRight size={24} color="#FFF" />
               </TouchableOpacity>
               
