@@ -14,6 +14,7 @@ type Plan = Database['public']['Tables']['plans']['Row'];
 interface RestaurantStore {
   restaurants: Restaurant[];
   plans: Plan[];
+  collections: Plan[]; // Alias for plans for backward compatibility
   userVotes: RestaurantVote[];
   discussions: RestaurantDiscussion[];
   favoriteRestaurants: string[];
@@ -460,6 +461,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const storeValue = useMemo(() => ({
     restaurants,
     plans: plansQuery.data || [],
+    collections: plansQuery.data || [], // Alias for backward compatibility
     userVotes,
     discussions,
     favoriteRestaurants,
@@ -555,4 +557,17 @@ export function useRestaurantVotes(restaurantId: string, planId?: string) {
     userVote: votes.find(v => v.userId === 'currentUser')?.vote,
     allVotes: votes
   };
+}
+
+export function useCollectionRestaurants(collectionId: string) {
+  const { restaurants, plans } = useRestaurants();
+  
+  return useMemo(() => {
+    // Find the plan/collection
+    const plan = plans.find(p => p.id === collectionId);
+    if (!plan) return [];
+    
+    // Return restaurants that are in this collection
+    return restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+  }, [restaurants, plans, collectionId]);
 }

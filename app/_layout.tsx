@@ -38,7 +38,7 @@ function RootLayoutNav() {
         }} 
       />
       <Stack.Screen 
-        name="create-plan" 
+        name="create-collection" 
         options={{ 
           title: "New Plan",
           presentation: 'modal',

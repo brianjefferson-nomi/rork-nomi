@@ -2,52 +2,57 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 
 const occasions = ['Birthday', 'Date Night', 'Business', 'Casual', 'Late Night', 'Brunch', 'Special Occasion'];
-const coverImages = [
-  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800',
-  'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800',
-  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-];
 
-export default function CreateCollectionScreen() {
-  const { createCollection } = useRestaurants();
+export default function CreatePlanScreen() {
+  const { createPlan } = useRestaurants();
+  const { isAuthenticated } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedOccasion, setSelectedOccasion] = useState('');
+  const [plannedDate, setPlannedDate] = useState('');
   const [isPublic, setIsPublic] = useState(true);
 
-  const handleCreate = () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a collection name');
+  const handleCreate = async () => {
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to create a plan', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/auth' as any) }
+      ]);
       return;
     }
 
-    createCollection({
-      name,
-      description,
-      coverImage: coverImages[Math.floor(Math.random() * coverImages.length)],
-      restaurants: [],
-      createdBy: 'currentUser',
-      collaborators: [],
-      occasion: selectedOccasion,
-      isPublic,
-    });
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter a plan name');
+      return;
+    }
 
-    router.back();
+    try {
+      await createPlan({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        plannedDate: plannedDate.trim() || undefined,
+        isPublic
+      });
+      router.back();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create plan. Please try again.');
+      console.error('Create plan error:', error);
+    }
   };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Collection Name *</Text>
+          <Text style={styles.label}>Plan Name *</Text>
           <TextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="e.g., Birthday Dinner Spots"
+            placeholder="e.g., Birthday Dinner Plans"
             placeholderTextColor="#999"
           />
         </View>
@@ -58,10 +63,21 @@ export default function CreateCollectionScreen() {
             style={[styles.input, styles.textArea]}
             value={description}
             onChangeText={setDescription}
-            placeholder="What's this collection about?"
+            placeholder="What's this plan about?"
             placeholderTextColor="#999"
             multiline
             numberOfLines={3}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Planned Date (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={plannedDate}
+            onChangeText={setPlannedDate}
+            placeholder="e.g., Next Friday, Dec 15th"
+            placeholderTextColor="#999"
           />
         </View>
 
@@ -110,7 +126,7 @@ export default function CreateCollectionScreen() {
 
         <View style={styles.buttons}>
           <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
-            <Text style={styles.createButtonText}>Create Collection</Text>
+            <Text style={styles.createButtonText}>Create Plan</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
             <Text style={styles.cancelButtonText}>Cancel</Text>

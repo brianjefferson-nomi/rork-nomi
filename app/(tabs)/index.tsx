@@ -4,12 +4,15 @@ import { router, Stack } from 'expo-router';
 import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { CollectionCard } from '@/components/CollectionCard';
+import { Collection } from '@/types/restaurant';
 import { ContributorCard } from '@/components/ContributorCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
 
 export default function HomeScreen() {
   const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
+  const { user, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -34,7 +37,99 @@ export default function HomeScreen() {
   // Use city-specific restaurants when available, otherwise show all
   const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
   const trendingRestaurants = availableRestaurants.slice(0, 6);
-  const popularCollections = collections.sort((a, b) => b.likes - a.likes).slice(0, 4);
+  // Mock collections data for display when no plans exist
+  const mockCollections: Collection[] = [
+    {
+      id: 'mock-1',
+      name: 'Date Night Spots',
+      description: 'Romantic restaurants perfect for special occasions',
+      coverImage: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+      restaurants: [],
+      createdBy: 'mock-user',
+      collaborators: [],
+      createdAt: new Date(),
+      isPublic: true,
+      likes: 45,
+      votingRules: {
+        equalVoting: true,
+        adminWeighted: false,
+        expertiseWeighted: false,
+        minimumParticipation: 1,
+        allowVoteChanges: true,
+        anonymousVoting: false
+      },
+      settings: {
+        voteVisibility: 'public',
+        discussionEnabled: true,
+        autoRankingEnabled: true,
+        consensusThreshold: 0.6
+      }
+    },
+    {
+      id: 'mock-2', 
+      name: 'Best Brunch',
+      description: 'Weekend brunch favorites in the city',
+      coverImage: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+      restaurants: [],
+      createdBy: 'mock-user',
+      collaborators: [],
+      createdAt: new Date(),
+      isPublic: true,
+      likes: 32,
+      votingRules: {
+        equalVoting: true,
+        adminWeighted: false,
+        expertiseWeighted: false,
+        minimumParticipation: 1,
+        allowVoteChanges: true,
+        anonymousVoting: false
+      },
+      settings: {
+        voteVisibility: 'public',
+        discussionEnabled: true,
+        autoRankingEnabled: true,
+        consensusThreshold: 0.6
+      }
+    }
+  ];
+  
+  // Convert plans to collections format for display
+  const planCollections: Collection[] = collections.map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    description: plan.description || 'A collaborative dining plan',
+    coverImage: plan.image_url || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+    restaurants: plan.restaurant_ids,
+    createdBy: plan.creator_id,
+    collaborators: plan.collaborators.map(id => ({
+      userId: id,
+      name: 'Collaborator',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+      role: 'member' as const,
+      joinedAt: new Date(),
+      voteWeight: 1
+    })),
+    createdAt: new Date(plan.created_at),
+    isPublic: plan.is_public,
+    likes: Math.floor(Math.random() * 50) + 10, // Mock likes for now
+    votingRules: {
+      equalVoting: true,
+      adminWeighted: false,
+      expertiseWeighted: false,
+      minimumParticipation: 1,
+      allowVoteChanges: true,
+      anonymousVoting: false
+    },
+    settings: {
+      voteVisibility: 'public',
+      discussionEnabled: true,
+      autoRankingEnabled: true,
+      consensusThreshold: 0.6
+    }
+  }));
+  
+  const displayCollections = planCollections.length > 0 ? planCollections : mockCollections;
+  const popularCollections = displayCollections.sort((a, b) => b.likes - a.likes).slice(0, 4);
   const newRestaurants = availableRestaurants.slice(6, 10);
   const localHighlights = availableRestaurants.slice(0, 4);
   
@@ -98,16 +193,27 @@ export default function HomeScreen() {
               </View>
             </View>
             <TouchableOpacity 
-              onPress={() => router.push('/profile' as any)}
+              onPress={() => {
+                if (isAuthenticated) {
+                  router.push('/profile' as any);
+                } else {
+                  router.push('/auth' as any);
+                }
+              }}
               style={styles.profileButton}
               testID="profile-btn"
             >
               <View style={styles.profileAvatarContainer}>
-                <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
-                  style={styles.profileAvatar}
-                />
-                <Text style={styles.profileInitials}>BJ</Text>
+                {user?.avatar_url ? (
+                  <Image
+                    source={{ uri: user.avatar_url }}
+                    style={styles.profileAvatar}
+                  />
+                ) : (
+                  <Text style={styles.profileInitials}>
+                    {isAuthenticated && user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                  </Text>
+                )}
               </View>
             </TouchableOpacity>
           </View>
@@ -185,7 +291,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <BookOpen size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Popular Collections</Text>
+            <Text style={styles.sectionTitle}>Popular Plans</Text>
             <TouchableOpacity onPress={() => router.push('/lists' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -195,7 +301,14 @@ export default function HomeScreen() {
               <CollectionCard
                 key={collection.id}
                 collection={collection}
-                onPress={() => router.push(`/collection/${collection.id}` as any)}
+                onPress={() => {
+                  if (collection.id.startsWith('mock-')) {
+                    // For mock collections, navigate to create collection
+                    router.push('/create-collection' as any);
+                  } else {
+                    router.push(`/collection/${collection.id}` as any);
+                  }
+                }}
               />
             ))}
           </View>
