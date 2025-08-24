@@ -1,4 +1,4 @@
-import { Restaurant, Collection, RestaurantContributor } from '@/types/restaurant';
+import { Restaurant, Collection, RestaurantContributor, RestaurantVote, RestaurantDiscussion } from '@/types/restaurant';
 
 export const mockRestaurants: Restaurant[] = [
   {
@@ -282,11 +282,63 @@ export const mockCollections: Collection[] = [
     coverImage: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800',
     restaurants: ['1', '3', '5'],
     createdBy: 'user1',
-    collaborators: ['user2', 'user3'],
+    collaborators: [
+      {
+        userId: 'user1',
+        name: 'Alex Chen',
+        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        role: 'admin',
+        joinedAt: new Date('2024-01-15'),
+        voteWeight: 1,
+        isVerified: true,
+        expertise: ['Fine Dining', 'Wine Pairing']
+      },
+      {
+        userId: 'user2',
+        name: 'Sarah Johnson',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+        role: 'member',
+        joinedAt: new Date('2024-01-16'),
+        voteWeight: 1,
+        isVerified: false
+      },
+      {
+        userId: 'user3',
+        name: 'Mike Rodriguez',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+        role: 'member',
+        joinedAt: new Date('2024-01-17'),
+        voteWeight: 1,
+        isVerified: true,
+        expertise: ['Local Expert']
+      }
+    ],
     createdAt: new Date('2024-01-15'),
     occasion: 'Birthday',
     isPublic: true,
-    likes: 24
+    likes: 24,
+    votingRules: {
+      equalVoting: true,
+      adminWeighted: false,
+      expertiseWeighted: false,
+      minimumParticipation: 2,
+      allowVoteChanges: true,
+      anonymousVoting: false
+    },
+    settings: {
+      voteVisibility: 'public',
+      discussionEnabled: true,
+      autoRankingEnabled: true,
+      consensusThreshold: 0.7
+    },
+    analytics: {
+      totalVotes: 12,
+      participationRate: 0.85,
+      consensusScore: 0.73,
+      topInfluencers: ['user1', 'user3'],
+      votingPatterns: { 'user1': 8, 'user2': 6, 'user3': 9 },
+      decisionTimeline: []
+    }
   },
   {
     id: 'c2',
@@ -295,11 +347,35 @@ export const mockCollections: Collection[] = [
     coverImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800',
     restaurants: ['2', '8'],
     createdBy: 'user1',
-    collaborators: [],
+    collaborators: [
+      {
+        userId: 'user1',
+        name: 'Alex Chen',
+        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        role: 'admin',
+        joinedAt: new Date('2024-01-20'),
+        voteWeight: 1,
+        isVerified: true
+      }
+    ],
     createdAt: new Date('2024-01-20'),
     occasion: 'Late Night',
     isPublic: true,
-    likes: 18
+    likes: 18,
+    votingRules: {
+      equalVoting: true,
+      adminWeighted: false,
+      expertiseWeighted: false,
+      minimumParticipation: 1,
+      allowVoteChanges: true,
+      anonymousVoting: false
+    },
+    settings: {
+      voteVisibility: 'public',
+      discussionEnabled: true,
+      autoRankingEnabled: true,
+      consensusThreshold: 0.7
+    }
   },
   {
     id: 'c3',
@@ -308,10 +384,43 @@ export const mockCollections: Collection[] = [
     coverImage: 'https://images.unsplash.com/photo-1555126634-323283e090fa?w=800',
     restaurants: ['2', '4', '6'],
     createdBy: 'user2',
-    collaborators: ['user1'],
+    collaborators: [
+      {
+        userId: 'user2',
+        name: 'Sarah Johnson',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+        role: 'admin',
+        joinedAt: new Date('2024-01-25'),
+        voteWeight: 1,
+        isVerified: false
+      },
+      {
+        userId: 'user1',
+        name: 'Alex Chen',
+        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        role: 'member',
+        joinedAt: new Date('2024-01-26'),
+        voteWeight: 1,
+        isVerified: true
+      }
+    ],
     createdAt: new Date('2024-01-25'),
     isPublic: true,
-    likes: 32
+    likes: 32,
+    votingRules: {
+      equalVoting: true,
+      adminWeighted: false,
+      expertiseWeighted: false,
+      minimumParticipation: 1,
+      allowVoteChanges: true,
+      anonymousVoting: false
+    },
+    settings: {
+      voteVisibility: 'public',
+      discussionEnabled: true,
+      autoRankingEnabled: true,
+      consensusThreshold: 0.6
+    }
   },
   {
     id: 'c4',
@@ -320,10 +429,100 @@ export const mockCollections: Collection[] = [
     coverImage: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800',
     restaurants: ['1', '3', '5'],
     createdBy: 'user3',
-    collaborators: [],
+    collaborators: [
+      {
+        userId: 'user3',
+        name: 'Mike Rodriguez',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+        role: 'admin',
+        joinedAt: new Date('2024-02-01'),
+        voteWeight: 1,
+        isVerified: true,
+        expertise: ['Romantic Dining']
+      }
+    ],
     createdAt: new Date('2024-02-01'),
     occasion: 'Date Night',
     isPublic: true,
-    likes: 45
+    likes: 45,
+    votingRules: {
+      equalVoting: false,
+      adminWeighted: true,
+      expertiseWeighted: true,
+      minimumParticipation: 1,
+      allowVoteChanges: true,
+      anonymousVoting: false
+    },
+    settings: {
+      voteVisibility: 'public',
+      discussionEnabled: true,
+      autoRankingEnabled: true,
+      consensusThreshold: 0.8
+    }
+  }
+];
+
+// Mock vote data for collaborative features
+export const mockVotes = [
+  // Birthday collection votes
+  { restaurantId: '1', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-16T10:00:00Z', reason: 'Perfect for special occasions' },
+  { restaurantId: '1', userId: 'user2', collectionId: 'c1', vote: 'like', timestamp: '2024-01-16T11:00:00Z', reason: 'Amazing food quality' },
+  { restaurantId: '1', userId: 'user3', collectionId: 'c1', vote: 'dislike', timestamp: '2024-01-16T12:00:00Z', reason: 'Too expensive for our group' },
+  
+  { restaurantId: '3', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T10:00:00Z', reason: 'Great atmosphere' },
+  { restaurantId: '3', userId: 'user2', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T11:00:00Z', reason: 'Good for groups' },
+  { restaurantId: '3', userId: 'user3', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T12:00:00Z', reason: 'Reliable choice' },
+  
+  { restaurantId: '5', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-18T10:00:00Z', reason: 'Impressive for celebrations' },
+  { restaurantId: '5', userId: 'user2', collectionId: 'c1', vote: 'dislike', timestamp: '2024-01-18T11:00:00Z', reason: 'Hard to get reservations' },
+  { restaurantId: '5', userId: 'user3', collectionId: 'c1', vote: 'like', timestamp: '2024-01-18T12:00:00Z', reason: 'Worth the splurge' },
+  
+  // Cheap & Cheerful collection votes
+  { restaurantId: '2', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-26T10:00:00Z', reason: 'Classic NYC experience' },
+  { restaurantId: '2', userId: 'user2', collectionId: 'c3', vote: 'like', timestamp: '2024-01-26T11:00:00Z', reason: 'Great value' },
+  
+  { restaurantId: '4', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-27T10:00:00Z', reason: 'Authentic and affordable' },
+  { restaurantId: '4', userId: 'user2', collectionId: 'c3', vote: 'dislike', timestamp: '2024-01-27T11:00:00Z', reason: 'Too spicy for me' },
+  
+  { restaurantId: '6', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-28T10:00:00Z', reason: 'Best cookies in the city' },
+  { restaurantId: '6', userId: 'user2', collectionId: 'c3', vote: 'like', timestamp: '2024-01-28T11:00:00Z', reason: 'Perfect sweet treat' }
+];
+
+// Mock discussion data
+export const mockDiscussions = [
+  {
+    id: 'd1',
+    restaurantId: '1',
+    collectionId: 'c1',
+    userId: 'user2',
+    userName: 'Sarah Johnson',
+    userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+    message: 'Has anyone been here recently? I heard they changed their menu.',
+    timestamp: new Date('2024-01-16T15:00:00Z'),
+    likes: 2,
+    replies: [
+      {
+        id: 'd1r1',
+        restaurantId: '1',
+        collectionId: 'c1',
+        userId: 'user1',
+        userName: 'Alex Chen',
+        userAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        message: 'Yes! The tasting menu is even better now. Definitely worth it for a birthday.',
+        timestamp: new Date('2024-01-16T16:00:00Z'),
+        likes: 1
+      }
+    ]
+  },
+  {
+    id: 'd2',
+    restaurantId: '5',
+    collectionId: 'c1',
+    userId: 'user3',
+    userName: 'Mike Rodriguez',
+    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+    message: 'I can help with getting a reservation here if needed. I know someone who works there.',
+    timestamp: new Date('2024-01-18T14:00:00Z'),
+    likes: 3
   }
 ];

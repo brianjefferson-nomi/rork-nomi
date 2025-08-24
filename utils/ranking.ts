@@ -1,11 +1,14 @@
-import { Restaurant, RestaurantVote, RankedRestaurantMeta } from '@/types/restaurant';
+import { Restaurant, RestaurantVote, RankedRestaurantMeta, VoteBreakdown, VoterInfo, VoteEvent, Collection, GroupRecommendation } from '@/types/restaurant';
 
 interface ComputeOptions {
   memberCount?: number;
+  collection?: Collection;
+  discussions?: Record<string, number>;
 }
 
 function getAuthorityWeight(authority: RestaurantVote['authority']): number {
-  if (authority === 'verified' || authority === 'admin') return 1.2;
+  if (authority === 'admin') return 1.5;
+  if (authority === 'verified') return 1.2;
   return 1;
 }
 
@@ -24,7 +27,7 @@ export function computeRankings(
   try {
     const now = Date.now();
 
-    const results = restaurants.map((restaurant) => {
+    const results = restaurants.map((restaurant, index) => {
       const rvotes = votes.filter((v) => v.restaurantId === restaurant.id);
 
       let weightedLikes = 0;
@@ -32,11 +35,58 @@ export function computeRankings(
       let authorityApplied = false;
       let recencyBoost = 0;
 
+      // Build vote breakdown
+      const likeVoters: VoterInfo[] = [];
+      const dislikeVoters: VoterInfo[] = [];
+      const reasons: Record<string, { count: number; examples: string[] }> = {};
+      const timeline: VoteEvent[] = [];
+
       for (const v of rvotes) {
         const weight = getAuthorityWeight(v.authority);
-        if (weight !== 1) authorityApplied = true;
-        if (v.vote === 'like') weightedLikes += (v.weight ?? 1) * weight;
-        if (v.vote === 'dislike') weightedDislikes += (v.weight ?? 1) * weight;
+        const memberWeight = options?.collection?.collaborators.find(m => m.userId === v.userId)?.voteWeight ?? 1;
+        const finalWeight = (v.weight ?? 1) * weight * memberWeight;
+        
+        if (weight !== 1 || memberWeight !== 1) authorityApplied = true;
+        
+        const voterInfo: VoterInfo = {
+          userId: v.userId,
+          name: options?.collection?.collaborators.find(m => m.userId === v.userId)?.name ?? 'Unknown',
+          avatar: options?.collection?.collaborators.find(m => m.userId === v.userId)?.avatar ?? '',
+          timestamp: new Date(v.timestamp ?? Date.now()),
+          weight: finalWeight,
+          isVerified: options?.collection?.collaborators.find(m => m.userId === v.userId)?.isVerified,
+          reason: v.reason
+        };
+
+        if (v.vote === 'like') {
+          weightedLikes += finalWeight;
+          likeVoters.push(voterInfo);
+        } else {
+          weightedDislikes += finalWeight;
+          dislikeVoters.push(voterInfo);
+        }
+
+        // Track reasons
+        if (v.reason) {
+          const category = categorizeReason(v.reason);
+          if (!reasons[category]) {
+            reasons[category] = { count: 0, examples: [] };
+          }
+          reasons[category].count++;
+          if (reasons[category].examples.length < 3) {
+            reasons[category].examples.push(v.reason);
+          }
+        }
+
+        // Add to timeline
+        timeline.push({
+          id: `${v.userId}-${v.restaurantId}-${v.timestamp}`,
+          userId: v.userId,
+          restaurantId: v.restaurantId,
+          vote: v.vote,
+          timestamp: new Date(v.timestamp ?? Date.now()),
+          reason: v.reason
+        });
 
         if (v.timestamp) {
           const ageDays = Math.max(0, (now - new Date(v.timestamp).getTime()) / (1000 * 60 * 60 * 24));
@@ -53,13 +103,16 @@ export function computeRankings(
 
       const engagement = (restaurant.commentsCount ?? 0) + (restaurant.savesCount ?? 0) + (restaurant.sharesCount ?? 0);
       const engagementBoost = Math.min(1.5, engagement / 50);
+      const discussionCount = options?.discussions?.[restaurant.id] ?? 0;
 
       const consensus = computeConsensus(likeRatio);
 
       let badge: RankedRestaurantMeta['badge'] | undefined = undefined;
-      if (totalVotes >= 3 && likeRatio >= 0.7) badge = 'group_favorite';
+      const consensusThreshold = options?.collection?.settings.consensusThreshold ?? 0.7;
+      
+      if (totalVotes >= 3 && likeRatio >= consensusThreshold) badge = 'group_favorite';
       if (totalVotes >= 3 && likes === totalVotes) badge = 'unanimous';
-      if (totalVotes >= 5 && likeRatio >= 0.45 && likeRatio <= 0.55 && engagement >= 10) badge = 'debated';
+      if (totalVotes >= 5 && likeRatio >= 0.45 && likeRatio <= 0.55 && (engagement >= 10 || discussionCount >= 5)) badge = 'debated';
 
       const approvalPercent = Math.round(likeRatio * 100);
 
@@ -79,6 +132,23 @@ export function computeRankings(
         else if (recentDislikes >= recentLikes + 2) trend = 'down';
       }
 
+      // Get abstentions
+      const allMemberIds = options?.collection?.collaborators.map(m => m.userId) ?? [];
+      const votedMemberIds = rvotes.map(v => v.userId);
+      const abstentions = allMemberIds.filter(id => !votedMemberIds.includes(id));
+
+      const voteDetails: VoteBreakdown = {
+        likeVoters: likeVoters.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()),
+        dislikeVoters: dislikeVoters.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()),
+        abstentions,
+        reasons: Object.entries(reasons).map(([category, data]) => ({
+          category,
+          count: data.count,
+          examples: data.examples
+        })).sort((a, b) => b.count - a.count),
+        timeline: timeline.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      };
+
       const meta: RankedRestaurantMeta = {
         restaurantId: restaurant.id,
         netScore,
@@ -93,6 +163,9 @@ export function computeRankings(
         badge,
         trend,
         approvalPercent,
+        rank: 0, // Will be set after sorting
+        voteDetails,
+        discussionCount
       };
 
       return { restaurant, meta, composite } as { restaurant: Restaurant; meta: RankedRestaurantMeta } & { composite: number };
@@ -101,6 +174,7 @@ export function computeRankings(
     const sorted = results
       .sort((a, b) => b.composite - a.composite)
       .map((r, idx, arr) => {
+        r.meta.rank = idx + 1;
         if (idx === 0 && arr.length > 0) {
           r.meta.badge = r.meta.badge ?? 'top_choice';
         }
@@ -111,7 +185,7 @@ export function computeRankings(
     return sorted;
   } catch (e) {
     console.error('[ranking] error computing rankings', e);
-    return restaurants.map((restaurant) => ({
+    return restaurants.map((restaurant, index) => ({
       restaurant,
       meta: {
         restaurantId: restaurant.id,
@@ -123,9 +197,88 @@ export function computeRankings(
         recencyBoost: 0,
         distanceBoost: 0,
         authorityApplied: false,
-        consensus: 'low',
+        consensus: 'low' as const,
         approvalPercent: 0,
+        rank: index + 1,
+        voteDetails: {
+          likeVoters: [],
+          dislikeVoters: [],
+          abstentions: [],
+          reasons: [],
+          timeline: []
+        },
+        discussionCount: 0
       },
     }));
   }
+}
+
+function categorizeReason(reason: string): string {
+  const lower = reason.toLowerCase();
+  if (lower.includes('expensive') || lower.includes('price') || lower.includes('cost')) return 'Price';
+  if (lower.includes('service') || lower.includes('staff') || lower.includes('waiter')) return 'Service';
+  if (lower.includes('food') || lower.includes('taste') || lower.includes('flavor') || lower.includes('delicious')) return 'Food Quality';
+  if (lower.includes('atmosphere') || lower.includes('ambiance') || lower.includes('vibe') || lower.includes('mood')) return 'Atmosphere';
+  if (lower.includes('location') || lower.includes('distance') || lower.includes('far') || lower.includes('close')) return 'Location';
+  if (lower.includes('wait') || lower.includes('busy') || lower.includes('crowded') || lower.includes('reservation')) return 'Availability';
+  if (lower.includes('clean') || lower.includes('dirty') || lower.includes('hygiene')) return 'Cleanliness';
+  return 'Other';
+}
+
+export function generateGroupRecommendations(
+  restaurants: { restaurant: Restaurant; meta: RankedRestaurantMeta }[],
+  collection: Collection
+): GroupRecommendation[] {
+  const recommendations: GroupRecommendation[] = [];
+  
+  // Find controversial choices (high engagement, split votes)
+  const controversial = restaurants.filter(r => 
+    r.meta.badge === 'debated' && r.meta.likeRatio >= 0.4 && r.meta.likeRatio <= 0.6
+  );
+  
+  if (controversial.length > 0) {
+    const topControversial = controversial[0];
+    const similarCuisines = restaurants.filter(r => 
+      r.restaurant.cuisine === topControversial.restaurant.cuisine &&
+      r.restaurant.id !== topControversial.restaurant.id &&
+      r.meta.consensus === 'strong'
+    ).slice(0, 3);
+    
+    if (similarCuisines.length > 0) {
+      recommendations.push({
+        id: `compromise-${Date.now()}`,
+        type: 'compromise',
+        title: `Since the group is split on ${topControversial.restaurant.name}`,
+        description: `Here are highly-rated ${topControversial.restaurant.cuisine} alternatives with strong group consensus`,
+        restaurants: similarCuisines.map(r => r.restaurant.id),
+        confidence: 0.8,
+        reasoning: `Based on similar cuisine preferences and higher group agreement`,
+        createdAt: new Date()
+      });
+    }
+  }
+  
+  // Find alternatives for low-consensus choices
+  const lowConsensus = restaurants.filter(r => r.meta.consensus === 'low' && r.meta.likes > 0);
+  if (lowConsensus.length > 0) {
+    const alternatives = restaurants.filter(r => 
+      r.meta.consensus === 'strong' &&
+      r.restaurant.priceRange === lowConsensus[0].restaurant.priceRange
+    ).slice(0, 3);
+    
+    if (alternatives.length > 0) {
+      recommendations.push({
+        id: `alternative-${Date.now()}`,
+        type: 'alternative',
+        title: 'Alternative suggestions',
+        description: 'Based on your group\'s preferences and similar price range',
+        restaurants: alternatives.map(r => r.restaurant.id),
+        confidence: 0.7,
+        reasoning: 'Similar price range with higher group consensus',
+        createdAt: new Date()
+      });
+    }
+  }
+  
+  return recommendations;
 }

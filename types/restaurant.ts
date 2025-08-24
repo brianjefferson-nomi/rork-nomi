@@ -32,11 +32,61 @@ export interface Collection {
   coverImage: string;
   restaurants: string[];
   createdBy: string;
-  collaborators: string[];
+  collaborators: CollectionMember[];
   createdAt: Date;
   occasion?: string;
   isPublic: boolean;
   likes: number;
+  votingRules: VotingRules;
+  settings: CollectionSettings;
+  analytics?: CollectionAnalytics;
+}
+
+export interface CollectionMember {
+  userId: string;
+  name: string;
+  avatar: string;
+  role: 'admin' | 'member';
+  joinedAt: Date;
+  voteWeight: number;
+  isVerified?: boolean;
+  expertise?: string[];
+}
+
+export interface VotingRules {
+  equalVoting: boolean;
+  adminWeighted: boolean;
+  expertiseWeighted: boolean;
+  minimumParticipation: number;
+  votingDeadline?: Date;
+  allowVoteChanges: boolean;
+  anonymousVoting: boolean;
+}
+
+export interface CollectionSettings {
+  voteVisibility: 'public' | 'anonymous' | 'admin_only';
+  discussionEnabled: boolean;
+  autoRankingEnabled: boolean;
+  consensusThreshold: number;
+}
+
+export interface CollectionAnalytics {
+  totalVotes: number;
+  participationRate: number;
+  consensusScore: number;
+  topInfluencers: string[];
+  votingPatterns: Record<string, number>;
+  decisionTimeline: VoteEvent[];
+}
+
+export interface VoteEvent {
+  id: string;
+  userId: string;
+  restaurantId: string;
+  vote: 'like' | 'dislike';
+  timestamp: Date;
+  reason?: string;
+  previousVote?: 'like' | 'dislike';
 }
 
 export interface UserProfile {
@@ -60,10 +110,13 @@ export interface UserProfile {
 export interface RestaurantVote {
   restaurantId: string;
   userId: string;
+  collectionId?: string;
   vote: 'like' | 'dislike';
   timestamp?: string;
   authority?: 'regular' | 'verified' | 'admin';
   weight?: number;
+  reason?: string;
+  isAnonymous?: boolean;
 }
 
 export interface RestaurantContributor {
@@ -127,4 +180,56 @@ export interface RankedRestaurantMeta {
   badge?: 'group_favorite' | 'debated' | 'unanimous' | 'top_choice';
   trend?: 'up' | 'down' | 'steady';
   approvalPercent: number;
+  rank: number;
+  voteDetails: VoteBreakdown;
+  discussionCount: number;
+}
+
+export interface VoteBreakdown {
+  likeVoters: VoterInfo[];
+  dislikeVoters: VoterInfo[];
+  abstentions: string[];
+  reasons: VoteReason[];
+  timeline: VoteEvent[];
+}
+
+export interface VoterInfo {
+  userId: string;
+  name: string;
+  avatar: string;
+  timestamp: Date;
+  weight: number;
+  isVerified?: boolean;
+  reason?: string;
+}
+
+export interface VoteReason {
+  category: string;
+  count: number;
+  examples: string[];
+}
+
+export interface RestaurantDiscussion {
+  id: string;
+  restaurantId: string;
+  collectionId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  message: string;
+  timestamp: Date;
+  replies?: RestaurantDiscussion[];
+  likes: number;
+  isEdited?: boolean;
+}
+
+export interface GroupRecommendation {
+  id: string;
+  type: 'compromise' | 'alternative' | 'similar';
+  title: string;
+  description: string;
+  restaurants: string[];
+  confidence: number;
+  reasoning: string;
+  createdAt: Date;
 }
