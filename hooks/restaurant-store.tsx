@@ -370,8 +370,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, [user?.id, queryClient]);
   
-  const removeRestaurantFromCollection = removeRestaurantFromPlan;
-  const deleteCollection = deletePlan;
+  const removeRestaurantFromCollection = useCallback((collectionId: string, restaurantId: string) => {
+    return removeRestaurantFromPlan(collectionId, restaurantId);
+  }, [removeRestaurantFromPlan]);
+  
+  const deleteCollection = useCallback((collectionId: string) => {
+    return deletePlan(collectionId);
+  }, [deletePlan]);
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
     return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
   }, []);
