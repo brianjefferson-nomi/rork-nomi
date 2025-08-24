@@ -156,27 +156,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Users size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Suggested Contributors</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>See all</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.contributorsContainer}>
-            {suggestedContributors.map(contributor => (
-              <ContributorCard
-                key={contributor.id}
-                contributor={contributor}
-                compact={true}
-                onFollow={(id) => console.log('Follow contributor:', id)}
-                onViewProfile={(id) => console.log('View profile:', id)}
-                onAddToList={(id) => console.log('Add to list:', id)}
-              />
-            ))}
-          </View>
-        </View>
+
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -263,7 +243,7 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     marginRight: 12,
-    width: 280,
+    width: 260,
   },
   collectionsGrid: {
     flexDirection: 'row',

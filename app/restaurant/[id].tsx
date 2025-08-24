@@ -251,67 +251,40 @@ export default function RestaurantDetailScreen() {
             </View>
           </View>
 
-          {/* Photo Gallery Section */}
-          {images.length > 1 && (
-            <View style={styles.gallerySection}>
-              <Text style={styles.sectionTitle}>Photo Gallery</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryScroll}>
-                {images.map((imageUrl, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.galleryImageContainer}
-                    onPress={() => setCurrentImageIndex(index)}
-                  >
-                    <Image source={{ uri: imageUrl }} style={styles.galleryImage} />
-                    <View style={styles.galleryImageOverlay}>
-                      <Text style={styles.galleryImageLabel}>
-                        {index === 0 ? 'Main' : 
-                         index === 1 ? 'Interior' :
-                         index === 2 ? 'Food' :
-                         index === 3 ? 'Atmosphere' :
-                         index === 4 ? 'Kitchen' : 'Signature'}
-                      </Text>
+
+
+
+
+          {/* Menu Highlights - Only show if data exists */}
+          {((restaurant.aiTopPicks && restaurant.aiTopPicks.length > 0) || 
+            (restaurant.menuHighlights && restaurant.menuHighlights.length > 0) ||
+            (foodRecommendations && foodRecommendations.length > 0)) && (
+            <View style={styles.menuSection}>
+              <View style={styles.menuHeader}>
+                <Utensils size={20} color="#FF6B6B" />
+                <Text style={styles.sectionTitle}>Menu Highlights</Text>
+              </View>
+              {loadingEnhancements ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#FF6B6B" />
+                  <Text style={styles.loadingText}>Loading menu items...</Text>
+                </View>
+              ) : (
+                <View style={styles.menuGrid}>
+                  {(foodRecommendations.length > 0 ? foodRecommendations : 
+                    restaurant.aiTopPicks || restaurant.menuHighlights || []).map((item, i) => (
+                    <View key={i} style={styles.menuHighlightItem}>
+                      <View style={styles.menuItemIcon}>
+                        <Star size={14} color="#FFD700" fill="#FFD700" />
+                      </View>
+                      <Text style={styles.menuItemName}>{item}</Text>
+                      <Text style={styles.menuItemSubtext}>Popular choice</Text>
                     </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  ))}
+                </View>
+              )}
             </View>
           )}
-
-          {/* Food Recommendations Section */}
-          <View style={styles.foodRecsSection}>
-            <View style={styles.foodRecsHeader}>
-              <Utensils size={20} color="#FF6B6B" />
-              <Text style={styles.sectionTitle}>Must-Try Dishes</Text>
-            </View>
-            {loadingEnhancements ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#FF6B6B" />
-                <Text style={styles.loadingText}>Loading recommendations...</Text>
-              </View>
-            ) : (
-              <View style={styles.foodRecsGrid}>
-                {foodRecommendations.map((item, i) => (
-                  <View key={i} style={styles.foodRecItem}>
-                    <View style={styles.foodRecIcon}>
-                      <Star size={14} color="#FFD700" fill="#FFD700" />
-                    </View>
-                    <Text style={styles.foodRecText}>{item}</Text>
-                    <Text style={styles.foodRecSubtext}>Highly recommended</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.menuSection}>
-            <Text style={styles.sectionTitle}>Menu Highlights</Text>
-            {(restaurant.aiTopPicks || restaurant.menuHighlights).map((item, i) => (
-              <View key={i} style={styles.menuItem}>
-                <Text style={styles.menuItemText}>• {item}</Text>
-              </View>
-            ))}
-          </View>
 
           {sortedContributors.length > 0 && (
             <View style={styles.contributorsSection}>
@@ -625,12 +598,41 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
   },
-  menuItem: {
-    paddingVertical: 6,
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
-  menuItemText: {
+  menuGrid: {
+    gap: 12,
+  },
+  menuHighlightItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    gap: 12,
+  },
+  menuItemIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFF3CD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuItemName: {
+    flex: 1,
     fontSize: 15,
-    color: '#333',
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  menuItemSubtext: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
   },
   votingSection: {
     backgroundColor: '#FFF',
@@ -827,52 +829,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  gallerySection: {
-    backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  galleryScroll: {
-    flexDirection: 'row',
-  },
-  galleryImageContainer: {
-    marginRight: 12,
-    position: 'relative',
-  },
-  galleryImage: {
-    width: 120,
-    height: 80,
-    borderRadius: 8,
-  },
-  galleryImageOverlay: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  galleryImageLabel: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  foodRecsSection: {
-    backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  foodRecsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -883,35 +839,5 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     color: '#666',
-  },
-  foodRecsGrid: {
-    gap: 12,
-  },
-  foodRecItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    gap: 12,
-  },
-  foodRecIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFF3CD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  foodRecText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  foodRecSubtext: {
-    fontSize: 11,
-    color: '#666',
-    fontStyle: 'italic',
   },
 });

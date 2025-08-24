@@ -92,14 +92,18 @@ export default function CollectionDetailScreen() {
     try {
       if (Platform.OS === 'web') {
         // Web fallback - copy to clipboard
-        if (navigator.clipboard) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(message);
           Alert.alert('Copied!', 'Collection link copied to clipboard');
         } else {
-          // Fallback for older browsers
-          Alert.alert('Share Collection', message, [
-            { text: 'OK' }
-          ]);
+          // Fallback for older browsers - create a temporary textarea
+          const textArea = document.createElement('textarea');
+          textArea.value = message;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          Alert.alert('Copied!', 'Collection link copied to clipboard');
         }
       } else {
         // Native sharing
@@ -111,7 +115,22 @@ export default function CollectionDetailScreen() {
       }
     } catch (error) {
       console.error('Error sharing collection:', error);
+      // Final fallback - show the message in an alert
       Alert.alert('Share Collection', message, [
+        { text: 'Copy to Clipboard', onPress: () => {
+          try {
+            if (Platform.OS === 'web') {
+              const textArea = document.createElement('textarea');
+              textArea.value = message;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textArea);
+            }
+          } catch (e) {
+            console.error('Fallback copy failed:', e);
+          }
+        }},
         { text: 'OK' }
       ]);
     }
@@ -122,13 +141,18 @@ export default function CollectionDetailScreen() {
     
     try {
       if (Platform.OS === 'web') {
-        if (navigator.clipboard) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(inviteLink);
           Alert.alert('Copied!', 'Invite link copied to clipboard');
         } else {
-          Alert.alert('Invite Link', inviteLink, [
-            { text: 'OK' }
-          ]);
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = inviteLink;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          Alert.alert('Copied!', 'Invite link copied to clipboard');
         }
       } else {
         await Clipboard.setString(inviteLink);
@@ -137,6 +161,20 @@ export default function CollectionDetailScreen() {
     } catch (error) {
       console.error('Error copying invite link:', error);
       Alert.alert('Invite Link', inviteLink, [
+        { text: 'Copy to Clipboard', onPress: () => {
+          try {
+            if (Platform.OS === 'web') {
+              const textArea = document.createElement('textarea');
+              textArea.value = inviteLink;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textArea);
+            }
+          } catch (e) {
+            console.error('Fallback copy failed:', e);
+          }
+        }},
         { text: 'OK' }
       ]);
     }
@@ -164,9 +202,7 @@ export default function CollectionDetailScreen() {
           title: collection.name,
           headerRight: () => (
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setShowInviteModal(true)}>
-                <UserPlus size={20} color="#3B82F6" />
-              </TouchableOpacity>
+
               <TouchableOpacity onPress={handleShareCollection}>
                 <Share2 size={20} color="#6B7280" />
               </TouchableOpacity>

@@ -1,6 +1,23 @@
 const OPENAI_API_KEY = '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';
 const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 
+// Enhanced API configuration for better restaurant data
+const API_CONFIG = {
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    key: OPENAI_API_KEY
+  },
+  rapidapi: {
+    key: RAPIDAPI_KEY,
+    hosts: {
+      googlePlaces: 'google-map-places.p.rapidapi.com',
+      yelp: 'yelp-scraper.p.rapidapi.com',
+      tripadvisor: 'tripadvisor16.p.rapidapi.com',
+      unsplash: 'unsplash-image-search.p.rapidapi.com'
+    }
+  }
+};
+
 // OpenAI API for generating descriptions and vibe tags
 export const generateRestaurantDescription = async (reviews: string[], name: string) => {
   try {
@@ -103,21 +120,27 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[]) =
   }
 };
 
-// Google Places API
+// Enhanced Google Places API with better error handling and photo support
 export const searchGooglePlaces = async (query: string, location: string) => {
   try {
+    console.log(`[GooglePlaces] Searching for: ${query} in ${location}`);
     const response = await fetch(
-      `https://google-map-places.p.rapidapi.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' ' + location)}&radius=5000&type=restaurant`,
+      `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant ' + location)}&radius=10000&type=restaurant`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'google-map-places.p.rapidapi.com'
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googlePlaces
         }
       }
     );
     
+    if (!response.ok) {
+      throw new Error(`Google Places API error: ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log(`[GooglePlaces] Found ${data.results?.length || 0} results`);
     return data.results || [];
   } catch (error) {
     console.error('Error searching Google Places:', error);
@@ -127,16 +150,21 @@ export const searchGooglePlaces = async (query: string, location: string) => {
 
 export const getGooglePlaceDetails = async (placeId: string) => {
   try {
+    console.log(`[GooglePlaces] Getting details for place: ${placeId}`);
     const response = await fetch(
-      `https://google-map-places.p.rapidapi.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,formatted_phone_number,formatted_address,opening_hours,website,reviews,photos,price_level`,
+      `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,formatted_phone_number,formatted_address,opening_hours,website,reviews,photos,price_level,types`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'google-map-places.p.rapidapi.com'
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googlePlaces
         }
       }
     );
+    
+    if (!response.ok) {
+      throw new Error(`Google Places Details API error: ${response.status}`);
+    }
     
     const data = await response.json();
     return data.result;
@@ -146,21 +174,38 @@ export const getGooglePlaceDetails = async (placeId: string) => {
   }
 };
 
-// Yelp API
+// Get Google Places photo URL
+export const getGooglePlacePhoto = async (photoReference: string, maxWidth: number = 800) => {
+  try {
+    const photoUrl = `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/photo?photoreference=${photoReference}&maxwidth=${maxWidth}`;
+    return photoUrl;
+  } catch (error) {
+    console.error('Error getting place photo:', error);
+    return null;
+  }
+};
+
+// Enhanced Yelp API with better search parameters
 export const searchYelp = async (term: string, location: string) => {
   try {
+    console.log(`[Yelp] Searching for: ${term} in ${location}`);
     const response = await fetch(
-      `https://yelp-scraper.p.rapidapi.com/search?query=${encodeURIComponent(term)}&location=${encodeURIComponent(location)}&limit=20`,
+      `https://${API_CONFIG.rapidapi.hosts.yelp}/search?query=${encodeURIComponent(term + ' restaurant')}&location=${encodeURIComponent(location)}&limit=20&sort_by=rating`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'yelp-scraper.p.rapidapi.com'
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.yelp
         }
       }
     );
     
+    if (!response.ok) {
+      throw new Error(`Yelp API error: ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log(`[Yelp] Found ${data.businesses?.length || 0} results`);
     return data.businesses || [];
   } catch (error) {
     console.error('Error searching Yelp:', error);
@@ -232,88 +277,123 @@ export const getTripAdvisorDetails = async (restaurantId: string) => {
   }
 };
 
-// Unsplash API for fallback images
-export const getUnsplashImage = async (query: string) => {
+// Enhanced Unsplash API for high-quality restaurant images
+export const getUnsplashImage = async (query: string, count: number = 1) => {
   try {
+    console.log(`[Unsplash] Searching for images: ${query}`);
     const response = await fetch(
-      `https://unsplash-image-search.p.rapidapi.com/search?query=${encodeURIComponent(query)}&per_page=1`,
+      `https://${API_CONFIG.rapidapi.hosts.unsplash}/search?query=${encodeURIComponent(query + ' restaurant food')}&per_page=${count}&orientation=landscape`,
       {
         method: 'GET',
         headers: {
-          'X-RapidAPI-Key': RAPIDAPI_KEY,
-          'X-RapidAPI-Host': 'unsplash-image-search.p.rapidapi.com'
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.unsplash
         }
       }
     );
     
+    if (!response.ok) {
+      throw new Error(`Unsplash API error: ${response.status}`);
+    }
+    
     const data = await response.json();
-    return data.results?.[0]?.urls?.regular || null;
+    const images = data.results?.map((img: any) => img.urls?.regular).filter(Boolean) || [];
+    console.log(`[Unsplash] Found ${images.length} images`);
+    return count === 1 ? images[0] : images;
   } catch (error) {
     console.error('Error getting Unsplash image:', error);
-    return null;
+    return count === 1 ? null : [];
   }
 };
 
-// Location service to determine user's city
+// Enhanced location service with better city detection
 export const getUserLocation = async (): Promise<{ city: string; lat: number; lng: number } | null> => {
   try {
-    if (navigator.geolocation) {
-      return new Promise((resolve, reject) => {
+    console.log('[Location] Getting user location...');
+    
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      return new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
+            console.log(`[Location] Got coordinates: ${latitude}, ${longitude}`);
             
             // Reverse geocoding to get city
             try {
               const response = await fetch(
-                `https://google-map-places.p.rapidapi.com/maps/api/geocode/json?latlng=${latitude},${longitude}`,
+                `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/geocode/json?latlng=${latitude},${longitude}`,
                 {
                   method: 'GET',
                   headers: {
-                    'X-RapidAPI-Key': RAPIDAPI_KEY,
-                    'X-RapidAPI-Host': 'google-map-places.p.rapidapi.com'
+                    'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+                    'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googlePlaces
                   }
                 }
               );
               
-              const data = await response.json();
-              const addressComponents = data.results?.[0]?.address_components || [];
-              
-              let city = '';
-              for (const component of addressComponents) {
-                if (component.types.includes('locality')) {
-                  city = component.long_name;
-                  break;
+              if (response.ok) {
+                const data = await response.json();
+                const addressComponents = data.results?.[0]?.address_components || [];
+                
+                let city = '';
+                let state = '';
+                
+                for (const component of addressComponents) {
+                  if (component.types.includes('locality')) {
+                    city = component.long_name;
+                  }
+                  if (component.types.includes('administrative_area_level_1')) {
+                    state = component.short_name;
+                  }
+                }
+                
+                console.log(`[Location] Detected city: ${city}, state: ${state}`);
+                
+                // Enhanced city detection for MVP (NYC and LA)
+                if (city.toLowerCase().includes('new york') || 
+                    city.toLowerCase().includes('manhattan') || 
+                    city.toLowerCase().includes('brooklyn') || 
+                    city.toLowerCase().includes('queens') || 
+                    city.toLowerCase().includes('bronx') ||
+                    state === 'NY') {
+                  resolve({ city: 'New York', lat: latitude, lng: longitude });
+                  return;
+                } else if (city.toLowerCase().includes('los angeles') || 
+                          city.toLowerCase().includes('hollywood') || 
+                          city.toLowerCase().includes('beverly hills') || 
+                          city.toLowerCase().includes('santa monica') ||
+                          (state === 'CA' && (city.toLowerCase().includes('la') || city.toLowerCase().includes('angeles')))) {
+                  resolve({ city: 'Los Angeles', lat: latitude, lng: longitude });
+                  return;
                 }
               }
-              
-              // Restrict to NYC and LA for MVP
-              if (city.toLowerCase().includes('new york') || city.toLowerCase().includes('manhattan') || city.toLowerCase().includes('brooklyn') || city.toLowerCase().includes('queens') || city.toLowerCase().includes('bronx')) {
-                resolve({ city: 'New York', lat: latitude, lng: longitude });
-              } else if (city.toLowerCase().includes('los angeles') || city.toLowerCase().includes('hollywood') || city.toLowerCase().includes('beverly hills') || city.toLowerCase().includes('santa monica')) {
-                resolve({ city: 'Los Angeles', lat: latitude, lng: longitude });
-              } else {
-                // Default to NYC if not in supported cities
-                resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
-              }
             } catch (error) {
-              console.error('Error reverse geocoding:', error);
-              resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
+              console.error('[Location] Error reverse geocoding:', error);
             }
+            
+            // Default to NYC if location not supported
+            console.log('[Location] Location not in supported cities, defaulting to NYC');
+            resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
           },
           (error) => {
-            console.error('Error getting location:', error);
+            console.error('[Location] Error getting location:', error);
             // Default to NYC
             resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
+          },
+          {
+            timeout: 10000,
+            enableHighAccuracy: false,
+            maximumAge: 300000 // 5 minutes
           }
         );
       });
     } else {
       // Default to NYC if geolocation not available
+      console.log('[Location] Geolocation not available, defaulting to NYC');
       return { city: 'New York', lat: 40.7128, lng: -74.0060 };
     }
   } catch (error) {
-    console.error('Error in getUserLocation:', error);
+    console.error('[Location] Error in getUserLocation:', error);
     return { city: 'New York', lat: 40.7128, lng: -74.0060 };
   }
 };
@@ -449,59 +529,240 @@ const generateMockReviews = (name: string, cuisine: string) => {
   return reviews.slice(0, Math.floor(Math.random() * 3) + 2);
 };
 
-// Aggregate restaurant data from multiple sources
+// Enhanced restaurant data aggregation with real API integration
 export const aggregateRestaurantData = async (query: string, location: string) => {
   try {
-    console.log(`Searching for restaurants: ${query} in ${location}`);
+    console.log(`[API] Searching for restaurants: ${query} in ${location}`);
     
-    // For now, use mock data while APIs are being configured
-    // In production, you would uncomment the API calls below
+    // Use real APIs with fallback to mock data
+    let allResults: any[] = [];
     
-    /*
-    // Search all APIs in parallel
-    const [googleResults, yelpResults, tripAdvisorResults] = await Promise.all([
-      searchGooglePlaces(query, location),
-      searchYelp(query, location),
-      searchTripAdvisor(query, location)
-    ]);
+    try {
+      // Search all APIs in parallel with timeout
+      const apiPromises = [
+        Promise.race([
+          searchGooglePlaces(query, location),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Google Places timeout')), 5000))
+        ]),
+        Promise.race([
+          searchYelp(query, location),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 5000))
+        ]),
+        Promise.race([
+          searchTripAdvisor(query, location),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
+        ])
+      ];
+      
+      const [googleResults, yelpResults, tripAdvisorResults] = await Promise.allSettled(apiPromises);
+      
+      // Process successful results
+      const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
+      const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
+      const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
+      
+      console.log(`[API] Results - Google: ${googleData.length}, Yelp: ${yelpData.length}, TripAdvisor: ${tripAdvisorData.length}`);
+      
+      // Combine and deduplicate results
+      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, location);
+      
+    } catch (error) {
+      console.error('[API] Error with real APIs, falling back to mock data:', error);
+    }
     
-    console.log('API Results:', { googleResults: googleResults.length, yelpResults: yelpResults.length, tripAdvisorResults: tripAdvisorResults.length });
-    */
+    // If no real results, use enhanced mock data
+    if (allResults.length === 0) {
+      console.log('[API] Using mock data as fallback');
+      allResults = generateMockSearchResults(query, location);
+    }
     
-    // Generate mock results for demonstration
-    const mockResults = generateMockSearchResults(query, location);
-    console.log(`Generated ${mockResults.length} mock search results`);
-    
-    // Process and enhance results with AI-generated content
+    // Enhance results with AI-generated content (limit to first 10 for performance)
+    const resultsToEnhance = allResults.slice(0, 10);
     const enhancedResults = [];
     
-    for (const result of mockResults) {
+    for (const result of resultsToEnhance) {
       try {
-        // Generate AI-enhanced content
-        const [description, vibeTags, topPicks] = await Promise.all([
-          generateRestaurantDescription(result.reviews, result.name),
-          generateVibeTags(result.reviews, result.cuisine),
-          generateTopPicks([], result.reviews)
-        ]);
+        // Generate AI-enhanced content with timeout
+        const enhancementPromises = [
+          Promise.race([
+            generateRestaurantDescription(result.reviews || [], result.name),
+            new Promise((resolve) => setTimeout(() => resolve(result.description || ''), 3000))
+          ]),
+          Promise.race([
+            generateVibeTags(result.reviews || [], result.cuisine),
+            new Promise((resolve) => setTimeout(() => resolve(result.vibeTags || []), 3000))
+          ]),
+          Promise.race([
+            generateTopPicks([], result.reviews || []),
+            new Promise((resolve) => setTimeout(() => resolve(result.topPicks || []), 3000))
+          ])
+        ];
+        
+        const [description, vibeTags, topPicks] = await Promise.all(enhancementPromises);
         
         enhancedResults.push({
           ...result,
-          description: description || result.description,
-          vibeTags: vibeTags.length > 0 ? vibeTags : result.vibeTags,
-          topPicks: topPicks.length > 0 ? topPicks : result.topPicks
+          description: description || result.description || 'A great dining experience awaits.',
+          vibeTags: (vibeTags && vibeTags.length > 0) ? vibeTags : (result.vibeTags || ['popular']),
+          topPicks: (topPicks && topPicks.length > 0) ? topPicks : (result.topPicks || [])
         });
       } catch (error) {
-        console.error(`Error enhancing result for ${result.name}:`, error);
+        console.error(`[API] Error enhancing result for ${result.name}:`, error);
         // Use original result if enhancement fails
-        enhancedResults.push(result);
+        enhancedResults.push({
+          ...result,
+          description: result.description || 'A great dining experience awaits.',
+          vibeTags: result.vibeTags || ['popular'],
+          topPicks: result.topPicks || []
+        });
       }
     }
     
-    console.log(`Successfully processed ${enhancedResults.length} search results`);
+    // Add remaining results without enhancement
+    if (allResults.length > 10) {
+      enhancedResults.push(...allResults.slice(10).map(result => ({
+        ...result,
+        description: result.description || 'A great dining experience awaits.',
+        vibeTags: result.vibeTags || ['popular'],
+        topPicks: result.topPicks || []
+      })));
+    }
+    
+    console.log(`[API] Successfully processed ${enhancedResults.length} search results`);
     return enhancedResults;
   } catch (error) {
-    console.error('Error aggregating restaurant data:', error);
-    // Return mock data as fallback
+    console.error('[API] Error aggregating restaurant data:', error);
+    // Return mock data as final fallback
     return generateMockSearchResults(query, location);
   }
+};
+
+// Combine results from different APIs and remove duplicates
+const combineApiResults = async (googleResults: any[], yelpResults: any[], tripAdvisorResults: any[], location: string) => {
+  const combined: any[] = [];
+  const seenNames = new Set<string>();
+  
+  // Process Google Places results
+  for (const place of googleResults) {
+    if (!place.name || seenNames.has(place.name.toLowerCase())) continue;
+    
+    seenNames.add(place.name.toLowerCase());
+    
+    // Get additional details if available
+    let details = null;
+    if (place.place_id) {
+      try {
+        details = await getGooglePlaceDetails(place.place_id);
+      } catch (error) {
+        console.error('Error getting place details:', error);
+      }
+    }
+    
+    // Process photos
+    const photos = [];
+    if (place.photos && place.photos.length > 0) {
+      for (const photo of place.photos.slice(0, 3)) {
+        if (photo.photo_reference) {
+          const photoUrl = await getGooglePlacePhoto(photo.photo_reference);
+          if (photoUrl) photos.push(photoUrl);
+        }
+      }
+    }
+    
+    combined.push({
+      id: `google_${place.place_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: place.name,
+      cuisine: determineCuisineFromTypes(place.types || details?.types || []),
+      rating: place.rating || details?.rating || 4.0,
+      priceLevel: place.price_level || details?.price_level || 2,
+      address: place.formatted_address || details?.formatted_address || '',
+      phone: details?.formatted_phone_number || '',
+      website: details?.website || '',
+      photos: photos.length > 0 ? photos : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
+      reviews: (details?.reviews || []).map((r: any) => r.text).slice(0, 3),
+      source: 'google',
+      location: place.geometry?.location || { lat: 40.7128, lng: -74.0060 }
+    });
+  }
+  
+  // Process Yelp results
+  for (const business of yelpResults) {
+    if (!business.name || seenNames.has(business.name.toLowerCase())) continue;
+    
+    seenNames.add(business.name.toLowerCase());
+    
+    combined.push({
+      id: `yelp_${business.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: business.name,
+      cuisine: determineCuisineFromCategories(business.categories || []),
+      rating: business.rating || 4.0,
+      priceLevel: business.price ? business.price.length : 2,
+      address: business.location?.display_address?.join(', ') || '',
+      phone: business.phone || '',
+      website: business.url || '',
+      photos: business.photos ? business.photos.slice(0, 3) : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
+      reviews: [], // Yelp reviews would need separate API call
+      source: 'yelp',
+      location: business.coordinates || { lat: 40.7128, lng: -74.0060 }
+    });
+  }
+  
+  // Process TripAdvisor results (similar pattern)
+  for (const restaurant of tripAdvisorResults) {
+    if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
+    
+    seenNames.add(restaurant.name.toLowerCase());
+    
+    combined.push({
+      id: `tripadvisor_${restaurant.location_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: restaurant.name,
+      cuisine: restaurant.cuisine?.[0]?.name || 'International',
+      rating: parseFloat(restaurant.rating) || 4.0,
+      priceLevel: restaurant.price_level ? parseInt(restaurant.price_level.replace(/\$/g, '').length) : 2,
+      address: restaurant.address || '',
+      phone: restaurant.phone || '',
+      website: restaurant.website || '',
+      photos: restaurant.photo?.images ? [restaurant.photo.images.large.url] : [`https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop`],
+      reviews: [],
+      source: 'tripadvisor',
+      location: { lat: 40.7128, lng: -74.0060 }
+    });
+  }
+  
+  return combined;
+};
+
+// Helper function to determine cuisine from Google Places types
+const determineCuisineFromTypes = (types: string[]): string => {
+  const cuisineMap: Record<string, string> = {
+    'italian_restaurant': 'Italian',
+    'chinese_restaurant': 'Chinese',
+    'japanese_restaurant': 'Japanese',
+    'mexican_restaurant': 'Mexican',
+    'french_restaurant': 'French',
+    'indian_restaurant': 'Indian',
+    'thai_restaurant': 'Thai',
+    'korean_restaurant': 'Korean',
+    'mediterranean_restaurant': 'Mediterranean',
+    'american_restaurant': 'American',
+    'steakhouse': 'Steakhouse',
+    'seafood_restaurant': 'Seafood',
+    'pizza_restaurant': 'Pizza',
+    'bakery': 'Bakery',
+    'cafe': 'Cafe'
+  };
+  
+  for (const type of types) {
+    if (cuisineMap[type]) return cuisineMap[type];
+  }
+  
+  return 'International';
+};
+
+// Helper function to determine cuisine from Yelp categories
+const determineCuisineFromCategories = (categories: any[]): string => {
+  if (!categories || categories.length === 0) return 'International';
+  
+  const firstCategory = categories[0];
+  return firstCategory.title || firstCategory.alias || 'International';
 };

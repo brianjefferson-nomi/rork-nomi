@@ -406,7 +406,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     persistCollections.mutate(updated);
   }, [collections, persistCollections.mutate]);
 
-  return useMemo(() => ({
+  const storeValue = useMemo(() => ({
     restaurants,
     collections,
     userVotes,
@@ -461,6 +461,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     inviteToCollection,
     updateCollectionSettings,
   ]);
+
+  return storeValue;
 });
 
 // Helper hooks
