@@ -429,8 +429,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       ? ['Italian in Manhattan', 'Sushi in SoHo', 'Brunch in Brooklyn', 'Pizza in Queens']
       : ['Tacos in Hollywood', 'Sushi in Beverly Hills', 'Brunch in Santa Monica', 'Korean BBQ in Koreatown'];
     
-    const cuisines = restaurants.map((r: any) => r.cuisine.split(/[,&]/)[0].trim());
-    const neighborhoods = restaurants.map((r: any) => r.neighborhood);
+    const cuisines = restaurants.map((r: any) => r.cuisine?.split(/[,&]/)[0]?.trim() || r.cuisine || 'Unknown');
+    const neighborhoods = restaurants.map((r: any) => r.neighborhood || 'Unknown');
     const popular = [...cuisines, ...neighborhoods]
       .reduce<Record<string, number>>((acc: any, cur: string) => {
         acc[cur] = (acc[cur] ?? 0) + 1;
@@ -530,7 +530,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
         images: result.photos,
         address: result.address || '',
-        neighborhood: result.address?.split(',')[1]?.trim() || location.city,
+        neighborhood: result.address?.split(',')[1]?.trim() || location.city || 'Unknown',
         hours: result.hours || 'Hours vary',
         vibe: result.vibeTags || [],
         description: result.description || 'A great dining experience awaits.',

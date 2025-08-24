@@ -217,8 +217,9 @@ export default function RestaurantDetailScreen() {
 
           <View style={styles.vibeContainer}>
             {(restaurant.aiVibes || restaurant.vibe || []).map((v, i) => {
-              // Ensure single word and capitalized - remove any extra text
-              const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
+              // Ensure single word and capitalized with safety checks
+              if (!v || typeof v !== 'string') return null;
+              const cleanTag = v.split(' ')[0]?.charAt(0)?.toUpperCase() + v.split(' ')[0]?.slice(1)?.toLowerCase() || v;
               return (
                 <View key={i} style={styles.vibeTag}>
                   <Text style={styles.vibeText}>{cleanTag}</Text>
