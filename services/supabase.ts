@@ -680,14 +680,27 @@ export const dbHelpers = {
       
       if (error) {
         console.error('[Supabase] Error creating plan:', error);
-        throw error;
+        // Provide more specific error messages
+        if (error.code === '23505') {
+          throw new Error('A plan with this name already exists');
+        } else if (error.code === '23503') {
+          throw new Error('Invalid user reference. Please sign in again.');
+        } else if (error.message.includes('RLS') || error.message.includes('policy')) {
+          throw new Error('Permission denied. Please check your authentication.');
+        } else {
+          throw new Error(`Failed to create plan: ${error.message}`);
+        }
       }
       
       console.log('[Supabase] Plan created successfully:', data);
       return data;
     } catch (error) {
       console.error('[Supabase] createPlan error:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown error occurred while creating plan');
+      }
     }
   },
 
@@ -803,7 +816,16 @@ export const dbHelpers = {
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', error);
       if (error instanceof Error) {
-        throw error;
+        // Provide more specific error messages
+        if (error.message.includes('RLS') || error.message.includes('policy')) {
+          throw new Error('Permission denied. Please check your authentication.');
+        } else if (error.message.includes('does not exist')) {
+          throw new Error('Database schema issue. Please contact support.');
+        } else if (error.message.includes('infinite recursion')) {
+          throw new Error('Database policy issue. Please contact support.');
+        } else {
+          throw error;
+        }
       } else {
         throw new Error('Unknown error occurred while fetching user plans');
       }
