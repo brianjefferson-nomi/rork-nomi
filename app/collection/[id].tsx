@@ -23,7 +23,7 @@ export default function CollectionDetailScreen() {
     deleteCollection, 
     voteRestaurant, 
     addDiscussion, 
-    useRankedRestaurants, 
+    getRankedRestaurants, 
     getGroupRecommendations,
     getCollectionDiscussions 
   } = useRestaurants();
@@ -33,7 +33,7 @@ export default function CollectionDetailScreen() {
   const [showDiscussionModal, setShowDiscussionModal] = useState<string | null>(null);
   const [discussionMessage, setDiscussionMessage] = useState('');
   
-  const rankedRestaurants = useRankedRestaurants(id, collection?.collaborators.length);
+  const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators.length);
   const recommendations = collection ? getGroupRecommendations(id) : [];
   const discussions = getCollectionDiscussions(id);
 

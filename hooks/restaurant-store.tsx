@@ -28,7 +28,7 @@ interface RestaurantStore {
   voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => void;
   addUserNote: (restaurantId: string, note: string) => void;
   addDiscussion: (restaurantId: string, collectionId: string, message: string) => void;
-  useRankedRestaurants: (collectionId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
+  getRankedRestaurants: (collectionId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
   getGroupRecommendations: (collectionId: string) => GroupRecommendation[];
   getCollectionDiscussions: (collectionId: string, restaurantId?: string) => RestaurantDiscussion[];
   refreshLocation: () => Promise<void>;
@@ -278,7 +278,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     persistDiscussions.mutate([...discussions, newDiscussion]);
   }, [discussions, persistDiscussions.mutate]);
 
-  const useRankedRestaurants = useCallback((collectionId?: string, memberCount?: number) => {
+  const getRankedRestaurants = useCallback((collectionId?: string, memberCount?: number) => {
     const collection = collectionId ? collections.find(c => c.id === collectionId) : undefined;
     const pool = collectionId
       ? restaurants.filter(r => (collection?.restaurants ?? []).includes(r.id))
@@ -412,7 +412,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     voteRestaurant,
     addUserNote,
     addDiscussion,
-    useRankedRestaurants,
+    getRankedRestaurants,
     getGroupRecommendations,
     getCollectionDiscussions,
     refreshLocation,
@@ -437,7 +437,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     voteRestaurant,
     addUserNote,
     addDiscussion,
-    useRankedRestaurants,
+    getRankedRestaurants,
     getGroupRecommendations,
     getCollectionDiscussions,
     refreshLocation,
