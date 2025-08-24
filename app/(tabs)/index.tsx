@@ -95,34 +95,27 @@ export default function HomeScreen() {
     id: plan.id,
     name: plan.name,
     description: plan.description || 'A collaborative dining plan',
-    coverImage: plan.cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-    restaurants: plan.restaurant_ids || [],
-    createdBy: plan.creator_id || plan.created_by,
-    collaborators: (plan.collaborators || []).map(id => ({
-      userId: id,
-      name: 'Collaborator',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      role: 'member' as const,
-      joinedAt: new Date(),
-      voteWeight: 1
-    })),
-    createdAt: new Date(plan.created_at),
-    isPublic: plan.is_public,
-    likes: Math.floor(Math.random() * 50) + 10, // Mock likes for now
-    votingRules: {
-      equalVoting: true,
-      adminWeighted: false,
-      expertiseWeighted: false,
-      minimumParticipation: 1,
-      allowVoteChanges: true,
-      anonymousVoting: false
-    },
-    settings: {
-      voteVisibility: 'public',
-      discussionEnabled: true,
-      autoRankingEnabled: true,
-      consensusThreshold: 0.6
-    }
+    cover_image: plan.cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+    created_by: plan.created_by,
+    creator_id: plan.creator_id,
+    occasion: plan.occasion,
+    is_public: plan.is_public,
+    likes: plan.likes || 0,
+    equal_voting: plan.equal_voting,
+    admin_weighted: plan.admin_weighted,
+    expertise_weighted: plan.expertise_weighted,
+    minimum_participation: plan.minimum_participation,
+    voting_deadline: plan.voting_deadline,
+    allow_vote_changes: plan.allow_vote_changes,
+    anonymous_voting: plan.anonymous_voting,
+    vote_visibility: plan.vote_visibility,
+    discussion_enabled: plan.discussion_enabled,
+    auto_ranking_enabled: plan.auto_ranking_enabled,
+    consensus_threshold: plan.consensus_threshold,
+    restaurant_ids: plan.restaurant_ids || [],
+    collaborators: plan.collaborators || [],
+    created_at: plan.created_at,
+    updated_at: plan.updated_at
   }));
   
   const displayCollections = planCollections.length > 0 ? planCollections : mockCollections;

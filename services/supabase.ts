@@ -703,6 +703,25 @@ export const dbHelpers = {
     try {
       console.log('[Supabase] Getting plans for user:', userId);
       
+      if (!userId) {
+        console.error('[Supabase] No user ID provided');
+        throw new Error('User ID is required');
+      }
+      
+      // First check if user exists
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('id', userId)
+        .single();
+      
+      if (userError) {
+        console.error('[Supabase] Error checking user existence:', userError);
+        throw new Error(`User not found: ${userError.message}`);
+      }
+      
+      console.log('[Supabase] User found:', userData);
+      
       // Get plans where user is creator
       const { data, error } = await supabase
         .from('collections')
@@ -711,14 +730,18 @@ export const dbHelpers = {
       
       if (error) {
         console.error('[Supabase] Error fetching user plans:', error);
-        throw error;
+        throw new Error(`Failed to fetch plans: ${error.message}`);
       }
       
       console.log('[Supabase] Found plans:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown error occurred while fetching user plans');
+      }
     }
   },
 

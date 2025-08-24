@@ -77,6 +77,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return plans || [];
       } catch (error) {
         console.error('[RestaurantStore] Error loading plans:', error);
+        if (error instanceof Error) {
+          console.error('[RestaurantStore] Error details:', error.message);
+        }
         return [];
       }
     },
@@ -286,7 +289,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         minimum_participation: 1,
         allow_vote_changes: true,
         anonymous_voting: false,
-        vote_visibility: 'public',
+        vote_visibility: 'public' as const,
         discussion_enabled: true,
         auto_ranking_enabled: true,
         consensus_threshold: 50,
