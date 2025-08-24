@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { Search, Filter, MapPin } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
 
@@ -9,7 +9,7 @@ const cuisineTypes = ['All', 'Italian', 'French', 'Chinese', 'American', 'Deli',
 const priceRanges = ['All', '$', '$$', '$$$', '$$$$'];
 
 export default function DiscoverScreen() {
-  const { restaurants, userLocation, switchToCity } = useRestaurants();
+  const { restaurants, userLocation } = useRestaurants();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
@@ -33,21 +33,6 @@ export default function DiscoverScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <View style={styles.locationSwitcher}>
-          <MapPin size={16} color="#666" />
-          <TouchableOpacity 
-            style={[styles.cityButton, userLocation?.city === 'New York' && styles.cityButtonActive]}
-            onPress={() => switchToCity('New York')}
-          >
-            <Text style={[styles.cityButtonText, userLocation?.city === 'New York' && styles.cityButtonTextActive]}>NYC</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.cityButton, userLocation?.city === 'Los Angeles' && styles.cityButtonActive]}
-            onPress={() => switchToCity('Los Angeles')}
-          >
-            <Text style={[styles.cityButtonText, userLocation?.city === 'Los Angeles' && styles.cityButtonTextActive]}>LA</Text>
-          </TouchableOpacity>
-        </View>
         <View style={styles.searchBar}>
           <Search size={20} color="#999" />
           <TextInput
@@ -211,31 +196,5 @@ const styles = StyleSheet.create({
   },
   restaurantsList: {
     gap: 12,
-  },
-  locationSwitcher: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  cityButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  cityButtonActive: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
-  },
-  cityButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  cityButtonTextActive: {
-    color: '#FFF',
   },
 });

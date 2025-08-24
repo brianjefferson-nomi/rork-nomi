@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AI_API_URL = 'https://toolkit.rork.com/text/llm/';
 const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
+const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -429,7 +430,7 @@ export const getYelpDetails = async (businessId: string) => {
   }
 };
 
-// TripAdvisor API with new API key
+// TripAdvisor API (RapidAPI search) with new API key
 export const searchTripAdvisor = async (query: string, location: string) => {
   try {
     console.log(`[TripAdvisor] Searching for: ${query} in ${location}`);
@@ -485,7 +486,94 @@ export const getTripAdvisorDetails = async (restaurantId: string) => {
   }
 };
 
-// Get TripAdvisor restaurant photos
+// TripAdvisor Content API helpers (official Content API)
+export const taContentGetLocationDetails = async (locationId: string) => {
+  try {
+    const url = `${TA_CONTENT_BASE}/location/${encodeURIComponent(locationId)}/details?language=en`;
+    const res = await fetch(url, {
+      headers: { 'accept': 'application/json', 'x-api-key': TRIPADVISOR_API_KEY }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    console.log('[TripAdvisor Content] details error', e);
+    return null;
+  }
+};
+
+export const taContentGetLocationPhotos = async (locationId: string): Promise<string[]> => {
+  try {
+    const url = `${TA_CONTENT_BASE}/location/${encodeURIComponent(locationId)}/photos?language=en`;
+    const res = await fetch(url, {
+      headers: { 'accept': 'application/json', 'x-api-key': TRIPADVISOR_API_KEY }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = Array.isArray(data.data) ? data.data : data;
+    const urls: string[] = [];
+    if (Array.isArray(items)) {
+      for (const p of items) {
+        const u = p?.images?.large?.url || p?.images?.original?.url || p?.images?.medium?.url || p?.images?.small?.url;
+        if (typeof u === 'string' && u.startsWith('http')) urls.push(u);
+      }
+    }
+    return urls.slice(0, 12);
+  } catch (e) {
+    console.log('[TripAdvisor Content] photos error', e);
+    return [];
+  }
+};
+
+export const taContentGetLocationReviews = async (locationId: string) => {
+  try {
+    const url = `${TA_CONTENT_BASE}/location/${encodeURIComponent(locationId)}/reviews?language=en`;
+    const res = await fetch(url, {
+      headers: { 'accept': 'application/json', 'x-api-key': TRIPADVISOR_API_KEY }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const reviews: string[] = (Array.isArray(data.data) ? data.data : data)?.map((r: any) => r?.text || r?.title).filter(Boolean) || [];
+    return reviews.slice(0, 5);
+  } catch (e) {
+    console.log('[TripAdvisor Content] reviews error', e);
+    return [];
+  }
+};
+
+export const taContentSearch = async (query: string, lat?: number, lng?: number) => {
+  try {
+    const params: string[] = [`language=en`, `searchQuery=${encodeURIComponent(query)}`, `category=restaurants`];
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      params.push(`latLong=${lat},${lng}`);
+      params.push('radius=10');
+    }
+    const url = `${TA_CONTENT_BASE}/location/search?${params.join('&')}`;
+    const res = await fetch(url, { headers: { 'accept': 'application/json', 'x-api-key': TRIPADVISOR_API_KEY } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const results = Array.isArray(data.data) ? data.data : data?.results || [];
+    return results;
+  } catch (e) {
+    console.log('[TripAdvisor Content] search error', e);
+    return [];
+  }
+};
+
+export const taContentNearby = async (lat: number, lng: number) => {
+  try {
+    const url = `${TA_CONTENT_BASE}/location/nearby_search?latLong=${lat},${lng}&language=en&category=restaurants&radius=10`;
+    const res = await fetch(url, { headers: { 'accept': 'application/json', 'x-api-key': TRIPADVISOR_API_KEY } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.data) ? data.data : [];
+  } catch (e) {
+    console.log('[TripAdvisor Content] nearby error', e);
+    return [];
+  }
+};
+
+// Get TripAdvisor restaurant photos (RapidAPI)
 export const getTripAdvisorPhotos = async (restaurantId: string): Promise<string[]> => {
   try {
     console.log(`[TripAdvisor] Getting photos for: ${restaurantId}`);
@@ -1128,12 +1216,35 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     if (restaurant.photo?.images?.large?.url) {
       photos.push(restaurant.photo.images.large.url);
     }
-    
-    // Try to get more photos if we have location_id
-    if (restaurant.location_id && combined.length < 5) {
+
+    // Try official Content API for richer photos, details, and reviews
+    if (restaurant.location_id) {
+      try {
+        const [contentPhotos, contentDetails, contentReviews] = await Promise.all([
+          taContentGetLocationPhotos(restaurant.location_id),
+          taContentGetLocationDetails(restaurant.location_id),
+          taContentGetLocationReviews(restaurant.location_id)
+        ]);
+        photos.push(...contentPhotos.slice(0, 6));
+        if (contentDetails) {
+          restaurant.address = contentDetails?.address_obj?.address_string || restaurant.address;
+          restaurant.website = contentDetails?.website || restaurant.website;
+          restaurant.phone = contentDetails?.phone || restaurant.phone;
+          if (!restaurant.rating && contentDetails?.rating) restaurant.rating = contentDetails.rating;
+        }
+        if (Array.isArray(contentReviews) && contentReviews.length > 0) {
+          restaurant.reviews = contentReviews;
+        }
+      } catch (err) {
+        console.log('[TripAdvisor] Content API enrichment failed', err);
+      }
+    }
+
+    // Also try RapidAPI photos endpoint if still few images
+    if (restaurant.location_id && photos.length < 6 && combined.length < 5) {
       try {
         const additionalPhotos = await getTripAdvisorPhotos(restaurant.location_id);
-        photos.push(...additionalPhotos.slice(0, 3));
+        photos.push(...additionalPhotos.slice(0, 6));
       } catch (error) {
         console.error('Error getting additional TripAdvisor photos:', error);
       }
@@ -1143,7 +1254,7 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     const formattedAddress = formatAddress(restaurant.address || '', location);
     
     // Parse hours if available
-    const hours = parseRestaurantHours(restaurant.hours || restaurant.open_hours);
+    const hours = parseRestaurantHours(restaurant.hours || restaurant.open_hours || restaurant.hours_open || restaurant.opening_hours);
 
     combined.push({
       id: `tripadvisor_${restaurant.location_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1154,8 +1265,8 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       address: formattedAddress,
       phone: restaurant.phone || '',
       website: restaurant.website || '',
-      photos: [...new Set(photos)], // Remove duplicates
-      reviews: [],
+      photos: [...new Set(photos)],
+      reviews: (restaurant.reviews || []).slice(0, 5),
       hours: hours,
       source: 'tripadvisor',
       location: { lat: 40.7128, lng: -74.0060 }
