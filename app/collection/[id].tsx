@@ -471,7 +471,9 @@ export default function CollectionDetailScreen() {
               <View key={discussion.id} style={styles.discussionItem}>
                 <Text style={styles.discussionUser}>{discussion.userName}</Text>
                 <Text style={styles.discussionMessage}>{discussion.message}</Text>
-                <Text style={styles.discussionTime}>{discussion.timestamp.toLocaleDateString()}</Text>
+                <Text style={styles.discussionTime}>
+                  {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                </Text>
               </View>
             ))}
           </View>

@@ -530,7 +530,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     return discussions.filter((d: any) => 
       d.collectionId === planId && 
       (!restaurantId || d.restaurantId === restaurantId)
-    ).sort((a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime());
+    ).sort((a: any, b: any) => {
+      const timestampA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      const timestampB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+      return timestampB.getTime() - timestampA.getTime();
+    });
   }, [discussions]);
 
   const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
