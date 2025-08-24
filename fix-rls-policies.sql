@@ -1,19 +1,36 @@
 -- Fix RLS Policies to prevent infinite recursion
 -- Run this in your Supabase SQL Editor
 
--- First, drop the problematic policies
+-- First, drop ALL existing policies to start fresh
 DROP POLICY IF EXISTS "Anyone can view public collections" ON collections;
 DROP POLICY IF EXISTS "Collection members can view private collections" ON collections;
+DROP POLICY IF EXISTS "Users can view their own collections" ON collections;
+DROP POLICY IF EXISTS "Authenticated users can create collections" ON collections;
+DROP POLICY IF EXISTS "Collection creators can update collections" ON collections;
+
 DROP POLICY IF EXISTS "Collection members can view membership" ON collection_members;
 DROP POLICY IF EXISTS "Collection creators can manage members" ON collection_members;
+DROP POLICY IF EXISTS "Anyone can view collection members" ON collection_members;
+
 DROP POLICY IF EXISTS "Users can view votes in public collections" ON restaurant_votes;
 DROP POLICY IF EXISTS "Collection members can view votes" ON restaurant_votes;
+DROP POLICY IF EXISTS "Anyone can view votes" ON restaurant_votes;
+DROP POLICY IF EXISTS "Users can manage their own votes" ON restaurant_votes;
+
 DROP POLICY IF EXISTS "Users can view activities in public collections" ON user_activities;
+DROP POLICY IF EXISTS "Anyone can view activities" ON user_activities;
+DROP POLICY IF EXISTS "System can insert activities" ON user_activities;
+
 DROP POLICY IF EXISTS "Anyone can view discussions in public collections" ON restaurant_discussions;
 DROP POLICY IF EXISTS "Collection members can view discussions" ON restaurant_discussions;
 DROP POLICY IF EXISTS "Collection members can create discussions" ON restaurant_discussions;
+DROP POLICY IF EXISTS "Anyone can view discussions" ON restaurant_discussions;
+DROP POLICY IF EXISTS "Users can create discussions" ON restaurant_discussions;
+DROP POLICY IF EXISTS "Users can update their own discussions" ON restaurant_discussions;
+
 DROP POLICY IF EXISTS "Anyone can view rankings for public collections" ON restaurant_rankings;
 DROP POLICY IF EXISTS "Collection members can view rankings" ON restaurant_rankings;
+DROP POLICY IF EXISTS "Anyone can view rankings" ON restaurant_rankings;
 
 -- Create simplified policies that don't cause circular references
 
