@@ -699,6 +699,13 @@ export const dbHelpers = {
       .single();
     
     if (error) throw error;
+    
+    // Enhance with user details if data exists
+    if (data) {
+      const enhancedData = await this.enhanceCollectionsWithUserDetails([data]);
+      return enhancedData[0];
+    }
+    
     return data;
   },
 
@@ -786,6 +793,11 @@ export const dbHelpers = {
         }
       }
       
+      // Enhance collections with user details for collaborators
+      if (data && data.length > 0) {
+        data = await this.enhanceCollectionsWithUserDetails(data);
+      }
+      
       console.log('[Supabase] Found plans:', data?.length || 0);
       return data || [];
     } catch (error) {
@@ -795,6 +807,89 @@ export const dbHelpers = {
       } else {
         throw new Error('Unknown error occurred while fetching user plans');
       }
+    }
+  },
+
+  async enhanceCollectionsWithUserDetails(collections: any[]) {
+    try {
+      // Collect all unique user IDs from collaborators
+      const allUserIds = new Set<string>();
+      
+      collections.forEach(collection => {
+        if (collection.created_by) allUserIds.add(collection.created_by);
+        if (collection.creator_id) allUserIds.add(collection.creator_id);
+        if (collection.collaborators && Array.isArray(collection.collaborators)) {
+          collection.collaborators.forEach((collaborator: any) => {
+            if (typeof collaborator === 'string') {
+              allUserIds.add(collaborator);
+            } else if (collaborator && collaborator.userId) {
+              allUserIds.add(collaborator.userId);
+            }
+          });
+        }
+      });
+
+      if (allUserIds.size === 0) return collections;
+
+      // Fetch user details for all unique IDs
+      const userIdsArray = Array.from(allUserIds);
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email, avatar_url')
+        .in('id', userIdsArray);
+
+      if (usersError) {
+        console.error('[Supabase] Error fetching user details:', usersError);
+        return collections; // Return original data if user fetch fails
+      }
+
+      // Create a map of user details
+      const userMap = new Map();
+      users?.forEach(user => {
+        userMap.set(user.id, user);
+      });
+
+      // Enhance collections with user details
+      return collections.map(collection => {
+        const enhancedCollection = { ...collection };
+        
+        // Enhance creator info
+        if (collection.created_by && userMap.has(collection.created_by)) {
+          const creator = userMap.get(collection.created_by);
+          enhancedCollection.creatorName = creator.name;
+          enhancedCollection.creatorEmail = creator.email;
+        }
+        
+        // Enhance collaborators
+        if (collection.collaborators && Array.isArray(collection.collaborators)) {
+          enhancedCollection.collaborators = collection.collaborators.map((collaborator: any) => {
+            if (typeof collaborator === 'string') {
+              const user = userMap.get(collaborator);
+              return user ? {
+                userId: collaborator,
+                name: user.name,
+                email: user.email,
+                avatar: user.avatar_url,
+                role: 'member'
+              } : collaborator;
+            } else if (collaborator && collaborator.userId) {
+              const user = userMap.get(collaborator.userId);
+              return {
+                ...collaborator,
+                name: user?.name || collaborator.name || 'Unknown User',
+                email: user?.email || collaborator.email,
+                avatar: user?.avatar_url || collaborator.avatar
+              };
+            }
+            return collaborator;
+          });
+        }
+        
+        return enhancedCollection;
+      });
+    } catch (error) {
+      console.error('[Supabase] Error enhancing collections with user details:', error);
+      return collections; // Return original data if enhancement fails
     }
   },
 

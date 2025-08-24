@@ -103,9 +103,10 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
         <View style={styles.vibeContainer}>
-          {(restaurant.aiVibes || restaurant.vibe).slice(0, 3).map((v, i) => {
-            // Ensure single word and capitalized
-            const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
+          {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 3).map((v, i) => {
+            // Ensure single word and capitalized with safety checks
+            if (!v || typeof v !== 'string') return null;
+            const cleanTag = v.split(' ')[0]?.charAt(0)?.toUpperCase() + v.split(' ')[0]?.slice(1)?.toLowerCase() || v;
             return (
               <View key={i} style={styles.vibeTag}>
                 <Text style={styles.vibeText}>{cleanTag}</Text>
@@ -118,11 +119,11 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           {restaurant.aiDescription || restaurant.description}
         </Text>
         
-        {restaurant.aiTopPicks && (
+        {restaurant.aiTopPicks && Array.isArray(restaurant.aiTopPicks) && restaurant.aiTopPicks.length > 0 && (
           <View style={styles.topPicksContainer}>
             <Text style={styles.topPicksLabel}>Top picks:</Text>
             <Text style={styles.topPicksText} numberOfLines={1}>
-              {restaurant.aiTopPicks.slice(0, 2).join(', ')}
+              {restaurant.aiTopPicks.slice(0, 2).filter(Boolean).join(', ')}
             </Text>
           </View>
         )}
