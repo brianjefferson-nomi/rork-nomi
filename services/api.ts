@@ -121,8 +121,16 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[]) =
 };
 
 // Enhanced Google Places API with better error handling and photo support
-export const searchGooglePlaces = async (query: string, location: string) => {
+export const searchGooglePlaces = async (query: string, location: string): Promise<any[]> => {
   try {
+    // Implement rate limiting
+    const now = Date.now();
+    const timeSinceLastCall = now - lastGoogleApiCall;
+    if (timeSinceLastCall < GOOGLE_API_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, GOOGLE_API_DELAY - timeSinceLastCall));
+    }
+    lastGoogleApiCall = Date.now();
+    
     console.log(`[GooglePlaces] Searching for: ${query} in ${location}`);
     const response = await fetch(
       `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' restaurant ' + location)}&radius=10000&type=restaurant`,
@@ -134,6 +142,12 @@ export const searchGooglePlaces = async (query: string, location: string) => {
         }
       }
     );
+    
+    if (response.status === 429) {
+      console.log('[GooglePlaces] Rate limited, waiting and retrying...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      return await searchGooglePlaces(query, location); // Retry once
+    }
     
     if (!response.ok) {
       throw new Error(`Google Places API error: ${response.status}`);
@@ -148,8 +162,20 @@ export const searchGooglePlaces = async (query: string, location: string) => {
   }
 };
 
-export const getGooglePlaceDetails = async (placeId: string) => {
+// Rate limiting for Google Places API
+let lastGoogleApiCall = 0;
+const GOOGLE_API_DELAY = 1000; // 1 second between calls
+
+export const getGooglePlaceDetails = async (placeId: string): Promise<any | null> => {
   try {
+    // Implement rate limiting
+    const now = Date.now();
+    const timeSinceLastCall = now - lastGoogleApiCall;
+    if (timeSinceLastCall < GOOGLE_API_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, GOOGLE_API_DELAY - timeSinceLastCall));
+    }
+    lastGoogleApiCall = Date.now();
+    
     console.log(`[GooglePlaces] Getting details for place: ${placeId}`);
     const response = await fetch(
       `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,formatted_phone_number,formatted_address,opening_hours,website,reviews,photos,price_level,types`,
@@ -161,6 +187,12 @@ export const getGooglePlaceDetails = async (placeId: string) => {
         }
       }
     );
+    
+    if (response.status === 429) {
+      console.log('[GooglePlaces] Rate limited, waiting and retrying...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      return await getGooglePlaceDetails(placeId); // Retry once
+    }
     
     if (!response.ok) {
       throw new Error(`Google Places Details API error: ${response.status}`);
@@ -543,29 +575,55 @@ const generateMockReviews = (name: string, cuisine: string) => {
   return reviews.slice(0, Math.floor(Math.random() * 3) + 2);
 };
 
-// Reddit API for real-time forum search
+// Reddit API for real-time forum search with multiple endpoints
 export const searchReddit = async (query: string, location: string) => {
   try {
     console.log(`[Reddit] Searching for: ${query} in ${location}`);
-    const searchQuery = `${query} restaurant ${location} site:reddit.com`;
-    const response = await fetch(
-      `https://reddit-scraper.p.rapidapi.com/search?query=${encodeURIComponent(searchQuery)}&limit=10`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
-          'X-RapidAPI-Host': 'reddit-scraper.p.rapidapi.com'
-        }
-      }
-    );
+    const searchQuery = `${query} restaurant ${location}`;
     
-    if (!response.ok) {
-      throw new Error(`Reddit API error: ${response.status}`);
+    // Try multiple Reddit API endpoints
+    const endpoints = [
+      {
+        url: `https://reddit-scraper.p.rapidapi.com/search?query=${encodeURIComponent(searchQuery)}&limit=10`,
+        host: 'reddit-scraper.p.rapidapi.com'
+      },
+      {
+        url: `https://reddit-search.p.rapidapi.com/search?query=${encodeURIComponent(searchQuery)}&limit=10`,
+        host: 'reddit-search.p.rapidapi.com'
+      },
+      {
+        url: `https://reddit-api.p.rapidapi.com/search?q=${encodeURIComponent(searchQuery)}&limit=10`,
+        host: 'reddit-api.p.rapidapi.com'
+      }
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`[Reddit] Trying endpoint: ${endpoint.host}`);
+        const response = await fetch(endpoint.url, {
+          method: 'GET',
+          headers: {
+            'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+            'X-RapidAPI-Host': endpoint.host
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const posts = data.posts || data.data || data.results || [];
+          console.log(`[Reddit] Found ${posts.length} posts from ${endpoint.host}`);
+          return posts;
+        } else {
+          console.log(`[Reddit] ${endpoint.host} failed with status: ${response.status}`);
+        }
+      } catch (endpointError) {
+        console.log(`[Reddit] ${endpoint.host} error:`, endpointError);
+        continue;
+      }
     }
     
-    const data = await response.json();
-    console.log(`[Reddit] Found ${data.posts?.length || 0} posts`);
-    return data.posts || [];
+    console.log('[Reddit] All endpoints failed, returning empty results');
+    return [];
   } catch (error) {
     console.error('Error searching Reddit:', error);
     return [];
@@ -597,7 +655,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         ]),
         Promise.race([
           searchReddit(query, location),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Reddit timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Reddit timeout')), 5000))
         ])
       ];
       
@@ -737,11 +795,14 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     
     seenNames.add(place.name.toLowerCase());
     
-    // Get additional details if available
+    // Get additional details if available (with rate limiting)
     let details = null;
     if (place.place_id) {
       try {
-        details = await getGooglePlaceDetails(place.place_id);
+        // Only get details for first 5 places to avoid rate limiting
+        if (combined.length < 5) {
+          details = await getGooglePlaceDetails(place.place_id);
+        }
       } catch (error) {
         console.error('Error getting place details:', error);
       }
