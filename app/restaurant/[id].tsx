@@ -277,7 +277,7 @@ export default function RestaurantDetailScreen() {
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Location</Text>
                 <Text style={styles.infoText}>{restaurant.address || 'Address not available'}</Text>
-                <Text style={styles.infoSubtext}>{restaurant.neighborhood || ''}</Text>
+                {restaurant.neighborhood && <Text style={styles.infoSubtext}>{restaurant.neighborhood}</Text>}
               </View>
             </View>
             <View style={styles.infoItem}>
