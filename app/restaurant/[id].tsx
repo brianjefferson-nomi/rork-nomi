@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Star, Utensils } from 'lucide-react-native';
+import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Utensils } from 'lucide-react-native';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
 
 const { width } = Dimensions.get('window');
@@ -40,37 +40,43 @@ export default function RestaurantDetailScreen() {
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
 
-  // Enhanced restaurant data loading
+  // Enhanced restaurant data loading with proper image assignment and caching
   useEffect(() => {
     const loadData = async () => {
       if (!restaurant) return;
       
       setLoadingEnhancements(true);
       try {
-        // Simulate API calls to get enhanced images and recommendations
-        // In production, these would be real API calls to Google Places, Yelp, etc.
+        // Import the image assignment function
+        const { assignRestaurantImages, generateValidatedMenuItems, cleanupExpiredCache } = await import('@/services/api');
         
-        const mockEnhancedImages = [
-          restaurant.imageUrl,
-          `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80`, // Restaurant interior
-          `https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80`, // Food plating
-          `https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80`, // Dining atmosphere
-          `https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80`, // Kitchen/chef
-          `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80`, // Signature dish
-        ];
+        // Clean up expired cache periodically
+        cleanupExpiredCache();
         
-        // Generate more authentic menu items based on cuisine
-        const mockFoodRecs = generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name);
+        // Assign proper images with fallback logic
+        const assignedImages = await assignRestaurantImages({
+          photos: restaurant.images || [restaurant.imageUrl],
+          cuisine: restaurant.cuisine,
+          name: restaurant.name
+        });
         
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Generate validated menu items with caching
+        const validatedMenuItems = await generateValidatedMenuItems(
+          restaurant.name,
+          restaurant.cuisine,
+          restaurant.reviews || [],
+          restaurant.id
+        );
         
-        setEnhancedImages(mockEnhancedImages);
-        setFoodRecommendations(mockFoodRecs.slice(0, 8));
+        setEnhancedImages(assignedImages);
+        setFoodRecommendations(validatedMenuItems.length > 0 ? validatedMenuItems : 
+          (restaurant.aiTopPicks || restaurant.menuHighlights || generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name)).slice(0, 8)
+        );
       } catch (error) {
         console.error('Error loading enhanced restaurant data:', error);
-        setEnhancedImages([restaurant.imageUrl]);
-        setFoodRecommendations((restaurant.aiTopPicks || restaurant.menuHighlights || []).slice(0, 8));
+        // Fallback to original data
+        setEnhancedImages(restaurant.images || [restaurant.imageUrl]);
+        setFoodRecommendations((restaurant.aiTopPicks || restaurant.menuHighlights || generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name)).slice(0, 8));
       } finally {
         setLoadingEnhancements(false);
       }
@@ -142,12 +148,19 @@ export default function RestaurantDetailScreen() {
       <Stack.Screen options={{ title: restaurant.name }} />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.heroImageContainer}>
-          <Image source={{ uri: images[currentImageIndex] }} style={styles.heroImage} />
+          <Image 
+            source={{ uri: images[currentImageIndex] }} 
+            style={styles.heroImage}
+            onError={() => {
+              // If image fails to load, try to use a fallback
+              console.log('Image failed to load:', images[currentImageIndex]);
+            }}
+          />
           
           {loadingEnhancements && (
             <View style={styles.imageLoadingOverlay}>
               <ActivityIndicator size="small" color="#FFF" />
-              <Text style={styles.imageLoadingText}>Loading gallery...</Text>
+              <Text style={styles.imageLoadingText}>Loading images...</Text>
             </View>
           )}
           
@@ -191,7 +204,7 @@ export default function RestaurantDetailScreen() {
 
           <View style={styles.vibeContainer}>
             {(restaurant.aiVibes || restaurant.vibe).map((v, i) => {
-              // Ensure single word and capitalized
+              // Ensure single word and capitalized - remove any extra text
               const cleanTag = v.split(' ')[0].charAt(0).toUpperCase() + v.split(' ')[0].slice(1).toLowerCase();
               return (
                 <View key={i} style={styles.vibeTag}>
@@ -264,7 +277,7 @@ export default function RestaurantDetailScreen() {
 
 
 
-          {/* Menu Highlights - Enhanced with validation */}
+          {/* Menu Highlights - Reverted to original clean layout */}
           {((restaurant.aiTopPicks && restaurant.aiTopPicks.length > 0) || 
             (restaurant.menuHighlights && restaurant.menuHighlights.length > 0) ||
             (foodRecommendations && foodRecommendations.length > 0)) && (
@@ -276,18 +289,14 @@ export default function RestaurantDetailScreen() {
               {loadingEnhancements ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#FF6B6B" />
-                  <Text style={styles.loadingText}>Loading authentic menu items...</Text>
+                  <Text style={styles.loadingText}>Loading menu items...</Text>
                 </View>
               ) : (
                 <View style={styles.menuGrid}>
                   {(foodRecommendations.length > 0 ? foodRecommendations : 
                     restaurant.aiTopPicks || restaurant.menuHighlights || []).slice(0, 8).map((item, i) => (
                     <View key={i} style={styles.menuHighlightItem}>
-                      <View style={styles.menuItemIcon}>
-                        <Star size={14} color="#FFD700" fill="#FFD700" />
-                      </View>
                       <Text style={styles.menuItemName}>{item}</Text>
-                      <Text style={styles.menuItemSubtext}>Signature dish</Text>
                     </View>
                   ))}
                 </View>
@@ -617,31 +626,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuHighlightItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 12,
     backgroundColor: '#F8F9FA',
     borderRadius: 8,
-    gap: 12,
-  },
-  menuItemIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFF3CD',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 8,
   },
   menuItemName: {
-    flex: 1,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#1A1A1A',
-  },
-  menuItemSubtext: {
-    fontSize: 11,
-    color: '#666',
-    fontStyle: 'italic',
+    textAlign: 'left',
   },
   votingSection: {
     backgroundColor: '#FFF',
