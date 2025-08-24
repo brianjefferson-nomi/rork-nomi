@@ -60,100 +60,100 @@ INSERT INTO collections (id, collection_code, name, description, created_by, cre
 -- Create collection members for proper relationships
 INSERT INTO collection_members (id, collection_id, user_id, role, joined_at, vote_weight) VALUES
 -- Date Night Winners members
-('cm-001', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'admin', NOW(), 1),
-('cm-002', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
-('cm-003', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', 'member', NOW(), 1),
-('cm-004', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'member', NOW(), 1),
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'admin', NOW(), 1),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', 'member', NOW(), 1),
+('dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'member', NOW(), 1),
 
 -- Business Lunch Spots members
-('cm-005', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'admin', NOW(), 1),
-('cm-006', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
-('cm-007', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '55555555-5555-5555-5555-555555555555', 'member', NOW(), 1),
-('cm-008', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '66666666-6666-6666-6666-666666666666', 'member', NOW(), 1),
-('cm-009', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '77777777-7777-7777-7777-777777777777', 'member', NOW(), 1),
+('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'admin', NOW(), 1),
+('ffffffff-ffff-ffff-ffff-ffffffffffff', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
+('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '55555555-5555-5555-5555-555555555555', 'member', NOW(), 1),
+('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '66666666-6666-6666-6666-666666666666', 'member', NOW(), 1),
+('33333333-cccc-cccc-cccc-cccccccccccc', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '77777777-7777-7777-7777-777777777777', 'member', NOW(), 1),
 
 -- Foodie Adventures members
-('cm-010', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '33333333-3333-3333-3333-333333333333', 'admin', NOW(), 1),
-('cm-011', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
-('cm-012', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
-('cm-013', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '44444444-4444-4444-4444-444444444444', 'member', NOW(), 1),
-('cm-014', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '55555555-5555-5555-5555-555555555555', 'member', NOW(), 1),
-('cm-015', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '88888888-8888-8888-8888-888888888888', 'member', NOW(), 1),
+('44444444-dddd-dddd-dddd-dddddddddddd', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '33333333-3333-3333-3333-333333333333', 'admin', NOW(), 1),
+('55555555-eeee-eeee-eeee-eeeeeeeeeeee', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
+('66666666-ffff-ffff-ffff-ffffffffffff', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
+('77777777-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '44444444-4444-4444-4444-444444444444', 'member', NOW(), 1),
+('88888888-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '55555555-5555-5555-5555-555555555555', 'member', NOW(), 1),
+('99999999-cccc-cccc-cccc-cccccccccccc', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '88888888-8888-8888-8888-888888888888', 'member', NOW(), 1),
 
 -- Budget Eats members
-('cm-016', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '44444444-4444-4444-4444-444444444444', 'admin', NOW(), 1),
-('cm-017', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
-('cm-018', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
-('cm-019', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '77777777-7777-7777-7777-777777777777', 'member', NOW(), 1),
+('aaaaaaaa-dddd-dddd-dddd-dddddddddddd', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '44444444-4444-4444-4444-444444444444', 'admin', NOW(), 1),
+('bbbbbbbb-eeee-eeee-eeee-eeeeeeeeeeee', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
+('cccccccc-ffff-ffff-ffff-ffffffffffff', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '22222222-2222-2222-2222-222222222222', 'member', NOW(), 1),
+('dddddddd-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '77777777-7777-7777-7777-777777777777', 'member', NOW(), 1),
 
 -- Celebrity Chef Spots members
-('cm-020', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '55555555-5555-5555-5555-555555555555', 'admin', NOW(), 1),
-('cm-021', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
-('cm-022', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '33333333-3333-3333-3333-333333333333', 'member', NOW(), 1),
-('cm-023', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '66666666-6666-6666-6666-666666666666', 'member', NOW(), 1),
-('cm-024', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '88888888-8888-8888-8888-888888888888', 'member', NOW(), 1);
+('eeeeeeee-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '55555555-5555-5555-5555-555555555555', 'admin', NOW(), 1),
+('ffffffff-cccc-cccc-cccc-cccccccccccc', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '11111111-1111-1111-1111-111111111111', 'member', NOW(), 1),
+('11111111-dddd-dddd-dddd-dddddddddddd', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '33333333-3333-3333-3333-333333333333', 'member', NOW(), 1),
+('22222222-eeee-eeee-eeee-eeeeeeeeeeee', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '66666666-6666-6666-6666-666666666666', 'member', NOW(), 1),
+('33333333-ffff-ffff-ffff-ffffffffffff', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '88888888-8888-8888-8888-888888888888', 'member', NOW(), 1);
 
 -- Create restaurant votes with diverse opinions for decision insights
 INSERT INTO restaurant_votes (id, restaurant_id, user_id, collection_id, vote, timestamp, reason, authority, weight) VALUES
 -- Date Night Winners votes (showing consensus building)
-('vote-001', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Perfect for special occasions', 'admin', 1),
-('vote-002', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Amazing seafood and service', 'regular', 1),
-('vote-003', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '1 day', 'Romantic atmosphere', 'regular', 1),
-('vote-004', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'dislike', NOW() - INTERVAL '1 day', 'Too expensive for regular dates', 'regular', 1),
+('aaaaaaaa-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Perfect for special occasions', 'admin', 1),
+('bbbbbbbb-2222-2222-2222-222222222222', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Amazing seafood and service', 'regular', 1),
+('cccccccc-3333-3333-3333-333333333333', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '1 day', 'Romantic atmosphere', 'regular', 1),
+('dddddddd-4444-4444-4444-444444444444', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'dislike', NOW() - INTERVAL '1 day', 'Too expensive for regular dates', 'regular', 1),
 
-('vote-005', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '3 days', 'Stunning views and food', 'admin', 1),
-('vote-006', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '3 days', 'Worth every penny', 'regular', 1),
-('vote-007', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Perfect for anniversaries', 'regular', 1),
-('vote-008', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '44444444-4444-4444-4444-444444444444', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Exceptional experience', 'regular', 1),
+('eeeeeeee-5555-5555-5555-555555555555', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '3 days', 'Stunning views and food', 'admin', 1),
+('ffffffff-6666-6666-6666-666666666666', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '3 days', 'Worth every penny', 'regular', 1),
+('11111111-7777-7777-7777-777777777777', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Perfect for anniversaries', 'regular', 1),
+('22222222-8888-8888-8888-888888888888', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '44444444-4444-4444-4444-444444444444', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'like', NOW() - INTERVAL '2 days', 'Exceptional experience', 'regular', 1),
 
 -- Business Lunch Spots votes (showing debate)
-('vote-009', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Perfect for client meetings', 'admin', 1),
-('vote-010', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Professional atmosphere', 'regular', 1),
-('vote-011', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '55555555-5555-5555-5555-555555555555', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'dislike', NOW() - INTERVAL '1 day', 'Too casual for business', 'regular', 1),
-('vote-012', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '66666666-6666-6666-6666-666666666666', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Great food and service', 'regular', 1),
-('vote-013', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '77777777-7777-7777-7777-777777777777', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Reliable choice', 'regular', 1),
+('33333333-9999-9999-9999-999999999999', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Perfect for client meetings', 'admin', 1),
+('44444444-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Professional atmosphere', 'regular', 1),
+('55555555-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '55555555-5555-5555-5555-555555555555', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'dislike', NOW() - INTERVAL '1 day', 'Too casual for business', 'regular', 1),
+('66666666-cccc-cccc-cccc-cccccccccccc', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '66666666-6666-6666-6666-666666666666', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Great food and service', 'regular', 1),
+('77777777-dddd-dddd-dddd-dddddddddddd', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', '77777777-7777-7777-7777-777777777777', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'like', NOW() - INTERVAL '1 day', 'Reliable choice', 'regular', 1),
 
 -- Foodie Adventures votes (showing diverse opinions)
-('vote-014', '33333333-cccc-cccc-cccc-cccccccccccc', '33333333-3333-3333-3333-333333333333', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '2 days', 'Revolutionary plant-based cuisine', 'admin', 1),
-('vote-015', '33333333-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '2 days', 'Innovative and delicious', 'regular', 1),
-('vote-016', '33333333-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'dislike', NOW() - INTERVAL '2 days', 'Too experimental for my taste', 'regular', 1),
-('vote-017', '33333333-cccc-cccc-cccc-cccccccccccc', '44444444-4444-4444-4444-444444444444', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '1 day', 'Amazing creativity', 'regular', 1),
-('vote-018', '33333333-cccc-cccc-cccc-cccccccccccc', '55555555-5555-5555-5555-555555555555', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '1 day', 'Must-try experience', 'regular', 1),
-('vote-019', '33333333-cccc-cccc-cccc-cccccccccccc', '88888888-8888-8888-8888-888888888888', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'dislike', NOW() - INTERVAL '1 day', 'Not worth the price', 'regular', 1),
+('88888888-eeee-eeee-eeee-eeeeeeeeeeee', '33333333-cccc-cccc-cccc-cccccccccccc', '33333333-3333-3333-3333-333333333333', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '2 days', 'Revolutionary plant-based cuisine', 'admin', 1),
+('99999999-ffff-ffff-ffff-ffffffffffff', '33333333-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '2 days', 'Innovative and delicious', 'regular', 1),
+('aaaaaaaa-1111-1111-1111-111111111111', '33333333-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'dislike', NOW() - INTERVAL '2 days', 'Too experimental for my taste', 'regular', 1),
+('bbbbbbbb-2222-2222-2222-222222222222', '33333333-cccc-cccc-cccc-cccccccccccc', '44444444-4444-4444-4444-444444444444', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '1 day', 'Amazing creativity', 'regular', 1),
+('cccccccc-3333-3333-3333-333333333333', '33333333-cccc-cccc-cccc-cccccccccccc', '55555555-5555-5555-5555-555555555555', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'like', NOW() - INTERVAL '1 day', 'Must-try experience', 'regular', 1),
+('dddddddd-4444-4444-4444-444444444444', '33333333-cccc-cccc-cccc-cccccccccccc', '88888888-8888-8888-8888-888888888888', 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'dislike', NOW() - INTERVAL '1 day', 'Not worth the price', 'regular', 1),
 
 -- Budget Eats votes (showing agreement)
-('vote-020', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Best pastrami in NYC', 'admin', 1),
-('vote-021', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Classic NYC experience', 'regular', 1),
-('vote-022', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Great value for money', 'regular', 1),
-('vote-023', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '77777777-7777-7777-7777-777777777777', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Authentic deli experience', 'regular', 1),
+('eeeeeeee-5555-5555-5555-555555555555', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Best pastrami in NYC', 'admin', 1),
+('ffffffff-6666-6666-6666-666666666666', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Classic NYC experience', 'regular', 1),
+('11111111-7777-7777-7777-777777777777', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Great value for money', 'regular', 1),
+('22222222-8888-8888-8888-888888888888', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '77777777-7777-7777-7777-777777777777', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'like', NOW() - INTERVAL '1 day', 'Authentic deli experience', 'regular', 1),
 
 -- Celebrity Chef Spots votes (showing mixed opinions)
-('vote-024', '66666666-ffff-ffff-ffff-ffffffffffff', '55555555-5555-5555-5555-555555555555', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '2 days', 'Batali''s best restaurant', 'admin', 1),
-('vote-025', '66666666-ffff-ffff-ffff-ffffffffffff', '11111111-1111-1111-1111-111111111111', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '2 days', 'Authentic Italian cuisine', 'regular', 1),
-('vote-026', '66666666-ffff-ffff-ffff-ffffffffffff', '33333333-3333-3333-3333-333333333333', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'dislike', NOW() - INTERVAL '2 days', 'Overrated and expensive', 'regular', 1),
-('vote-027', '66666666-ffff-ffff-ffff-ffffffffffff', '66666666-6666-6666-6666-666666666666', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '1 day', 'Great pasta dishes', 'regular', 1),
-('vote-028', '66666666-ffff-ffff-ffff-ffffffffffff', '88888888-8888-8888-8888-888888888888', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'dislike', NOW() - INTERVAL '1 day', 'Too crowded and noisy', 'regular', 1);
+('33333333-9999-9999-9999-999999999999', '66666666-ffff-ffff-ffff-ffffffffffff', '55555555-5555-5555-5555-555555555555', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '2 days', 'Batali''s best restaurant', 'admin', 1),
+('44444444-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '66666666-ffff-ffff-ffff-ffffffffffff', '11111111-1111-1111-1111-111111111111', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '2 days', 'Authentic Italian cuisine', 'regular', 1),
+('55555555-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '66666666-ffff-ffff-ffff-ffffffffffff', '33333333-3333-3333-3333-333333333333', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'dislike', NOW() - INTERVAL '2 days', 'Overrated and expensive', 'regular', 1),
+('66666666-cccc-cccc-cccc-cccccccccccc', '66666666-ffff-ffff-ffff-ffffffffffff', '66666666-6666-6666-6666-666666666666', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'like', NOW() - INTERVAL '1 day', 'Great pasta dishes', 'regular', 1),
+('77777777-dddd-dddd-dddd-dddddddddddd', '66666666-ffff-ffff-ffff-ffffffffffff', '88888888-8888-8888-8888-888888888888', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'dislike', NOW() - INTERVAL '1 day', 'Too crowded and noisy', 'regular', 1);
 
 -- Create restaurant discussions for engagement
 INSERT INTO restaurant_discussions (id, restaurant_id, collection_id, user_id, message, timestamp, likes) VALUES
-('disc-001', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'Has anyone tried their tasting menu? Worth the splurge?', NOW() - INTERVAL '2 days', 3),
-('disc-002', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'The wine pairing is incredible! Highly recommend.', NOW() - INTERVAL '2 days', 2),
-('disc-003', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', 'Perfect for anniversary dinners. The service is impeccable.', NOW() - INTERVAL '3 days', 4),
-('disc-004', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'Great for client lunches. Professional but not stuffy.', NOW() - INTERVAL '1 day', 2),
-('disc-005', '33333333-cccc-cccc-cccc-cccccccccccc', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '33333333-3333-3333-3333-333333333333', 'The plant-based menu is revolutionary! Must try.', NOW() - INTERVAL '2 days', 5),
-('disc-006', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '44444444-4444-4444-4444-444444444444', 'Best pastrami sandwich in the city!', NOW() - INTERVAL '1 day', 3),
-('disc-007', '66666666-ffff-ffff-ffff-ffffffffffff', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '55555555-5555-5555-5555-555555555555', 'The pasta tasting menu is amazing!', NOW() - INTERVAL '2 days', 2);
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'Has anyone tried their tasting menu? Worth the splurge?', NOW() - INTERVAL '2 days', 3),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '22222222-2222-2222-2222-222222222222', 'The wine pairing is incredible! Highly recommend.', NOW() - INTERVAL '2 days', 2),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', 'Perfect for anniversary dinners. The service is impeccable.', NOW() - INTERVAL '3 days', 4),
+('dddddddd-dddd-dddd-dddd-dddddddddddd', '55555555-eeee-eeee-eeee-eeeeeeeeeeee', 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'Great for client lunches. Professional but not stuffy.', NOW() - INTERVAL '1 day', 2),
+('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '33333333-cccc-cccc-cccc-cccccccccccc', 'cccccccc-dddd-eeee-ffff-gggggggggggg', '33333333-3333-3333-3333-333333333333', 'The plant-based menu is revolutionary! Must try.', NOW() - INTERVAL '2 days', 5),
+('ffffffff-ffff-ffff-ffff-ffffffffffff', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', '44444444-4444-4444-4444-444444444444', 'Best pastrami sandwich in the city!', NOW() - INTERVAL '1 day', 3),
+('11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '66666666-ffff-ffff-ffff-ffffffffffff', 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', '55555555-5555-5555-5555-555555555555', 'The pasta tasting menu is amazing!', NOW() - INTERVAL '2 days', 2);
 
 -- Create user activities for engagement tracking
 INSERT INTO user_activities (id, user_id, type, restaurant_id, collection_id, content, timestamp) VALUES
-('act-001', '11111111-1111-1111-1111-111111111111', 'collection', NULL, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Created Date Night Winners collection', NOW() - INTERVAL '5 days'),
-('act-002', '22222222-2222-2222-2222-222222222222', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Liked Le Bernardin', NOW() - INTERVAL '2 days'),
-('act-003', '33333333-3333-3333-3333-333333333333', 'discussion', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Started discussion about tasting menu', NOW() - INTERVAL '2 days'),
-('act-004', '44444444-4444-4444-4444-444444444444', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Disliked Le Bernardin (too expensive)', NOW() - INTERVAL '1 day'),
-('act-005', '22222222-2222-2222-2222-222222222222', 'collection', NULL, 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'Created Business Lunch Spots collection', NOW() - INTERVAL '4 days'),
-('act-006', '33333333-3333-3333-3333-333333333333', 'collection', NULL, 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'Created Foodie Adventures collection', NOW() - INTERVAL '3 days'),
-('act-007', '44444444-4444-4444-4444-444444444444', 'collection', NULL, 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'Created Budget Eats collection', NOW() - INTERVAL '3 days'),
-('act-008', '55555555-5555-5555-5555-555555555555', 'collection', NULL, 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'Created Celebrity Chef Spots collection', NOW() - INTERVAL '2 days');
+('22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'collection', NULL, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Created Date Night Winners collection', NOW() - INTERVAL '5 days'),
+('33333333-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Liked Le Bernardin', NOW() - INTERVAL '2 days'),
+('44444444-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'discussion', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Started discussion about tasting menu', NOW() - INTERVAL '2 days'),
+('55555555-eeee-eeee-eeee-eeeeeeeeeeee', '44444444-4444-4444-4444-444444444444', 'vote', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'Disliked Le Bernardin (too expensive)', NOW() - INTERVAL '1 day'),
+('66666666-ffff-ffff-ffff-ffffffffffff', '22222222-2222-2222-2222-222222222222', 'collection', NULL, 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'Created Business Lunch Spots collection', NOW() - INTERVAL '4 days'),
+('77777777-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'collection', NULL, 'cccccccc-dddd-eeee-ffff-gggggggggggg', 'Created Foodie Adventures collection', NOW() - INTERVAL '3 days'),
+('88888888-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '44444444-4444-4444-4444-444444444444', 'collection', NULL, 'dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'Created Budget Eats collection', NOW() - INTERVAL '3 days'),
+('99999999-cccc-cccc-cccc-cccccccccccc', '55555555-5555-5555-5555-555555555555', 'collection', NULL, 'eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'Created Celebrity Chef Spots collection', NOW() - INTERVAL '2 days');
 
 -- Update collection analytics (this would normally be computed, but we'll set some realistic values)
 UPDATE collections SET 
@@ -173,10 +173,10 @@ SELECT 'Restaurants created:', COUNT(*) FROM restaurants WHERE id LIKE '11111111
 UNION ALL
 SELECT 'Collections created:', COUNT(*) FROM collections WHERE id LIKE 'aaaaaaaa-bbbb%' OR id LIKE 'bbbbbbbb-cccc%' OR id LIKE 'cccccccc-dddd%' OR id LIKE 'dddddddd-eeee%' OR id LIKE 'eeeeeeee-ffff%'
 UNION ALL
-SELECT 'Collection members:', COUNT(*) FROM collection_members WHERE id LIKE 'cm-%'
+SELECT 'Collection members:', COUNT(*) FROM collection_members WHERE id LIKE 'aaaaaaaa-aaaa%' OR id LIKE 'bbbbbbbb-bbbb%' OR id LIKE 'cccccccc-cccc%' OR id LIKE 'dddddddd-dddd%' OR id LIKE 'eeeeeeee-eeee%' OR id LIKE 'ffffffff-ffff%' OR id LIKE '11111111-aaaa%' OR id LIKE '22222222-bbbb%' OR id LIKE '33333333-cccc%' OR id LIKE '44444444-dddd%' OR id LIKE '55555555-eeee%' OR id LIKE '66666666-ffff%' OR id LIKE '77777777-aaaa%' OR id LIKE '88888888-bbbb%' OR id LIKE '99999999-cccc%' OR id LIKE 'aaaaaaaa-dddd%' OR id LIKE 'bbbbbbbb-eeee%' OR id LIKE 'cccccccc-ffff%' OR id LIKE 'dddddddd-aaaa%' OR id LIKE 'eeeeeeee-bbbb%' OR id LIKE 'ffffffff-cccc%' OR id LIKE '11111111-dddd%' OR id LIKE '22222222-eeee%' OR id LIKE '33333333-ffff%'
 UNION ALL
-SELECT 'Restaurant votes:', COUNT(*) FROM restaurant_votes WHERE id LIKE 'vote-%'
+SELECT 'Restaurant votes:', COUNT(*) FROM restaurant_votes WHERE id LIKE 'aaaaaaaa-1111%' OR id LIKE 'bbbbbbbb-2222%' OR id LIKE 'cccccccc-3333%' OR id LIKE 'dddddddd-4444%' OR id LIKE 'eeeeeeee-5555%' OR id LIKE 'ffffffff-6666%' OR id LIKE '11111111-7777%' OR id LIKE '22222222-8888%' OR id LIKE '33333333-9999%' OR id LIKE '44444444-aaaa%' OR id LIKE '55555555-bbbb%' OR id LIKE '66666666-cccc%' OR id LIKE '77777777-dddd%' OR id LIKE '88888888-eeee%' OR id LIKE '99999999-ffff%' OR id LIKE 'aaaaaaaa-1111%' OR id LIKE 'bbbbbbbb-2222%' OR id LIKE 'cccccccc-3333%' OR id LIKE 'dddddddd-4444%' OR id LIKE 'eeeeeeee-5555%' OR id LIKE 'ffffffff-6666%' OR id LIKE '11111111-7777%' OR id LIKE '22222222-8888%' OR id LIKE '33333333-9999%' OR id LIKE '44444444-aaaa%' OR id LIKE '55555555-bbbb%' OR id LIKE '66666666-cccc%' OR id LIKE '77777777-dddd%'
 UNION ALL
-SELECT 'Discussions created:', COUNT(*) FROM restaurant_discussions WHERE id LIKE 'disc-%'
+SELECT 'Discussions created:', COUNT(*) FROM restaurant_discussions WHERE id LIKE 'aaaaaaaa-aaaa%' OR id LIKE 'bbbbbbbb-bbbb%' OR id LIKE 'cccccccc-cccc%' OR id LIKE 'dddddddd-dddd%' OR id LIKE 'eeeeeeee-eeee%' OR id LIKE 'ffffffff-ffff%' OR id LIKE '11111111-aaaa%'
 UNION ALL
-SELECT 'User activities:', COUNT(*) FROM user_activities WHERE id LIKE 'act-%';
+SELECT 'User activities:', COUNT(*) FROM user_activities WHERE id LIKE '22222222-bbbb%' OR id LIKE '33333333-cccc%' OR id LIKE '44444444-dddd%' OR id LIKE '55555555-eeee%' OR id LIKE '66666666-ffff%' OR id LIKE '77777777-aaaa%' OR id LIKE '88888888-bbbb%' OR id LIKE '99999999-cccc%';
