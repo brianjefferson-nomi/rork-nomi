@@ -702,10 +702,12 @@ export function useCollectionRestaurants(collectionId: string) {
   return useMemo(() => {
     // Find the plan/collection
     const plan = plans.find((p: any) => p.id === collectionId);
-    if (!plan) return [];
+    if (!plan || !plan.restaurant_ids) return [];
     
     // Return restaurants that are in this collection
-    return restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
+    return restaurants.filter((r: any) => 
+      r && r.id && plan.restaurant_ids && Array.isArray(plan.restaurant_ids) && plan.restaurant_ids.includes(r.id)
+    );
   }, [restaurants, plans, collectionId]);
 }
 

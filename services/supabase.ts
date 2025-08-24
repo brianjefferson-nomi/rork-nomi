@@ -722,15 +722,37 @@ export const dbHelpers = {
       
       console.log('[Supabase] User found:', userData);
       
-      // Get plans where user is creator
-      const { data, error } = await supabase
+      // Try to get plans where user is creator - handle both created_by and creator_id fields
+      let { data, error } = await supabase
         .from('collections')
         .select('*')
-        .eq('created_by', userId);
+        .or(`created_by.eq.${userId},creator_id.eq.${userId}`);
       
       if (error) {
         console.error('[Supabase] Error fetching user plans:', error);
-        throw new Error(`Failed to fetch plans: ${error.message}`);
+        // If the error is about missing column, try a different approach
+        if (error.message.includes('does not exist')) {
+          console.log('[Supabase] Trying alternative query approach...');
+          // Try to get all collections and filter in memory
+          const { data: allCollections, error: allError } = await supabase
+            .from('collections')
+            .select('*');
+          
+          if (allError) {
+            console.error('[Supabase] Error fetching all collections:', allError);
+            throw new Error(`Failed to fetch collections: ${allError.message}`);
+          }
+          
+          // Filter collections where user is creator (check both fields)
+          data = allCollections?.filter(collection => 
+            collection.created_by === userId || 
+            collection.creator_id === userId
+          ) || [];
+          
+          console.log('[Supabase] Filtered collections in memory:', data.length);
+        } else {
+          throw new Error(`Failed to fetch plans: ${error.message}`);
+        }
       }
       
       console.log('[Supabase] Found plans:', data?.length || 0);

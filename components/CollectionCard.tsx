@@ -22,7 +22,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
       
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{collection.name}</Text>
-        <Text style={styles.count}>{restaurants?.length || 0} places</Text>
+        <Text style={styles.count}>{restaurants && Array.isArray(restaurants) ? restaurants.length : 0} places</Text>
       </View>
       
       <View style={styles.footer}>
@@ -34,7 +34,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
           <View style={styles.stat}>
             <Users size={14} color="#FFF" />
             <Text style={styles.statText}>
-              {Array.isArray(collection.collaborators) ? collection.collaborators.length + 1 : 1}
+              {collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length + 1 : 1}
             </Text>
           </View>
         )}
