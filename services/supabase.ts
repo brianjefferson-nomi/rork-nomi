@@ -69,6 +69,7 @@ export interface Database {
       restaurants: {
         Row: {
           id: string;
+          restaurant_code: string;
           name: string;
           cuisine: string;
           price_range: string;
@@ -98,6 +99,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          restaurant_code: string;
           name: string;
           cuisine: string;
           price_range: string;
@@ -126,6 +128,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          restaurant_code?: string;
           name?: string;
           cuisine?: string;
           price_range?: string;
@@ -156,6 +159,7 @@ export interface Database {
       collections: {
         Row: {
           id: string;
+          collection_code: string;
           name: string;
           description?: string;
           cover_image?: string;

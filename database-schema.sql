@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Restaurants table
 CREATE TABLE IF NOT EXISTS restaurants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  restaurant_code TEXT UNIQUE NOT NULL, -- Simple string code for easy reference
   name TEXT NOT NULL,
   cuisine TEXT NOT NULL,
   price_range TEXT NOT NULL CHECK (price_range IN ('$', '$$', '$$$', '$$$$')),
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
 -- Collections table
 CREATE TABLE IF NOT EXISTS collections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  collection_code TEXT UNIQUE NOT NULL, -- Simple string code for easy reference
   name TEXT NOT NULL,
   description TEXT,
   cover_image TEXT,
@@ -236,8 +238,10 @@ CREATE INDEX IF NOT EXISTS idx_restaurants_name ON restaurants USING gin(name gi
 CREATE INDEX IF NOT EXISTS idx_restaurants_cuisine ON restaurants(cuisine);
 CREATE INDEX IF NOT EXISTS idx_restaurants_neighborhood ON restaurants(neighborhood);
 CREATE INDEX IF NOT EXISTS idx_restaurants_rating ON restaurants(rating DESC);
+CREATE INDEX IF NOT EXISTS idx_restaurants_code ON restaurants(restaurant_code);
 CREATE INDEX IF NOT EXISTS idx_collections_created_by ON collections(created_by);
 CREATE INDEX IF NOT EXISTS idx_collections_is_public ON collections(is_public);
+CREATE INDEX IF NOT EXISTS idx_collections_code ON collections(collection_code);
 CREATE INDEX IF NOT EXISTS idx_collection_members_collection_id ON collection_members(collection_id);
 CREATE INDEX IF NOT EXISTS idx_collection_members_user_id ON collection_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_votes_restaurant_id ON restaurant_votes(restaurant_id);
