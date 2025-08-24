@@ -1,15 +1,19 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Restaurant, Collection, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
-import { mockRestaurants, mockCollections, mockVotes, mockDiscussions } from '@/mocks/restaurants';
+import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
+import { mockRestaurants, mockVotes, mockDiscussions } from '@/mocks/restaurants';
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
 import { aggregateRestaurantData, getUserLocation } from '@/services/api';
+import { dbHelpers, Database } from '@/services/supabase';
+import { useAuth } from '@/hooks/auth-store';
+
+type Plan = Database['public']['Tables']['plans']['Row'];
 
 interface RestaurantStore {
   restaurants: Restaurant[];
-  collections: Collection[];
+  plans: Plan[];
   userVotes: RestaurantVote[];
   discussions: RestaurantDiscussion[];
   favoriteRestaurants: string[];
@@ -20,39 +24,50 @@ interface RestaurantStore {
   addSearchQuery: (query: string) => void;
   clearSearchHistory: () => void;
   getQuickSuggestions: () => string[];
-  addRestaurantToCollection: (collectionId: string, restaurantId: string) => void;
-  removeRestaurantFromCollection: (collectionId: string, restaurantId: string) => void;
-  createCollection: (collection: Omit<Collection, 'id' | 'createdAt' | 'likes'>) => void;
-  deleteCollection: (collectionId: string) => void;
+  addRestaurantToPlan: (planId: string, restaurantId: string) => Promise<void>;
+  removeRestaurantFromPlan: (planId: string, restaurantId: string) => Promise<void>;
+  createPlan: (plan: { name: string; description?: string; plannedDate?: string; isPublic?: boolean }) => Promise<void>;
+  deletePlan: (planId: string) => Promise<void>;
   toggleFavorite: (restaurantId: string) => void;
-  voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => void;
+  voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => void;
   addUserNote: (restaurantId: string, note: string) => void;
-  addDiscussion: (restaurantId: string, collectionId: string, message: string) => void;
-  getRankedRestaurants: (collectionId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
-  getGroupRecommendations: (collectionId: string) => GroupRecommendation[];
-  getCollectionDiscussions: (collectionId: string, restaurantId?: string) => RestaurantDiscussion[];
+  addDiscussion: (restaurantId: string, planId: string, message: string) => void;
+  getRankedRestaurants: (planId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
+  getGroupRecommendations: (planId: string) => GroupRecommendation[];
+  getPlanDiscussions: (planId: string, restaurantId?: string) => RestaurantDiscussion[];
   refreshLocation: () => Promise<void>;
-  inviteToCollection: (collectionId: string, email: string, message?: string) => void;
-  updateCollectionSettings: (collectionId: string, settings: Partial<Collection>) => void;
+  inviteToPlan: (planId: string, email: string, message?: string) => Promise<void>;
+  updatePlanSettings: (planId: string, settings: Partial<Plan>) => Promise<void>;
   switchToCity: (city: 'New York' | 'Los Angeles') => void;
+  shareablePlanUrl: (planId: string) => string;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
-
+  const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
   const [userVotes, setUserVotes] = useState<RestaurantVote[]>([]);
   const [discussions, setDiscussions] = useState<RestaurantDiscussion[]>([]);
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
 
+  // Load user plans from database
+  const plansQuery = useQuery({
+    queryKey: ['userPlans', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return await dbHelpers.getUserPlans(user.id);
+    },
+    enabled: !!user?.id
+  });
+
   // Load initial data and user location
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
     queryFn: async () => {
-      const [storedCollections, storedVotes, storedDiscussions, storedFavorites, storedNotes, storedSearchHistory, location] = await Promise.all([
-        AsyncStorage.getItem('collections'),
+      const [storedVotes, storedDiscussions, storedFavorites, storedNotes, storedSearchHistory, location] = await Promise.all([
         AsyncStorage.getItem('userVotes'),
         AsyncStorage.getItem('discussions'),
         AsyncStorage.getItem('favoriteRestaurants'),
@@ -69,7 +84,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
       return {
         restaurants: restaurantsWithNotes,
-        collections: storedCollections ? JSON.parse(storedCollections) : mockCollections,
         userVotes: storedVotes ? JSON.parse(storedVotes) : mockVotes,
         discussions: storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions,
         favoriteRestaurants: storedFavorites ? JSON.parse(storedFavorites) : [],
@@ -82,7 +96,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   useEffect(() => {
     if (dataQuery.data) {
       setRestaurants(dataQuery.data.restaurants);
-      setCollections(dataQuery.data.collections);
       setUserVotes(dataQuery.data.userVotes);
       setDiscussions(dataQuery.data.discussions);
       setFavoriteRestaurants(dataQuery.data.favoriteRestaurants);
@@ -90,17 +103,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       setUserLocation(dataQuery.data.userLocation);
     }
   }, [dataQuery.data]);
-
-  // Persist collections
-  const persistCollections = useMutation({
-    mutationFn: async (newCollections: Collection[]) => {
-      await AsyncStorage.setItem('collections', JSON.stringify(newCollections));
-      return newCollections;
-    },
-    onSuccess: (data) => {
-      setCollections(data);
-    }
-  });
 
   // Persist votes
   const persistVotes = useMutation({
@@ -125,7 +127,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   });
 
   // Persist favorites
-  const persistFavorites = useMutation({
+  const { mutate: mutateFavorites } = useMutation({
     mutationFn: async (newFavorites: string[]) => {
       await AsyncStorage.setItem('favoriteRestaurants', JSON.stringify(newFavorites));
       return newFavorites;
@@ -136,7 +138,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   });
 
   // Persist notes
-  const persistNotes = useMutation({
+  const { mutate: mutateNotes } = useMutation({
     mutationFn: async ({ restaurantId, note }: { restaurantId: string; note: string }) => {
       const stored = await AsyncStorage.getItem('restaurantNotes');
       const notes = stored ? JSON.parse(stored) : {};
@@ -152,7 +154,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   });
 
   // Persist search history
-  const persistSearchHistory = useMutation({
+  const { mutate: mutateSearchHistory } = useMutation({
     mutationFn: async (history: string[]) => {
       await AsyncStorage.setItem('searchHistory', JSON.stringify(history.slice(0, 10)));
       return history.slice(0, 10);
@@ -160,51 +162,102 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     onSuccess: (data) => setSearchHistory(data)
   });
 
-  const addRestaurantToCollection = useCallback((collectionId: string, restaurantId: string) => {
-    const updated = collections.map(c => 
-      c.id === collectionId 
-        ? { ...c, restaurants: [...new Set([...c.restaurants, restaurantId])] }
-        : c
-    );
-    persistCollections.mutate(updated);
-  }, [collections, persistCollections.mutate]);
+  // Plan operations
+  const addRestaurantToPlan = useCallback(async (planId: string, restaurantId: string) => {
+    if (!user?.id) return;
+    
+    const plan = plansQuery.data?.find(p => p.id === planId);
+    if (!plan) return;
 
-  const removeRestaurantFromCollection = useCallback((collectionId: string, restaurantId: string) => {
-    const updated = collections.map(c => 
-      c.id === collectionId 
-        ? { ...c, restaurants: c.restaurants.filter(id => id !== restaurantId) }
-        : c
-    );
-    persistCollections.mutate(updated);
-  }, [collections, persistCollections.mutate]);
+    const updatedRestaurantIds = [...new Set([...plan.restaurant_ids, restaurantId])];
+    await dbHelpers.updatePlan(planId, {
+      restaurant_ids: updatedRestaurantIds,
+      updated_at: new Date().toISOString()
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+  }, [user?.id, plansQuery.data, queryClient]);
 
-  const createCollection = useCallback((collection: Omit<Collection, 'id' | 'createdAt' | 'likes'>) => {
-    const newCollection: Collection = {
-      ...collection,
-      id: `c${Date.now()}`,
-      createdAt: new Date(),
-      likes: 0
-    };
-    persistCollections.mutate([...collections, newCollection]);
-  }, [collections, persistCollections.mutate]);
+  const removeRestaurantFromPlan = useCallback(async (planId: string, restaurantId: string) => {
+    if (!user?.id) return;
+    
+    const plan = plansQuery.data?.find(p => p.id === planId);
+    if (!plan) return;
 
-  const deleteCollection = useCallback((collectionId: string) => {
-    const updated = collections.filter(c => c.id !== collectionId);
-    persistCollections.mutate(updated);
-  }, [collections, persistCollections.mutate]);
+    const updatedRestaurantIds = plan.restaurant_ids.filter((id: string) => id !== restaurantId);
+    await dbHelpers.updatePlan(planId, {
+      restaurant_ids: updatedRestaurantIds,
+      updated_at: new Date().toISOString()
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+  }, [user?.id, plansQuery.data, queryClient]);
 
+  const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean }) => {
+    if (!user?.id) return;
+
+    await dbHelpers.createPlan({
+      name: planData.name,
+      description: planData.description,
+      creator_id: user.id,
+      collaborators: [],
+      restaurant_ids: [],
+      is_public: planData.isPublic || false,
+      planned_date: planData.plannedDate
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+  }, [user?.id, queryClient]);
+
+  const deletePlan = useCallback(async (planId: string) => {
+    if (!user?.id) return;
+    
+    await dbHelpers.deletePlan(planId);
+    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+  }, [user?.id, queryClient]);
+
+  const inviteToPlan = useCallback(async (planId: string, email: string, message?: string) => {
+    if (!user?.id) return;
+
+    await dbHelpers.createInvitation({
+      plan_id: planId,
+      inviter_id: user.id,
+      invitee_email: email,
+      message,
+      status: 'pending'
+    });
+  }, [user?.id]);
+
+  const updatePlanSettings = useCallback(async (planId: string, settings: Partial<Plan>) => {
+    if (!user?.id) return;
+    
+    await dbHelpers.updatePlan(planId, {
+      ...settings,
+      updated_at: new Date().toISOString()
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+  }, [user?.id, queryClient]);
+
+  const shareablePlanUrl = useCallback((planId: string) => {
+    const plan = plansQuery.data?.find(p => p.id === planId);
+    if (!plan) return '';
+    return `https://yourapp.com/join/${plan.unique_code}`;
+  }, [plansQuery.data]);
+
+  // Other operations
   const toggleFavorite = useCallback((restaurantId: string) => {
     const updated = favoriteRestaurants.includes(restaurantId)
-      ? favoriteRestaurants.filter(id => id !== restaurantId)
+      ? favoriteRestaurants.filter((id: string) => id !== restaurantId)
       : [...favoriteRestaurants, restaurantId];
-    persistFavorites.mutate(updated);
-  }, [favoriteRestaurants, persistFavorites.mutate]);
+    mutateFavorites(updated);
+  }, [favoriteRestaurants, mutateFavorites]);
 
-  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => {
+  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
     const existingVoteIndex = userVotes.findIndex(v => 
       v.restaurantId === restaurantId && 
       v.userId === 'currentUser' && 
-      v.collectionId === collectionId
+      v.collectionId === planId
     );
     let updated: RestaurantVote[];
 
@@ -212,7 +265,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     const base: Omit<RestaurantVote, 'vote'> = { 
       restaurantId, 
       userId: 'currentUser', 
-      collectionId,
+      collectionId: planId,
       timestamp: now, 
       authority: 'regular', 
       weight: 1,
@@ -233,19 +286,19 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [userVotes, persistVotes.mutate]);
 
   const addUserNote = useCallback((restaurantId: string, note: string) => {
-    persistNotes.mutate({ restaurantId, note });
-  }, [persistNotes.mutate]);
+    mutateNotes({ restaurantId, note });
+  }, [mutateNotes]);
 
   const addSearchQuery = useCallback((query: string) => {
     const q = query.trim();
     if (!q) return;
     const updated = [q, ...searchHistory.filter(item => item.toLowerCase() !== q.toLowerCase())];
-    persistSearchHistory.mutate(updated);
-  }, [searchHistory, persistSearchHistory.mutate]);
+    mutateSearchHistory(updated);
+  }, [searchHistory, mutateSearchHistory]);
 
   const clearSearchHistory = useCallback(() => {
-    persistSearchHistory.mutate([]);
-  }, [persistSearchHistory.mutate]);
+    mutateSearchHistory([]);
+  }, [mutateSearchHistory]);
 
   const getQuickSuggestions = useCallback(() => {
     const locationSuggestions = userLocation?.city === 'New York' 
@@ -266,11 +319,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     return [...searchHistory, ...locationSuggestions, ...sorted].slice(0, 8);
   }, [restaurants, searchHistory, userLocation]);
 
-  const addDiscussion = useCallback((restaurantId: string, collectionId: string, message: string) => {
+  const addDiscussion = useCallback((restaurantId: string, planId: string, message: string) => {
     const newDiscussion: RestaurantDiscussion = {
       id: `d${Date.now()}`,
       restaurantId,
-      collectionId,
+      collectionId: planId,
       userId: 'currentUser',
       userName: 'You',
       userAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
@@ -281,55 +334,58 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     persistDiscussions.mutate([...discussions, newDiscussion]);
   }, [discussions, persistDiscussions.mutate]);
 
-  const getRankedRestaurants = useCallback((collectionId?: string, memberCount?: number) => {
-    const collection = collectionId ? collections.find(c => c.id === collectionId) : undefined;
-    const pool = collectionId
-      ? restaurants.filter(r => (collection?.restaurants ?? []).includes(r.id))
+  const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
+    const plan = planId ? plansQuery.data?.find(p => p.id === planId) : undefined;
+    const pool = planId
+      ? restaurants.filter(r => (plan?.restaurant_ids ?? []).includes(r.id))
       : restaurants;
     
-    const collectionVotes = collectionId 
-      ? userVotes.filter(v => v.collectionId === collectionId)
+    const planVotes = planId 
+      ? userVotes.filter(v => v.collectionId === planId)
       : userVotes;
     
     const discussionCounts = discussions
-      .filter(d => !collectionId || d.collectionId === collectionId)
+      .filter(d => !planId || d.collectionId === planId)
       .reduce<Record<string, number>>((acc, d) => {
         acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
         return acc;
       }, {});
     
-    return computeRankings(pool, collectionVotes, { 
+    // For now, use simplified ranking without collection compatibility
+    return computeRankings(pool, planVotes, { 
       memberCount, 
-      collection,
+      collection: undefined,
       discussions: discussionCounts 
     });
-  }, [collections, restaurants, userVotes, discussions]);
+  }, [plansQuery.data, restaurants, userVotes, discussions]);
 
-  const getGroupRecommendations = useCallback((collectionId: string) => {
-    const collection = collections.find(c => c.id === collectionId);
-    if (!collection) return [];
+  const getGroupRecommendations = useCallback((planId: string) => {
+    const plan = plansQuery.data?.find(p => p.id === planId);
+    if (!plan) return [];
     
-    const pool = restaurants.filter(r => collection.restaurants.includes(r.id));
-    const collectionVotes = userVotes.filter(v => v.collectionId === collectionId);
+    const pool = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    const planVotes = userVotes.filter(v => v.collectionId === planId);
     const discussionCounts = discussions
-      .filter(d => d.collectionId === collectionId)
+      .filter(d => d.collectionId === planId)
       .reduce<Record<string, number>>((acc, d) => {
         acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
         return acc;
       }, {});
     
-    const rankedRestaurants = computeRankings(pool, collectionVotes, { 
-      memberCount: collection.collaborators.length, 
-      collection,
+    // For now, use simplified ranking without collection compatibility
+    const rankedRestaurants = computeRankings(pool, planVotes, { 
+      memberCount: plan.collaborators.length, 
+      collection: undefined,
       discussions: discussionCounts 
     });
     
-    return generateGroupRecommendations(rankedRestaurants, collection);
-  }, [collections, restaurants, userVotes, discussions]);
+    // Return empty recommendations for now - will be implemented later
+    return [];
+  }, [plansQuery.data, restaurants, userVotes, discussions]);
 
-  const getCollectionDiscussions = useCallback((collectionId: string, restaurantId?: string) => {
+  const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
     return discussions.filter(d => 
-      d.collectionId === collectionId && 
+      d.collectionId === planId && 
       (!restaurantId || d.restaurantId === restaurantId)
     ).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [discussions]);
@@ -391,22 +447,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, []);
 
-  const inviteToCollection = useCallback((collectionId: string, email: string, message?: string) => {
-    // In a real app, this would send an email invitation
-    console.log(`Inviting ${email} to collection ${collectionId} with message: ${message}`);
-    // For now, we'll just log it. In production, this would:
-    // 1. Send an email invitation
-    // 2. Create a pending invitation record
-    // 3. Handle invitation acceptance/rejection
-  }, []);
-
-  const updateCollectionSettings = useCallback((collectionId: string, settings: Partial<Collection>) => {
-    const updated = collections.map(c => 
-      c.id === collectionId ? { ...c, ...settings } : c
-    );
-    persistCollections.mutate(updated);
-  }, [collections, persistCollections.mutate]);
-
   const switchToCity = useCallback((city: 'New York' | 'Los Angeles') => {
     const coordinates = city === 'New York' 
       ? { city: 'New York', lat: 40.7128, lng: -74.0060 }
@@ -417,64 +457,65 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, []);
 
   // Memoize the store value to prevent unnecessary re-renders
-  const storeValue = useMemo(() => {
-    return {
-      restaurants,
-      collections,
-      userVotes,
-      discussions,
-      favoriteRestaurants,
-      isLoading: dataQuery.isLoading,
-      searchHistory,
-      userLocation,
-      searchRestaurants,
-      addSearchQuery,
-      clearSearchHistory,
-      getQuickSuggestions,
-      addRestaurantToCollection,
-      removeRestaurantFromCollection,
-      createCollection,
-      deleteCollection,
-      toggleFavorite,
-      voteRestaurant,
-      addUserNote,
-      addDiscussion,
-      getRankedRestaurants,
-      getGroupRecommendations,
-      getCollectionDiscussions,
-      refreshLocation,
-      inviteToCollection,
-      updateCollectionSettings,
-      switchToCity,
-    };
-  }, [
+  const storeValue = useMemo(() => ({
     restaurants,
-    collections,
+    plans: plansQuery.data || [],
     userVotes,
     discussions,
     favoriteRestaurants,
-    dataQuery.isLoading,
+    isLoading: dataQuery.isLoading || plansQuery.isLoading,
     searchHistory,
     userLocation,
     searchRestaurants,
     addSearchQuery,
     clearSearchHistory,
     getQuickSuggestions,
-    addRestaurantToCollection,
-    removeRestaurantFromCollection,
-    createCollection,
-    deleteCollection,
+    addRestaurantToPlan,
+    removeRestaurantFromPlan,
+    createPlan,
+    deletePlan,
     toggleFavorite,
     voteRestaurant,
     addUserNote,
     addDiscussion,
     getRankedRestaurants,
     getGroupRecommendations,
-    getCollectionDiscussions,
+    getPlanDiscussions,
     refreshLocation,
-    inviteToCollection,
-    updateCollectionSettings,
+    inviteToPlan,
+    updatePlanSettings,
     switchToCity,
+    shareablePlanUrl,
+  }), [
+    restaurants,
+    plansQuery.data,
+    userVotes,
+    discussions,
+    favoriteRestaurants,
+    dataQuery.isLoading,
+    plansQuery.isLoading,
+    searchHistory,
+    userLocation,
+    searchRestaurants,
+    addSearchQuery,
+    clearSearchHistory,
+    getQuickSuggestions,
+    addRestaurantToPlan,
+    removeRestaurantFromPlan,
+    createPlan,
+    deletePlan,
+    toggleFavorite,
+    voteRestaurant,
+    addUserNote,
+    addDiscussion,
+    getRankedRestaurants,
+    getGroupRecommendations,
+    getPlanDiscussions,
+    refreshLocation,
+    inviteToPlan,
+    updatePlanSettings,
+    switchToCity,
+    shareablePlanUrl,
   ]);
 
   return storeValue;
@@ -486,26 +527,26 @@ export function useRestaurantById(id: string) {
   return restaurants.find(r => r.id === id);
 }
 
-export function useCollectionById(id: string) {
-  const { collections } = useRestaurants();
-  return collections.find(c => c.id === id);
+export function usePlanById(id: string) {
+  const { plans } = useRestaurants();
+  return plans.find(p => p.id === id);
 }
 
-export function useCollectionRestaurants(collectionId: string) {
+export function usePlanRestaurants(planId: string) {
   const { restaurants } = useRestaurants();
-  const collection = useCollectionById(collectionId);
+  const plan = usePlanById(planId);
   
   return useMemo(() => {
-    if (!collection) return [];
-    return restaurants.filter(r => collection.restaurants.includes(r.id));
-  }, [restaurants, collection]);
+    if (!plan) return [];
+    return restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+  }, [restaurants, plan]);
 }
 
-export function useRestaurantVotes(restaurantId: string, collectionId?: string) {
+export function useRestaurantVotes(restaurantId: string, planId?: string) {
   const { userVotes } = useRestaurants();
   const votes = userVotes.filter(v => 
     v.restaurantId === restaurantId && 
-    (!collectionId || v.collectionId === collectionId)
+    (!planId || v.collectionId === planId)
   );
   
   return {

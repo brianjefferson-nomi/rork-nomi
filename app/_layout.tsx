@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RestaurantProvider } from "@/hooks/restaurant-store";
+import { AuthProvider } from "@/hooks/auth-store";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,17 +30,35 @@ function RootLayoutNav() {
         }} 
       />
       <Stack.Screen 
-        name="collection/[id]" 
+        name="plan/[id]" 
         options={{ 
-          title: "Collection",
+          title: "Plan",
           headerStyle: { backgroundColor: '#FFF' },
           headerTintColor: '#1A1A1A',
         }} 
       />
       <Stack.Screen 
-        name="create-collection" 
+        name="create-plan" 
         options={{ 
-          title: "New Collection",
+          title: "New Plan",
+          presentation: 'modal',
+          headerStyle: { backgroundColor: '#FFF' },
+          headerTintColor: '#1A1A1A',
+        }} 
+      />
+      <Stack.Screen 
+        name="join-plan" 
+        options={{ 
+          title: "Join Plan",
+          presentation: 'modal',
+          headerStyle: { backgroundColor: '#FFF' },
+          headerTintColor: '#1A1A1A',
+        }} 
+      />
+      <Stack.Screen 
+        name="auth" 
+        options={{ 
+          title: "Sign In",
           presentation: 'modal',
           headerStyle: { backgroundColor: '#FFF' },
           headerTintColor: '#1A1A1A',
@@ -56,11 +75,13 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RestaurantProvider>
-        <GestureHandlerRootView>
-          <RootLayoutNav />
-        </GestureHandlerRootView>
-      </RestaurantProvider>
+      <AuthProvider>
+        <RestaurantProvider>
+          <GestureHandlerRootView>
+            <RootLayoutNav />
+          </GestureHandlerRootView>
+        </RestaurantProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
