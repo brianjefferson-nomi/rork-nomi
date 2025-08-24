@@ -355,7 +355,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [plansQuery.data]);
 
   // Collection operations (aliases for backward compatibility)
-  const addRestaurantToCollection = addRestaurantToPlan;
+  const addRestaurantToCollection = useCallback(async (collectionId: string, restaurantId: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for adding restaurant to collection');
+      return;
+    }
+    try {
+      await dbHelpers.addRestaurantToCollection(collectionId, restaurantId, user.id);
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error adding restaurant to collection:', error);
+      throw error;
+    }
+  }, [user?.id, queryClient]);
+  
   const removeRestaurantFromCollection = removeRestaurantFromPlan;
   const deleteCollection = deletePlan;
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {

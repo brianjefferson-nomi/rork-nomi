@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { Heart, BookOpen, Users, Star, Camera, MessageSquare, MapPin, Settings, Edit3 } from 'lucide-react-native';
+import { Heart, BookOpen, Users, Star, Camera, MessageSquare, MapPin, Settings, Edit3, LogOut } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { supabase } from '@/services/supabase';
 
 export default function ProfileScreen() {
   const { favoriteRestaurants, collections } = useRestaurants();
@@ -14,6 +15,34 @@ export default function ProfileScreen() {
     { icon: Users, label: 'Friends', value: 12, color: '#50C878' },
     { icon: Star, label: 'Reviews', value: 28, color: '#FFD700' },
   ];
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.auth.signOut();
+              if (error) {
+                console.error('Logout error:', error);
+                Alert.alert('Error', 'Failed to logout. Please try again.');
+              } else {
+                router.replace('/auth');
+              }
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <>
@@ -83,6 +112,13 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.preferenceItem}>
             <Text style={styles.preferenceText}>Price Range</Text>
             <Text style={styles.preferenceValue}>$$ - $$$</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <LogOut size={20} color="#FF6B6B" />
+            <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
@@ -199,5 +235,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A1A1A',
     fontWeight: '500',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFE5E5',
+    gap: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
 });
