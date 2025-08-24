@@ -30,31 +30,31 @@ INSERT INTO collections (id, collection_code, name, description, created_by, cre
 -- Collection 1: Date Night Winners (4 members)
 ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'DATE_NIGHT_001', 'Date Night Winners', 'Perfect restaurants for romantic evenings', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'romantic', true, 15, true, false, false, 2, true, false, 'public', true, true, 60, 
  ARRAY['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-cccc-cccc-cccc-cccccccccccc', '44444444-dddd-dddd-dddd-dddddddddddd'], 
- ARRAY['22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444'], 
+ ARRAY['22222222-2222-2222-2222-222222222222'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, '44444444-4444-4444-4444-444444444444'::uuid], 
  NOW(), NOW()),
 
 -- Collection 2: Business Lunch Spots (5 members)
 ('bbbbbbbb-cccc-dddd-eeee-ffffffffffff', 'BUSINESS_001', 'Business Lunch Spots', 'Professional dining for client meetings', '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 'business', true, 23, true, false, false, 3, true, false, 'public', true, true, 50, 
  ARRAY['55555555-eeee-eeee-eeee-eeeeeeeeeeee', '66666666-ffff-ffff-ffff-ffffffffffff', '77777777-aaaa-bbbb-cccc-dddddddddddd'], 
- ARRAY['11111111-1111-1111-1111-111111111111', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', '77777777-7777-7777-7777-777777777777'], 
+ ARRAY['11111111-1111-1111-1111-111111111111'::uuid, '55555555-5555-5555-5555-555555555555'::uuid, '66666666-6666-6666-6666-666666666666'::uuid, '77777777-7777-7777-7777-777777777777'::uuid], 
  NOW(), NOW()),
 
 -- Collection 3: Foodie Adventures (6 members)
 ('cccccccc-dddd-eeee-ffff-gggggggggggg', 'FOODIE_001', 'Foodie Adventures', 'Must-try restaurants for food enthusiasts', '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333', 'exploration', true, 31, true, false, false, 2, true, false, 'public', true, true, 40, 
  ARRAY['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-cccc-cccc-cccc-cccccccccccc', '77777777-aaaa-bbbb-cccc-dddddddddddd', '88888888-bbbb-cccc-dddd-eeeeeeeeeeee', '99999999-cccc-dddd-eeee-ffffffffffff'], 
- ARRAY['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '88888888-8888-8888-8888-888888888888'], 
+ ARRAY['11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, '55555555-5555-5555-5555-555555555555'::uuid, '88888888-8888-8888-8888-888888888888'::uuid], 
  NOW(), NOW()),
 
 -- Collection 4: Budget Eats (4 members)
 ('dddddddd-eeee-ffff-gggg-hhhhhhhhhhhh', 'BUDGET_001', 'Budget Eats', 'Great food without breaking the bank', '44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444', 'budget', true, 18, true, false, false, 2, true, false, 'public', true, true, 50, 
  ARRAY['88888888-bbbb-cccc-dddd-eeeeeeeeeeee', 'aaaaaaaa-dddd-eeee-ffff-gggggggggggg'], 
- ARRAY['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '77777777-7777-7777-7777-777777777777'], 
+ ARRAY['11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '77777777-7777-7777-7777-777777777777'::uuid], 
  NOW(), NOW()),
 
 -- Collection 5: Celebrity Chef Spots (5 members)
 ('eeeeeeee-ffff-gggg-hhhh-iiiiiiiiiiii', 'CELEBRITY_001', 'Celebrity Chef Spots', 'Restaurants by famous chefs', '55555555-5555-5555-5555-555555555555', '55555555-5555-5555-5555-555555555555', 'celebration', true, 27, true, false, false, 3, true, false, 'public', true, true, 60, 
  ARRAY['22222222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-cccc-cccc-cccc-cccccccccccc', '66666666-ffff-ffff-ffff-ffffffffffff', '77777777-aaaa-bbbb-cccc-dddddddddddd'], 
- ARRAY['11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', '66666666-6666-6666-6666-666666666666', '88888888-8888-8888-8888-888888888888'], 
+ ARRAY['11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, '66666666-6666-6666-6666-666666666666'::uuid, '88888888-8888-8888-8888-888888888888'::uuid], 
  NOW(), NOW());
 
 -- Create collection members for proper relationships
