@@ -65,8 +65,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const plansQuery = useQuery({
     queryKey: ['userPlans', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      return await dbHelpers.getUserPlans(user.id);
+      if (!user?.id) {
+        console.log('[RestaurantStore] No user ID, returning empty plans');
+        return [];
+      }
+      
+      try {
+        console.log('[RestaurantStore] Loading plans for user:', user.id);
+        const plans = await dbHelpers.getUserPlans(user.id);
+        console.log('[RestaurantStore] Loaded plans:', plans.length);
+        return plans;
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading plans:', error);
+        return [];
+      }
     },
     enabled: !!user?.id
   });
@@ -251,18 +263,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean }) => {
     if (!user?.id) return;
 
-    await dbHelpers.createPlan({
-      name: planData.name,
-      description: planData.description,
-      created_by: user.id,
-      creator_id: user.id,
-      collaborators: [],
-      restaurant_ids: [],
-      is_public: planData.isPublic || false,
-      planned_date: planData.plannedDate
-    });
+    console.log('[RestaurantStore] Creating plan:', planData);
     
-    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    try {
+      const newPlan = await dbHelpers.createPlan({
+        name: planData.name,
+        description: planData.description,
+        created_by: user.id,
+        creator_id: user.id,
+        collaborators: [],
+        restaurant_ids: [],
+        is_public: planData.isPublic || false,
+        planned_date: planData.plannedDate
+      });
+      
+      console.log('[RestaurantStore] Plan created successfully:', newPlan);
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error creating plan:', error);
+      throw error;
+    }
   }, [user?.id, queryClient]);
 
   const deletePlan = useCallback(async (planId: string) => {

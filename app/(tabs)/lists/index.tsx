@@ -34,7 +34,7 @@ export default function ListsScreen() {
   }, [restaurants, favoriteRestaurants, sortBy]);
 
   const sortedCollections = useMemo(() => {
-    return collections.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return (collections || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [collections]);
 
   const renderTabButton = (tab: TabType, icon: React.ReactNode, label: string, count: number) => (
@@ -69,11 +69,11 @@ export default function ListsScreen() {
       </View>
 
       <View style={styles.tabsContainer}>
-        {renderTabButton('collections', <BookOpen size={18} color={activeTab === 'collections' ? '#FF6B6B' : '#666'} />, 'Collections', collections.length)}
-        {renderTabButton('favorites', <Heart size={18} color={activeTab === 'favorites' ? '#FF6B6B' : '#666'} />, 'Favorites', favoriteRestaurants.length)}
+        {renderTabButton('collections', <BookOpen size={18} color={activeTab === 'collections' ? '#FF6B6B' : '#666'} />, 'Plans', (collections || []).length)}
+        {renderTabButton('favorites', <Heart size={18} color={activeTab === 'favorites' ? '#FF6B6B' : '#666'} />, 'Favorites', (favoriteRestaurants || []).length)}
       </View>
 
-      {activeTab === 'favorites' && favoriteRestaurants.length > 0 && (
+      {activeTab === 'favorites' && (favoriteRestaurants || []).length > 0 && (
         <View style={styles.controlsContainer}>
           <TouchableOpacity
             style={styles.filterToggle}
@@ -112,23 +112,23 @@ export default function ListsScreen() {
       )}
 
       {activeTab === 'collections' ? (
-        collections.length === 0 ? (
+        (collections || []).length === 0 ? (
           <View style={styles.emptyState}>
             <BookOpen size={48} color="#CCC" />
-            <Text style={styles.emptyTitle}>No collections yet</Text>
-            <Text style={styles.emptyText}>Create your first collection to start organizing restaurants by theme, occasion, or preference</Text>
+            <Text style={styles.emptyTitle}>No plans yet</Text>
+            <Text style={styles.emptyText}>Create your first plan to start organizing restaurants for group dining experiences</Text>
             <TouchableOpacity 
               style={styles.createButton} 
               onPress={() => router.push('/create-collection' as any)}
             >
               <Plus size={20} color="#FFF" />
-              <Text style={styles.createButtonText}>Create Collection</Text>
+              <Text style={styles.createButtonText}>Create Plan</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.content}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Collections</Text>
+              <Text style={styles.sectionTitle}>Your Plans</Text>
               <TouchableOpacity 
                 style={styles.addButton}
                 onPress={() => router.push('/create-collection' as any)}
@@ -138,18 +138,54 @@ export default function ListsScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.collectionsGrid}>
-              {sortedCollections.map(collection => (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  onPress={() => router.push(`/collection/${collection.id}` as any)}
-                />
-              ))}
+              {sortedCollections.map(plan => {
+                // Convert plan to collection format for display
+                const collection = {
+                  id: plan.id,
+                  name: plan.name,
+                  description: plan.description || 'A collaborative dining plan',
+                  coverImage: plan.cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+                  restaurants: plan.restaurant_ids || [],
+                  createdBy: plan.creator_id || plan.created_by,
+                  collaborators: (plan.collaborators || []).map(id => ({
+                    userId: id,
+                    name: 'Collaborator',
+                    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+                    role: 'member' as const,
+                    joinedAt: new Date(),
+                    voteWeight: 1
+                  })),
+                  createdAt: new Date(plan.created_at),
+                  isPublic: plan.is_public,
+                  likes: Math.floor(Math.random() * 50) + 10,
+                  votingRules: {
+                    equalVoting: true,
+                    adminWeighted: false,
+                    expertiseWeighted: false,
+                    minimumParticipation: 1,
+                    allowVoteChanges: true,
+                    anonymousVoting: false
+                  },
+                  settings: {
+                    voteVisibility: 'public' as const,
+                    discussionEnabled: true,
+                    autoRankingEnabled: true,
+                    consensusThreshold: 0.6
+                  }
+                };
+                return (
+                  <CollectionCard
+                    key={plan.id}
+                    collection={collection}
+                    onPress={() => router.push(`/collection/${plan.id}` as any)}
+                  />
+                );
+              })}
             </View>
           </View>
         )
       ) : (
-        favoriteRestaurants.length === 0 ? (
+        (favoriteRestaurants || []).length === 0 ? (
           <View style={styles.emptyState}>
             <Heart size={48} color="#CCC" />
             <Text style={styles.emptyTitle}>No favorites yet</Text>
@@ -165,7 +201,7 @@ export default function ListsScreen() {
           <View style={styles.content}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
-                Your Favorites ({favoriteRestaurants.length})
+                Your Favorites ({(favoriteRestaurants || []).length})
               </Text>
               <Text style={styles.sectionSubtitle}>
                 Sorted by {sortBy === 'recent' ? 'recently added' : sortBy}

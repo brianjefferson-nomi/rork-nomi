@@ -653,9 +653,15 @@ export const dbHelpers = {
 
   // Collection operations (alias for plans)
   async createPlan(planData: Database['public']['Tables']['collections']['Insert']) {
+    // Generate a unique collection code
+    const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     const { data, error } = await supabase
       .from('collections')
-      .insert(planData)
+      .insert({
+        ...planData,
+        collection_code: collectionCode
+      })
       .select()
       .single();
     

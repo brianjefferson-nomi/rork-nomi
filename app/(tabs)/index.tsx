@@ -94,14 +94,14 @@ export default function HomeScreen() {
   ];
   
   // Convert plans to collections format for display
-  const planCollections: Collection[] = collections.map(plan => ({
+  const planCollections: Collection[] = (collections || []).map(plan => ({
     id: plan.id,
     name: plan.name,
     description: plan.description || 'A collaborative dining plan',
-    coverImage: plan.image_url || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-    restaurants: plan.restaurant_ids,
-    createdBy: plan.creator_id,
-    collaborators: plan.collaborators.map(id => ({
+    coverImage: plan.cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+    restaurants: plan.restaurant_ids || [],
+    createdBy: plan.creator_id || plan.created_by,
+    collaborators: (plan.collaborators || []).map(id => ({
       userId: id,
       name: 'Collaborator',
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
@@ -129,7 +129,7 @@ export default function HomeScreen() {
   }));
   
   const displayCollections = planCollections.length > 0 ? planCollections : mockCollections;
-  const popularCollections = displayCollections.sort((a, b) => b.likes - a.likes).slice(0, 4);
+  const popularCollections = (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4);
   const newRestaurants = availableRestaurants.slice(6, 10);
   const localHighlights = availableRestaurants.slice(0, 4);
   
