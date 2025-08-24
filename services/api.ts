@@ -678,75 +678,40 @@ export const getUserLocation = async (): Promise<{ city: string; lat: number; ln
       return new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
-            const { latitude, longitude } = position.coords;
-            console.log(`[Location] Got coordinates: ${latitude}, ${longitude}`);
-            
-            // Reverse geocoding to get city
             try {
-              const response = await fetch(
-                `https://${API_CONFIG.rapidapi.hosts.googlePlaces}/maps/api/geocode/json?latlng=${latitude},${longitude}`,
-                {
-                  method: 'GET',
-                  headers: {
-                    'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
-                    'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googlePlaces
-                  }
-                }
-              );
+              const { latitude, longitude } = position.coords;
+              console.log(`[Location] Got coordinates: ${latitude}, ${longitude}`);
               
-              if (response.ok) {
-                const data = await response.json();
-                const addressComponents = data.results?.[0]?.address_components || [];
-                
-                let city = '';
-                let state = '';
-                
-                for (const component of addressComponents) {
-                  if (component.types.includes('locality')) {
-                    city = component.long_name;
-                  }
-                  if (component.types.includes('administrative_area_level_1')) {
-                    state = component.short_name;
-                  }
-                }
-                
-                console.log(`[Location] Detected city: ${city}, state: ${state}`);
-                
-                // Enhanced city detection for MVP (NYC and LA)
-                if (city.toLowerCase().includes('new york') || 
-                    city.toLowerCase().includes('manhattan') || 
-                    city.toLowerCase().includes('brooklyn') || 
-                    city.toLowerCase().includes('queens') || 
-                    city.toLowerCase().includes('bronx') ||
-                    state === 'NY') {
-                  resolve({ city: 'New York', lat: latitude, lng: longitude });
-                  return;
-                } else if (city.toLowerCase().includes('los angeles') || 
-                          city.toLowerCase().includes('hollywood') || 
-                          city.toLowerCase().includes('beverly hills') || 
-                          city.toLowerCase().includes('santa monica') ||
-                          (state === 'CA' && (city.toLowerCase().includes('la') || city.toLowerCase().includes('angeles')))) {
-                  resolve({ city: 'Los Angeles', lat: latitude, lng: longitude });
-                  return;
-                }
+              // Simple city detection based on coordinates
+              // NYC area: roughly 40.4774-40.9176 lat, -74.2591 to -73.7004 lng
+              // LA area: roughly 33.7037-34.3373 lat, -118.6681 to -117.9448 lng
+              if (latitude >= 40.4774 && latitude <= 40.9176 && longitude >= -74.2591 && longitude <= -73.7004) {
+                console.log('[Location] Detected NYC area');
+                resolve({ city: 'New York', lat: latitude, lng: longitude });
+                return;
+              } else if (latitude >= 33.7037 && latitude <= 34.3373 && longitude >= -118.6681 && longitude <= -117.9448) {
+                console.log('[Location] Detected LA area');
+                resolve({ city: 'Los Angeles', lat: latitude, lng: longitude });
+                return;
               }
+              
+              // Default to NYC if location not in supported areas
+              console.log('[Location] Location not in supported cities, defaulting to NYC');
+              resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
             } catch (error) {
-              console.error('[Location] Error reverse geocoding:', error);
+              console.error('[Location] Error processing coordinates:', error);
+              resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
             }
-            
-            // Default to NYC if location not supported
-            console.log('[Location] Location not in supported cities, defaulting to NYC');
-            resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
           },
           (error) => {
-            console.error('[Location] Error getting location:', error);
+            console.log('[Location] Geolocation error, using default location:', error.message || 'Unknown error');
             // Default to NYC
             resolve({ city: 'New York', lat: 40.7128, lng: -74.0060 });
           },
           {
-            timeout: 10000,
+            timeout: 8000,
             enableHighAccuracy: false,
-            maximumAge: 300000 // 5 minutes
+            maximumAge: 600000 // 10 minutes
           }
         );
       });

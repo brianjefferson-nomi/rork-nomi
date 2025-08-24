@@ -73,14 +73,17 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       try {
         console.log('[RestaurantStore] Loading plans for user:', user.id);
         const plans = await dbHelpers.getUserPlans(user.id);
-        console.log('[RestaurantStore] Loaded plans:', plans.length);
-        return plans;
+        console.log('[RestaurantStore] Loaded plans:', plans?.length || 0);
+        return plans || [];
       } catch (error) {
         console.error('[RestaurantStore] Error loading plans:', error);
         return [];
       }
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   // Load restaurants from database

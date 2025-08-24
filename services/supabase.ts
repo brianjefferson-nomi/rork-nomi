@@ -687,13 +687,26 @@ export const dbHelpers = {
   },
 
   async getUserPlans(userId: string) {
-    const { data, error } = await supabase
-      .from('collections')
-      .select('*')
-      .or(`created_by.eq.${userId},is_public.eq.true`);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      console.log('[Supabase] Getting plans for user:', userId);
+      
+      // Get plans where user is creator or collaborator
+      const { data, error } = await supabase
+        .from('collections')
+        .select('*')
+        .or(`created_by.eq.${userId},collaborators.cs.{"${userId}"}`);
+      
+      if (error) {
+        console.error('[Supabase] Error fetching user plans:', error);
+        throw error;
+      }
+      
+      console.log('[Supabase] Found plans:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('[Supabase] getUserPlans error:', error);
+      throw error;
+    }
   },
 
   async updatePlan(id: string, updates: Database['public']['Tables']['collections']['Update']) {

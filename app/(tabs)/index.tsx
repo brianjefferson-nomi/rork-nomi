@@ -22,6 +22,9 @@ export default function HomeScreen() {
     );
   }
 
+  // Ensure collections is always an array
+  const safeCollections = Array.isArray(collections) ? collections : [];
+
   const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
   
   // Filter restaurants by location with better matching
@@ -94,7 +97,7 @@ export default function HomeScreen() {
   ];
   
   // Convert plans to collections format for display
-  const planCollections: Collection[] = (collections || []).map(plan => ({
+  const planCollections: Collection[] = safeCollections.map(plan => ({
     id: plan.id,
     name: plan.name,
     description: plan.description || 'A collaborative dining plan',
