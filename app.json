@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Nomi",
-    "slug": "groupdine-collaborative-restaurant-recommendations",
+    "slug": "nomi-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.groupdine-collaborative-restaurant-recommendations"
+      "bundleIdentifier": "app.rork.nomi"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.groupdine-collaborative-restaurant-recommendations"
+      "package": "app.rork.nomi"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
