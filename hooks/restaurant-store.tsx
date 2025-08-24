@@ -4,7 +4,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Restaurant, Collection, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
 import { mockRestaurants, mockCollections, mockVotes, mockDiscussions } from '@/mocks/restaurants';
-import { computeRankings, generateGroupRecommendations } from '../utils/ranking';
+import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
+import { aggregateRestaurantData, getUserLocation } from '@/services/api';
 
 interface RestaurantStore {
   restaurants: Restaurant[];
@@ -14,6 +15,8 @@ interface RestaurantStore {
   favoriteRestaurants: string[];
   isLoading: boolean;
   searchHistory: string[];
+  userLocation: { city: string; lat: number; lng: number } | null;
+  searchRestaurants: (query: string) => Promise<Restaurant[]>;
   addSearchQuery: (query: string) => void;
   clearSearchHistory: () => void;
   getQuickSuggestions: () => string[];
@@ -28,6 +31,7 @@ interface RestaurantStore {
   useRankedRestaurants: (collectionId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
   getGroupRecommendations: (collectionId: string) => GroupRecommendation[];
   getCollectionDiscussions: (collectionId: string, restaurantId?: string) => RestaurantDiscussion[];
+  refreshLocation: () => Promise<void>;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -38,18 +42,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [discussions, setDiscussions] = useState<RestaurantDiscussion[]>([]);
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
 
-  // Load initial data
+  // Load initial data and user location
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
     queryFn: async () => {
-      const [storedCollections, storedVotes, storedDiscussions, storedFavorites, storedNotes, storedSearchHistory] = await Promise.all([
+      const [storedCollections, storedVotes, storedDiscussions, storedFavorites, storedNotes, storedSearchHistory, location] = await Promise.all([
         AsyncStorage.getItem('collections'),
         AsyncStorage.getItem('userVotes'),
         AsyncStorage.getItem('discussions'),
         AsyncStorage.getItem('favoriteRestaurants'),
         AsyncStorage.getItem('restaurantNotes'),
-        AsyncStorage.getItem('searchHistory')
+        AsyncStorage.getItem('searchHistory'),
+        getUserLocation()
       ]);
 
       const notes = storedNotes ? JSON.parse(storedNotes) : {};
@@ -64,7 +70,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         userVotes: storedVotes ? JSON.parse(storedVotes) : mockVotes,
         discussions: storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions,
         favoriteRestaurants: storedFavorites ? JSON.parse(storedFavorites) : [],
-        searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : []
+        searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
+        userLocation: location
       };
     }
   });
@@ -77,6 +84,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       setDiscussions(dataQuery.data.discussions);
       setFavoriteRestaurants(dataQuery.data.favoriteRestaurants);
       setSearchHistory(dataQuery.data.searchHistory);
+      setUserLocation(dataQuery.data.userLocation);
     }
   }, [dataQuery.data]);
 
@@ -237,6 +245,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [persistSearchHistory.mutate]);
 
   const getQuickSuggestions = useCallback(() => {
+    const locationSuggestions = userLocation?.city === 'New York' 
+      ? ['Italian in Manhattan', 'Sushi in SoHo', 'Brunch in Brooklyn', 'Pizza in Queens']
+      : ['Tacos in Hollywood', 'Sushi in Beverly Hills', 'Brunch in Santa Monica', 'Korean BBQ in Koreatown'];
+    
     const cuisines = restaurants.map(r => r.cuisine.split(/[,&]/)[0].trim());
     const neighborhoods = restaurants.map(r => r.neighborhood);
     const popular = [...cuisines, ...neighborhoods]
@@ -247,8 +259,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     const sorted = Object.entries(popular)
       .sort((a, b) => b[1] - a[1])
       .map(([k]) => k);
-    return [...searchHistory, ...sorted].slice(0, 8);
-  }, [restaurants, searchHistory]);
+    
+    return [...searchHistory, ...locationSuggestions, ...sorted].slice(0, 8);
+  }, [restaurants, searchHistory, userLocation]);
 
   const addDiscussion = useCallback((restaurantId: string, collectionId: string, message: string) => {
     const newDiscussion: RestaurantDiscussion = {
@@ -318,6 +331,66 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     ).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [discussions]);
 
+  const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
+    if (!userLocation) {
+      console.warn('User location not available, using default');
+      return [];
+    }
+
+    try {
+      console.log(`Searching for: ${query} in ${userLocation.city}`);
+      const results = await aggregateRestaurantData(query, userLocation.city);
+      
+      // Convert API results to Restaurant format
+      const formattedResults: Restaurant[] = results.map(result => ({
+        id: result.id,
+        name: result.name,
+        cuisine: result.cuisine,
+        priceRange: '$'.repeat(Math.min(result.priceLevel, 4)) as '$' | '$$' | '$$$' | '$$$$',
+        imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+        images: result.photos,
+        address: result.address || '',
+        neighborhood: result.address?.split(',')[1]?.trim() || userLocation.city,
+        hours: 'Hours vary',
+        vibe: result.vibeTags || [],
+        description: result.description || 'A great dining experience awaits.',
+        menuHighlights: result.topPicks || [],
+        rating: result.rating,
+        reviews: result.reviews || [],
+        aiDescription: result.description,
+        aiVibes: result.vibeTags,
+        aiTopPicks: result.topPicks,
+        contributors: [],
+        commentsCount: 0,
+        savesCount: 0,
+        sharesCount: 0,
+        averageGroupStars: result.rating
+      }));
+
+      // Add to local restaurants if not already present
+      const existingIds = new Set(restaurants.map(r => r.id));
+      const newRestaurants = formattedResults.filter(r => !existingIds.has(r.id));
+      
+      if (newRestaurants.length > 0) {
+        setRestaurants(prev => [...prev, ...newRestaurants]);
+      }
+
+      return formattedResults;
+    } catch (error) {
+      console.error('Error searching restaurants:', error);
+      return [];
+    }
+  }, [userLocation, restaurants]);
+
+  const refreshLocation = useCallback(async () => {
+    try {
+      const location = await getUserLocation();
+      setUserLocation(location);
+    } catch (error) {
+      console.error('Error refreshing location:', error);
+    }
+  }, []);
+
   return useMemo(() => ({
     restaurants,
     collections,
@@ -326,6 +399,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     favoriteRestaurants,
     isLoading: dataQuery.isLoading,
     searchHistory,
+    userLocation,
+    searchRestaurants,
     addSearchQuery,
     clearSearchHistory,
     getQuickSuggestions,
@@ -340,6 +415,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     useRankedRestaurants,
     getGroupRecommendations,
     getCollectionDiscussions,
+    refreshLocation,
   }), [
     restaurants,
     collections,
@@ -348,6 +424,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     favoriteRestaurants,
     dataQuery.isLoading,
     searchHistory,
+    userLocation,
+    searchRestaurants,
     addSearchQuery,
     clearSearchHistory,
     getQuickSuggestions,
@@ -362,6 +440,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     useRankedRestaurants,
     getGroupRecommendations,
     getCollectionDiscussions,
+    refreshLocation,
   ]);
 });
 
