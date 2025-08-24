@@ -654,20 +654,32 @@ export const dbHelpers = {
 
   // Collection operations (alias for plans)
   async createPlan(planData: Database['public']['Tables']['collections']['Insert']) {
-    // Generate a unique collection code
-    const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const { data, error } = await supabase
-      .from('collections')
-      .insert({
-        ...planData,
-        collection_code: collectionCode
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+    try {
+      // Generate a unique collection code
+      const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('[Supabase] Creating plan with data:', { ...planData, collection_code: collectionCode });
+      
+      const { data, error } = await supabase
+        .from('collections')
+        .insert({
+          ...planData,
+          collection_code: collectionCode
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[Supabase] Error creating plan:', error);
+        throw error;
+      }
+      
+      console.log('[Supabase] Plan created successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('[Supabase] createPlan error:', error);
+      throw error;
+    }
   },
 
   async getPlanById(id: string) {

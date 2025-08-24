@@ -264,12 +264,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user?.id, plansQuery.data, queryClient]);
 
   const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for plan creation');
+      throw new Error('User not authenticated');
+    }
 
     console.log('[RestaurantStore] Creating plan:', planData);
     
     try {
-      const newPlan = await dbHelpers.createPlan({
+      const planInsertData = {
         name: planData.name,
         description: planData.description,
         created_by: user.id,
@@ -288,15 +291,27 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         auto_ranking_enabled: true,
         consensus_threshold: 50,
         restaurant_ids: [],
-        collaborators: [],
-        planned_date: planData.plannedDate
-      });
+        collaborators: []
+      };
+
+      // Only add planned_date if it's provided
+      if (planData.plannedDate) {
+        (planInsertData as any).planned_date = planData.plannedDate;
+      }
+
+      console.log('[RestaurantStore] Plan insert data:', planInsertData);
+      
+      const newPlan = await dbHelpers.createPlan(planInsertData);
       
       console.log('[RestaurantStore] Plan created successfully:', newPlan);
       queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
     } catch (error) {
       console.error('[RestaurantStore] Error creating plan:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw new Error(`Failed to create plan: ${error.message}`);
+      } else {
+        throw new Error('Failed to create plan: Unknown error occurred');
+      }
     }
   }, [user?.id, queryClient]);
 

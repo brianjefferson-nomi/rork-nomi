@@ -51,7 +51,8 @@ export default function CreatePlanScreen() {
       ]);
     } catch (error) {
       console.error('[CreatePlan] Error creating plan:', error);
-      Alert.alert('Error', `Failed to create plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to create plan: ${errorMessage}`);
     }
   };
 
