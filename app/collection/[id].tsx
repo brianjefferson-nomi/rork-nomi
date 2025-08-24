@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award } from 'lucide-react-native';
+import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 
@@ -25,13 +25,18 @@ export default function CollectionDetailScreen() {
     addDiscussion, 
     getRankedRestaurants, 
     getGroupRecommendations,
-    getCollectionDiscussions 
+    getCollectionDiscussions,
+    inviteToCollection,
+    updateCollectionSettings 
   } = useRestaurants();
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
   const [voteReason, setVoteReason] = useState('');
   const [showDiscussionModal, setShowDiscussionModal] = useState<string | null>(null);
   const [discussionMessage, setDiscussionMessage] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
   
   const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators.length);
   const recommendations = collection ? getGroupRecommendations(id) : [];
@@ -67,6 +72,42 @@ export default function CollectionDetailScreen() {
     );
   };
 
+  const handleInviteUser = () => {
+    if (!inviteEmail.trim()) {
+      Alert.alert('Error', 'Please enter an email address');
+      return;
+    }
+    
+    inviteToCollection(collection.id, inviteEmail, inviteMessage);
+    setShowInviteModal(false);
+    setInviteEmail('');
+    setInviteMessage('');
+    Alert.alert('Invitation Sent', `Invitation sent to ${inviteEmail}`);
+  };
+
+  const handleShareCollection = async () => {
+    const shareUrl = `https://yourapp.com/collection/${collection.id}`;
+    const message = `Check out this restaurant collection: ${collection.name}\n\n${collection.description}\n\n${shareUrl}`;
+    
+    try {
+      await Share.share({
+        message,
+        url: shareUrl,
+        title: collection.name
+      });
+    } catch (error) {
+      console.error('Error sharing collection:', error);
+    }
+  };
+
+  const copyInviteLink = () => {
+    const inviteLink = `https://yourapp.com/invite/${collection.id}`;
+    // In a real app, you'd copy to clipboard
+    Alert.alert('Invite Link', inviteLink, [
+      { text: 'OK' }
+    ]);
+  };
+
   const handleRemoveRestaurant = (restaurantId: string, restaurantName: string) => {
     Alert.alert(
       'Remove Restaurant',
@@ -88,9 +129,17 @@ export default function CollectionDetailScreen() {
         options={{ 
           title: collection.name,
           headerRight: () => (
-            <TouchableOpacity onPress={handleDeleteCollection}>
-              <Trash2 size={20} color="#FF6B6B" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setShowInviteModal(true)}>
+                <UserPlus size={20} color="#3B82F6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleShareCollection}>
+                <Share2 size={20} color="#6B7280" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleDeleteCollection}>
+                <Trash2 size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+            </View>
           )
         }} 
       />
@@ -112,7 +161,25 @@ export default function CollectionDetailScreen() {
           
           {/* Collaborators */}
           <View style={styles.collaboratorsSection}>
-            <Text style={styles.collaboratorsTitle}>Group Members</Text>
+            <View style={styles.collaboratorsHeader}>
+              <Text style={styles.collaboratorsTitle}>Group Members</Text>
+              <View style={styles.collaboratorActions}>
+                <TouchableOpacity 
+                  style={styles.inviteButton}
+                  onPress={() => setShowInviteModal(true)}
+                >
+                  <UserPlus size={14} color="#3B82F6" />
+                  <Text style={styles.inviteButtonText}>Invite</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.shareButton}
+                  onPress={copyInviteLink}
+                >
+                  <Copy size={14} color="#6B7280" />
+                  <Text style={styles.shareButtonText}>Copy Link</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collaboratorsList}>
               {collection.collaborators.map(member => (
                 <View key={member.userId} style={styles.collaboratorItem}>
@@ -366,6 +433,49 @@ export default function CollectionDetailScreen() {
           </View>
         </Modal>
 
+        {/* Invite Modal */}
+        <Modal visible={showInviteModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Invite to Collection</Text>
+              <TextInput
+                style={styles.reasonInput}
+                placeholder="Email address"
+                value={inviteEmail}
+                onChangeText={setInviteEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.reasonInput}
+                placeholder="Personal message (optional)"
+                value={inviteMessage}
+                onChangeText={setInviteMessage}
+                multiline
+                numberOfLines={3}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.modalButton}
+                  onPress={handleInviteUser}
+                >
+                  <Text style={styles.modalButtonText}>Send Invitation</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowInviteModal(false);
+                    setInviteEmail('');
+                    setInviteMessage('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         <View style={{ height: 32 }} />
       </ScrollView>
     </>
@@ -447,11 +557,48 @@ const styles = StyleSheet.create({
   collaboratorsSection: {
     marginTop: 16,
   },
+  collaboratorsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   collaboratorsTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 12,
+  },
+  collaboratorActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#EBF4FF',
+    borderRadius: 16,
+    gap: 4,
+  },
+  inviteButtonText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    gap: 4,
+  },
+  shareButtonText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
   },
   collaboratorsList: {
     flexDirection: 'row',

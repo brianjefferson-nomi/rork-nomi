@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platfo
 import { Mic, Search, ChevronDown, SlidersHorizontal, X, MapPin, Clock, TrendingUp, History } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
+import { router } from 'expo-router';
 
 interface SearchWizardProps {
   testID?: string;
@@ -243,7 +244,15 @@ export function SearchWizard({ testID }: SearchWizardProps) {
           ) : (
             <>
               {filtered.slice(0, 8).map(r => (
-                <View key={r.id} style={styles.resultItem}>
+                <TouchableOpacity 
+                  key={r.id} 
+                  style={styles.resultItem}
+                  onPress={() => {
+                    router.push({ pathname: '/restaurant/[id]', params: { id: r.id } });
+                    setShowSuggestions(false);
+                  }}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.resultContent}>
                     <Text style={styles.resultName}>{r.name}</Text>
                     <Text style={styles.resultMeta}>{r.cuisine} • {r.neighborhood}</Text>
@@ -257,7 +266,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
                   {r.aiDescription && (
                     <Text style={styles.aiDescription} numberOfLines={2}>{r.aiDescription}</Text>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
               {filtered.length === 0 && (
                 <View style={styles.noResultsContainer}>

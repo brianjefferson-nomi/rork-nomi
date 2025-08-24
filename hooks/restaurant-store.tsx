@@ -32,6 +32,8 @@ interface RestaurantStore {
   getGroupRecommendations: (collectionId: string) => GroupRecommendation[];
   getCollectionDiscussions: (collectionId: string, restaurantId?: string) => RestaurantDiscussion[];
   refreshLocation: () => Promise<void>;
+  inviteToCollection: (collectionId: string, email: string, message?: string) => void;
+  updateCollectionSettings: (collectionId: string, settings: Partial<Collection>) => void;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -388,6 +390,22 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, []);
 
+  const inviteToCollection = useCallback((collectionId: string, email: string, message?: string) => {
+    // In a real app, this would send an email invitation
+    console.log(`Inviting ${email} to collection ${collectionId} with message: ${message}`);
+    // For now, we'll just log it. In production, this would:
+    // 1. Send an email invitation
+    // 2. Create a pending invitation record
+    // 3. Handle invitation acceptance/rejection
+  }, []);
+
+  const updateCollectionSettings = useCallback((collectionId: string, settings: Partial<Collection>) => {
+    const updated = collections.map(c => 
+      c.id === collectionId ? { ...c, ...settings } : c
+    );
+    persistCollections.mutate(updated);
+  }, [collections, persistCollections.mutate]);
+
   return useMemo(() => ({
     restaurants,
     collections,
@@ -413,6 +431,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getGroupRecommendations,
     getCollectionDiscussions,
     refreshLocation,
+    inviteToCollection,
+    updateCollectionSettings,
   }), [
     restaurants,
     collections,
@@ -438,6 +458,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getGroupRecommendations,
     getCollectionDiscussions,
     refreshLocation,
+    inviteToCollection,
+    updateCollectionSettings,
   ]);
 });
 
