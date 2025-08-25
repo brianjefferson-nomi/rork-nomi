@@ -273,7 +273,16 @@ export default function CollectionDetailScreen() {
   // Debug logging for ranked restaurants
   console.log('[CollectionDetail] Ranked restaurants:', rankedRestaurants.length);
   rankedRestaurants.forEach(({ restaurant, meta }, index) => {
-    console.log(`[CollectionDetail] Restaurant ${index + 1}: ${restaurant.name} - Likes: ${meta.likes}, Dislikes: ${meta.dislikes}`);
+    console.log(`[CollectionDetail] Restaurant ${index + 1}:`, {
+      id: restaurant.id,
+      name: restaurant.name,
+      cuisine: restaurant.cuisine,
+      likes: meta.likes,
+      dislikes: meta.dislikes,
+      hasVoteDetails: !!meta.voteDetails,
+      likeVoters: meta.voteDetails?.likeVoters?.length || 0,
+      dislikeVoters: meta.voteDetails?.dislikeVoters?.length || 0
+    });
   });
   const recommendations = collection ? getGroupRecommendations(id) : [];
   
