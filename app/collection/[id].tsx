@@ -26,7 +26,7 @@ interface InsightsTabProps {
   setShowCommentModal: (restaurantId: string | null) => void;
 }
 
-function InsightsTab({ collection, rankedRestaurants, discussions, collectionMembers, styles }: InsightsTabProps) {
+function InsightsTab({ collection, rankedRestaurants, discussions, collectionMembers, styles, setShowCommentModal }: InsightsTabProps) {
   return (
     <View style={styles.insightsContainer}>
       {/* Group Insights */}
@@ -301,7 +301,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const collection = useCollectionById(id) as any; // Type assertion for now to handle mixed data
+  const collection = useCollectionById(id) as any;
   const { user } = useAuth();
   const { 
     removeRestaurantFromCollection, 
@@ -315,7 +315,9 @@ export default function CollectionDetailScreen() {
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
-    getRestaurantVotingDetails
+    getRestaurantVotingDetails,
+    toggleFavorite,
+    favoriteRestaurants
   } = useRestaurants();
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
@@ -726,152 +728,160 @@ export default function CollectionDetailScreen() {
               <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
             </View>
           ) : (
-                        rankedRestaurants.map(({ restaurant, meta }, index) => (
-              <View key={restaurant?.id || index} style={[
-                styles.restaurantItem,
-                meta?.rank === 1 && styles.winningRestaurantItem
-              ]}>
-                {/* Top Badges Row */}
-                <View style={styles.badgesRow}>
-                  <View style={[
-                    styles.rankBadge,
-                    meta?.rank === 1 && styles.winnerRankBadge,
-                    meta?.rank === 2 && styles.silverRankBadge,
-                    meta?.rank === 3 && styles.bronzeRankBadge
-                  ]}>
-                    <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
-                  </View>
-                  
-                  {/* Top Choice Badge for Winner */}
-                  {meta?.rank === 1 && (
-                    <View style={styles.topChoiceBadge}>
-                      <Crown size={12} color="#FFFFFF" />
-                      <Text style={styles.topChoiceText}>TOP CHOICE</Text>
+                        rankedRestaurants.map(({ restaurant, meta }, index) => {
+              const isFavorite = favoriteRestaurants.includes(restaurant.id);
+              const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
+              const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
+              
+              return (
+                <View key={restaurant?.id || index} style={[
+                  styles.restaurantItem,
+                  meta?.rank === 1 && styles.winningRestaurantItem
+                ]}>
+                  {/* Top Badges Row */}
+                  <View style={styles.badgesRow}>
+                    <View style={[
+                      styles.rankBadge,
+                      meta?.rank === 1 && styles.winnerRankBadge,
+                      meta?.rank === 2 && styles.silverRankBadge,
+                      meta?.rank === 3 && styles.bronzeRankBadge
+                    ]}>
+                      <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
                     </View>
+                    
+                    {/* Top Choice Badge for Winner */}
+                    {meta?.rank === 1 && (
+                      <View style={styles.topChoiceBadge}>
+                        <Crown size={12} color="#FFFFFF" />
+                        <Text style={styles.topChoiceText}>TOP CHOICE</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Restaurant Info Section */}
+                  <View style={styles.restaurantInfoSection}>
+                    <View style={styles.restaurantImageContainer}>
+                      <Image 
+                        source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
+                        style={styles.restaurantImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    
+                    <View style={styles.restaurantInfo}>
+                      <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                      <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
+                      <Text style={styles.restaurantDetails}>
+                        {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
+                      </Text>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={styles.heartButton}
+                      onPress={() => toggleFavorite(restaurant.id)}
+                    >
+                      <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
+                        {isFavorite ? '♥' : '♡'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Approval Section */}
+                  <View style={styles.approvalSection}>
+                    <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
+                    <Text style={styles.voteBreakdown}>
+                      {meta.likes} likes • {meta.dislikes} dislikes
+                    </Text>
+                    <View style={styles.consensusBadge}>
+                      <Text style={styles.consensusBadgeText}>
+                        {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Vote Actions */}
+                  <View style={styles.voteActions}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.voteButton, 
+                        styles.likeButton,
+                        userLiked && styles.likeButtonActive
+                      ]}
+                      onPress={() => {
+                        console.log('[CollectionDetail] Like button pressed:', {
+                          restaurantId: restaurant.id,
+                          collectionId: id,
+                          userLiked,
+                          userDisliked
+                        });
+                        
+                        if (userLiked) {
+                          // Remove like
+                          voteRestaurant(restaurant.id, 'like', id, '');
+                        } else {
+                          // Add like, remove dislike if exists
+                          if (userDisliked) {
+                            voteRestaurant(restaurant.id, 'dislike', id, '');
+                          }
+                          setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
+                        }
+                      }}
+                    >
+                      <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
+                      <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[
+                        styles.voteButton, 
+                        styles.dislikeButton,
+                        userDisliked && styles.dislikeButtonActive
+                      ]}
+                      onPress={() => {
+                        console.log('[CollectionDetail] Dislike button pressed:', {
+                          restaurantId: restaurant.id,
+                          collectionId: id,
+                          userLiked,
+                          userDisliked
+                        });
+                        
+                        if (userDisliked) {
+                          // Remove dislike
+                          voteRestaurant(restaurant.id, 'dislike', id, '');
+                        } else {
+                          // Add dislike, remove like if exists
+                          if (userLiked) {
+                            voteRestaurant(restaurant.id, 'like', id, '');
+                          }
+                          setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
+                        }
+                      }}
+                    >
+                      <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
+                      <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.voteButton, styles.commentButton]}
+                      onPress={() => setShowDiscussionModal(restaurant.id)}
+                    >
+                      <MessageCircle size={16} color="#6B7280" />
+                      <Text style={styles.voteCount}>{meta.discussionCount}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Remove Button */}
+                  {user?.id === collection.created_by && (
+                    <TouchableOpacity 
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
+                    >
+                      <Text style={styles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
-
-                {/* Restaurant Info Section */}
-                <View style={styles.restaurantInfoSection}>
-                  <View style={styles.restaurantImageContainer}>
-                    <Image 
-                      source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
-                      style={styles.restaurantImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  
-                  <View style={styles.restaurantInfo}>
-                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                    <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
-                    <Text style={styles.restaurantDetails}>
-                      {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
-                    </Text>
-                  </View>
-                  
-                  <TouchableOpacity style={styles.heartButton}>
-                    <Text style={styles.heartIcon}>♡</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Approval Section */}
-                <View style={styles.approvalSection}>
-                  <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                  <Text style={styles.voteBreakdown}>
-                    {meta.likes} likes • {meta.dislikes} dislikes
-                  </Text>
-                  <View style={styles.consensusBadge}>
-                    <Text style={styles.consensusBadgeText}>
-                      {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Vote Actions */}
-                <View style={styles.voteActions}>
-                  {(() => {
-                    const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
-                    const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
-                    
-                    return (
-                      <>
-                        <TouchableOpacity 
-                          style={[
-                            styles.voteButton, 
-                            styles.likeButton,
-                            userLiked && styles.likeButtonActive
-                          ]}
-                          onPress={() => {
-                            console.log('[CollectionDetail] Like button pressed:', {
-                              restaurantId: restaurant.id,
-                              collectionId: id,
-                              userLiked,
-                              userDisliked
-                            });
-                            if (userDisliked) {
-                              voteRestaurant(restaurant.id, 'dislike', id, '');
-                              setTimeout(() => voteRestaurant(restaurant.id, 'like', id, ''), 100);
-                            } else if (userLiked) {
-                              voteRestaurant(restaurant.id, 'like', id, '');
-                            } else {
-                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
-                            }
-                          }}
-                        >
-                          <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
-                          <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity 
-                          style={[
-                            styles.voteButton, 
-                            styles.dislikeButton,
-                            userDisliked && styles.dislikeButtonActive
-                          ]}
-                          onPress={() => {
-                            console.log('[CollectionDetail] Dislike button pressed:', {
-                              restaurantId: restaurant.id,
-                              collectionId: id,
-                              userLiked,
-                              userDisliked
-                            });
-                            if (userLiked) {
-                              voteRestaurant(restaurant.id, 'like', id, '');
-                              setTimeout(() => voteRestaurant(restaurant.id, 'dislike', id, ''), 100);
-                            } else if (userDisliked) {
-                              voteRestaurant(restaurant.id, 'dislike', id, '');
-                            } else {
-                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
-                            }
-                          }}
-                        >
-                          <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
-                          <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity 
-                          style={[styles.voteButton, styles.commentButton]}
-                          onPress={() => setShowDiscussionModal(restaurant.id)}
-                        >
-                          <MessageCircle size={16} color="#6B7280" />
-                          <Text style={styles.voteCount}>{meta.discussionCount}</Text>
-                        </TouchableOpacity>
-                      </>
-                    );
-                  })()}
-                </View>
-
-                {/* Remove Button */}
-                {user?.id === collection.created_by && (
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
-                  >
-                    <Text style={styles.removeButtonText}>Remove</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))
+              );
+            })
           )}
                 </View>
         ) : (
@@ -955,7 +965,8 @@ export default function CollectionDetailScreen() {
                 style={styles.modalButton}
                 onPress={() => {
                   if (showDiscussionModal && discussionMessage.trim()) {
-                    addDiscussion(showDiscussionModal.id, discussionMessage);
+                    // FIXED: Correct parameter order (restaurantId, planId, message)
+                    addDiscussion(showDiscussionModal, id, discussionMessage);
                   }
                   setShowDiscussionModal(null);
                   setDiscussionMessage('');
@@ -1367,6 +1378,10 @@ const styles = StyleSheet.create({
   heartIcon: {
     fontSize: 20,
     color: '#9CA3AF',
+  },
+  heartIconActive: {
+    color: '#FF6B6B',
+    fontSize: 20,
   },
   discussionsSection: {
     marginTop: 16,
