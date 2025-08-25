@@ -69,13 +69,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Add timeout mechanism to prevent infinite loading
   useEffect(() => {
+    console.log('[RestaurantStore] Setting up timeout mechanism, restaurants.length:', restaurants.length);
     const timeout = setTimeout(() => {
       console.log('[RestaurantStore] Loading timeout reached, forcing data display');
       // Force the app to show data even if queries are still loading
       if (restaurants.length === 0) {
+        console.log('[RestaurantStore] Setting mock restaurants due to timeout');
         setRestaurants(mockRestaurants);
       }
-    }, 10000); // 10 second timeout
+    }, 5000); // 5 second timeout
 
     return () => clearTimeout(timeout);
   }, [restaurants.length]);
@@ -229,6 +231,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
+
+  // Ensure restaurants are always available
+  useEffect(() => {
+    if (restaurants.length === 0 && dataQuery.data?.restaurants) {
+      console.log('[RestaurantStore] Setting restaurants from dataQuery');
+      setRestaurants(dataQuery.data.restaurants);
+    } else if (restaurants.length === 0 && restaurantsQuery.data) {
+      console.log('[RestaurantStore] Setting restaurants from restaurantsQuery');
+      setRestaurants(restaurantsQuery.data);
+    } else if (restaurants.length === 0) {
+      console.log('[RestaurantStore] No restaurants available, setting mock data');
+      setRestaurants(mockRestaurants);
+    }
+  }, [restaurants.length, dataQuery.data, restaurantsQuery.data]);
 
   // Helper function to map database restaurant format to component format
   const mapDatabaseRestaurant = useCallback((dbRestaurant: any): Restaurant => ({
@@ -1105,7 +1121,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     userVotes,
     discussions,
     favoriteRestaurants,
-    isLoading: (dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading) && !dataQuery.data,
+    isLoading: (dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading) && !dataQuery.data && restaurants.length === 0,
     searchHistory,
     searchResults,
     userLocation,
