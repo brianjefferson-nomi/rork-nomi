@@ -17,6 +17,10 @@ const FORK_SPOON_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const FORK_SPOON_HOST = 'the-fork-the-spoon.p.rapidapi.com';
 const REDDIT_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const REDDIT_HOST = 'reddit3.p.rapidapi.com';
+const GOOGLE_MAPS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const GOOGLE_MAPS_HOST = 'google-map-places-new-v2.p.rapidapi.com';
+const UNSPLASH_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const UNSPLASH_HOST = 'unsplash-image-search-api.p.rapidapi.com';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -34,7 +38,9 @@ const API_CONFIG = {
       restaurants: 'restaurants222.p.rapidapi.com',
       tripadvisorRapid: 'tripadvisor16.p.rapidapi.com',
       forkSpoon: 'the-fork-the-spoon.p.rapidapi.com',
-      reddit: 'reddit3.p.rapidapi.com'
+      reddit: 'reddit3.p.rapidapi.com',
+      googleMapsNew: 'google-map-places-new-v2.p.rapidapi.com',
+      unsplashNew: 'unsplash-image-search-api.p.rapidapi.com'
     }
   }
 };
@@ -2755,5 +2761,287 @@ export const searchRestaurantsWithReddit = async (
   } catch (error) {
     console.error('[API] Error in Reddit restaurant search:', error);
     return [];
+  }
+};
+
+// Google Maps Places API Integration
+export const searchGoogleMapsPlaces = async (
+  latitude: number,
+  longitude: number,
+  radius: number = 10000,
+  types: string[] = ['restaurant'],
+  maxResults: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[Google Maps] Searching places near:', latitude, longitude);
+    
+    const requestBody = {
+      languageCode: 'en',
+      regionCode: 'US',
+      includedTypes: types,
+      excludedTypes: [],
+      includedPrimaryTypes: [],
+      excludedPrimaryTypes: [],
+      maxResultCount: maxResults,
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude,
+            longitude
+          },
+          radius
+        }
+      },
+      rankPreference: 0
+    };
+    
+    const response = await fetch('https://google-map-places-new-v2.p.rapidapi.com/v1/places:searchNearby', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-FieldMask': '*',
+        'x-rapidapi-host': GOOGLE_MAPS_HOST,
+        'x-rapidapi-key': GOOGLE_MAPS_API_KEY
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Google Maps API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const places = data.places || [];
+    
+    console.log(`[Google Maps] Retrieved ${places.length} places`);
+    return places;
+  } catch (error) {
+    console.error('[Google Maps] Error searching places:', error);
+    return [];
+  }
+};
+
+// Get Google Maps place photos
+export const getGoogleMapsPlacePhotos = async (
+  placeId: string,
+  photoId: string,
+  maxWidth: number = 400,
+  maxHeight: number = 400
+): Promise<string | null> => {
+  try {
+    console.log('[Google Maps] Getting photo for place:', placeId, 'photo:', photoId);
+    
+    const params = new URLSearchParams({
+      maxWidthPx: maxWidth.toString(),
+      maxHeightPx: maxHeight.toString(),
+      skipHttpRedirect: 'true'
+    });
+    
+    const url = `https://google-map-places-new-v2.p.rapidapi.com/v1/places/${placeId}/photos/${photoId}/media?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': GOOGLE_MAPS_HOST,
+        'x-rapidapi-key': GOOGLE_MAPS_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Google Maps API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const photoUrl = data.photoUri || data.url;
+    
+    console.log('[Google Maps] Retrieved photo URL:', photoUrl);
+    return photoUrl;
+  } catch (error) {
+    console.error('[Google Maps] Error getting place photo:', error);
+    return null;
+  }
+};
+
+// Transform Google Maps place data to our format
+export const transformGoogleMapsPlace = (place: any): any => {
+  try {
+    const location = place.location || {};
+    const photos = place.photos || [];
+    const types = place.types || [];
+    const primaryType = place.primaryType || 'restaurant';
+    
+    return {
+      id: place.id || `google_${Date.now()}`,
+      name: place.displayName?.text || place.name || 'Unknown Restaurant',
+      address: place.formattedAddress || '',
+      city: location.locality || '',
+      state: location.administrativeAreaLevel1 || '',
+      zipCode: location.postalCode || '',
+      country: location.country || '',
+      latitude: location.latitude || 0,
+      longitude: location.longitude || 0,
+      phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
+      website: place.websiteUri || '',
+      rating: place.rating || 0,
+      price: place.priceLevel || 0,
+      cuisine: primaryType === 'restaurant' ? 'International' : primaryType,
+      categories: types,
+      hours: place.regularOpeningHours?.weekdayDescriptions || 'Hours vary',
+      isOpen: place.regularOpeningHours?.openNow || false,
+      totalPhotos: photos.length,
+      totalReviews: place.userRatingCount || 0,
+      google_place_id: place.id,
+      photos: photos.map((photo: any) => photo.name).filter(Boolean),
+      source: 'google_maps'
+    };
+  } catch (error) {
+    console.error('[Google Maps] Error transforming place data:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with Google Maps Places
+export const searchRestaurantsWithGoogleMaps = async (
+  latitude: number,
+  longitude: number,
+  radius: number = 10000,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Google Maps Places');
+    
+    // Search for restaurants
+    const places = await searchGoogleMapsPlaces(latitude, longitude, radius, ['restaurant'], limit);
+    
+    // Transform results
+    const transformedResults = places
+      .map(transformGoogleMapsPlace)
+      .filter(Boolean);
+    
+    // Enhance with photos for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          if (restaurant.photos && restaurant.photos.length > 0) {
+            const photoUrls = [];
+            for (const photoId of restaurant.photos.slice(0, 3)) {
+              const photoUrl = await getGoogleMapsPlacePhotos(restaurant.google_place_id, photoId);
+              if (photoUrl) {
+                photoUrls.push(photoUrl);
+              }
+            }
+            restaurant.photos = photoUrls;
+          }
+          
+          return restaurant;
+        } catch (error) {
+          console.error('[Google Maps] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Google Maps data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Google Maps search:', error);
+    return [];
+  }
+};
+
+// Unsplash API Integration
+export const searchUnsplashImages = async (
+  query: string,
+  page: number = 1,
+  perPage: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[Unsplash] Searching images for:', query);
+    
+    const params = new URLSearchParams({
+      page: page.toString(),
+      query,
+      per_page: perPage.toString()
+    });
+    
+    const url = `https://unsplash-image-search-api.p.rapidapi.com/search?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': UNSPLASH_HOST,
+        'x-rapidapi-key': UNSPLASH_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Unsplash API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const images = data.results || data.data || [];
+    
+    console.log(`[Unsplash] Retrieved ${images.length} images for "${query}"`);
+    return images;
+  } catch (error) {
+    console.error('[Unsplash] Error searching images:', error);
+    return [];
+  }
+};
+
+// Get a random Unsplash image for a given query
+export const getRandomUnsplashImage = async (query: string): Promise<string | null> => {
+  try {
+    const images = await searchUnsplashImages(query, 1, 20);
+    
+    if (images.length === 0) {
+      console.log(`[Unsplash] No images found for "${query}"`);
+      return null;
+    }
+    
+    // Select a random image from the results
+    const randomIndex = Math.floor(Math.random() * images.length);
+    const selectedImage = images[randomIndex];
+    
+    // Return the image URL
+    const imageUrl = selectedImage.urls?.regular || selectedImage.url || selectedImage.src;
+    
+    console.log(`[Unsplash] Selected random image for "${query}":`, imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error('[Unsplash] Error getting random image:', error);
+    return null;
+  }
+};
+
+// Enhanced collection cover image function using Unsplash
+export const getUnsplashCollectionCoverImage = async (occasion: string): Promise<string> => {
+  try {
+    // Create search queries based on occasion
+    const searchQueries = [
+      `${occasion} restaurant`,
+      `${occasion} dining`,
+      `${occasion} food`,
+      `${occasion} celebration`,
+      `${occasion} meal`,
+      `${occasion} cuisine`
+    ];
+    
+    // Try each query until we find an image
+    for (const query of searchQueries) {
+      const imageUrl = await getRandomUnsplashImage(query);
+      if (imageUrl) {
+        console.log(`[Unsplash] Found cover image for "${occasion}" using query: "${query}"`);
+        return imageUrl;
+      }
+    }
+    
+    // Fallback to the original static images
+    console.log(`[Unsplash] No images found for "${occasion}", using fallback`);
+    return getCollectionCoverImage(occasion);
+  } catch (error) {
+    console.error('[Unsplash] Error getting cover image:', error);
+    // Fallback to original function
+    return getCollectionCoverImage(occasion);
   }
 };
