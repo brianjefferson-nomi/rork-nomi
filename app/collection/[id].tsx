@@ -190,16 +190,39 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
               {/* User Discussions */}
               {(() => {
+                console.log(`[InsightsTab] Processing discussions for restaurant ${restaurant.name}:`, {
+                  restaurantId: restaurant.id,
+                  totalDiscussions: discussions.length,
+                  discussions: discussions.map(d => ({
+                    id: d.id,
+                    restaurantId: d.restaurantId,
+                    userName: d.userName,
+                    message: d.message?.substring(0, 30) + '...'
+                  }))
+                });
+
                 const filteredDiscussions = discussions.filter((discussion: any) => {
-                  if (discussion.restaurantId !== restaurant.id) return false;
-                  if (collection.is_public && !collectionMembers.includes(discussion.userId)) {
-                    return false;
-                  }
-                  return discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
+                  const matchesRestaurant = discussion.restaurantId === restaurant.id;
+                  const isPublic = collection.is_public;
+                  const isMember = collectionMembers.includes(discussion.userId);
+                  const hasValidName = discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
+                  
+                  console.log(`[InsightsTab] Filtering discussion:`, {
+                    discussionId: discussion.id,
+                    matchesRestaurant,
+                    isPublic,
+                    isMember,
+                    hasValidName,
+                    willShow: matchesRestaurant && (!isPublic || isMember) && hasValidName
+                  });
+                  
+                  if (!matchesRestaurant) return false;
+                  if (isPublic && !isMember) return false;
+                  return hasValidName;
                 });
 
                 // Debug logging for discussions
-                console.log(`[InsightsTab] Restaurant ${restaurant.name} discussions:`, {
+                console.log(`[InsightsTab] Restaurant ${restaurant.name} filtered discussions:`, {
                   restaurantId: restaurant.id,
                   allDiscussions: discussions.length,
                   filteredDiscussions: filteredDiscussions.length,
@@ -719,21 +742,21 @@ export default function CollectionDetailScreen() {
                           style={[
                             styles.voteButton, 
                             styles.likeButton,
-                            userLiked && styles.voteButtonActive
+                            userLiked && styles.likeButtonActive
                           ]}
-                          onPress={() => {
-                            if (userDisliked) {
-                              // Remove dislike and add like
-                              voteRestaurant('dislike', restaurant.id, id, '');
-                              setTimeout(() => voteRestaurant('like', restaurant.id, id, ''), 100);
-                            } else if (userLiked) {
-                              // Remove like
-                              voteRestaurant('like', restaurant.id, id, '');
-                            } else {
-                              // Add like
-                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
-                            }
-                          }}
+                                                      onPress={() => {
+                              if (userDisliked) {
+                                // Remove dislike and add like
+                                voteRestaurant(restaurant.id, 'dislike', id, '');
+                                setTimeout(() => voteRestaurant(restaurant.id, 'like', id, ''), 100);
+                              } else if (userLiked) {
+                                // Remove like
+                                voteRestaurant(restaurant.id, 'like', id, '');
+                              } else {
+                                // Add like
+                                setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
+                              }
+                            }}
                         >
                           <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
@@ -743,21 +766,21 @@ export default function CollectionDetailScreen() {
                           style={[
                             styles.voteButton, 
                             styles.dislikeButton,
-                            userDisliked && styles.voteButtonActive
+                            userDisliked && styles.dislikeButtonActive
                           ]}
-                          onPress={() => {
-                            if (userLiked) {
-                              // Remove like and add dislike
-                              voteRestaurant('like', restaurant.id, id, '');
-                              setTimeout(() => voteRestaurant('dislike', restaurant.id, id, ''), 100);
-                            } else if (userDisliked) {
-                              // Remove dislike
-                              voteRestaurant('dislike', restaurant.id, id, '');
-                            } else {
-                              // Add dislike
-                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
-                            }
-                          }}
+                                                      onPress={() => {
+                              if (userLiked) {
+                                // Remove like and add dislike
+                                voteRestaurant(restaurant.id, 'like', id, '');
+                                setTimeout(() => voteRestaurant(restaurant.id, 'dislike', id, ''), 100);
+                              } else if (userDisliked) {
+                                // Remove dislike
+                                voteRestaurant(restaurant.id, 'dislike', id, '');
+                              } else {
+                                // Add dislike
+                                setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
+                              }
+                            }}
                         >
                           <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
@@ -1480,6 +1503,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFF',
+    backgroundColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   winningRankNumber: {
     color: '#1A1A1A',
@@ -1964,6 +1992,14 @@ const styles = StyleSheet.create({
   voteButtonActive: {
     backgroundColor: '#22C55E',
     borderColor: '#22C55E',
+  },
+  likeButtonActive: {
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
+  },
+  dislikeButtonActive: {
+    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
   },
   commentButton: {
     backgroundColor: '#F9FAFB',
