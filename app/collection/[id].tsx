@@ -86,7 +86,13 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
       <View style={styles.insightsSection}>
         <Text style={styles.insightsTitle}>📊 Restaurant Voting Breakdown</Text>
         <View style={styles.insightsGrid}>
-          {rankedRestaurants.slice(0, 6).map((restaurant, index) => (
+          {rankedRestaurants.slice(0, 6).map((restaurant, index) => {
+            console.log(`[InsightsTab] Rendering restaurant ${index}:`, {
+              id: restaurant.id,
+              name: restaurant.name,
+              cuisine: restaurant.cuisine
+            });
+            return (
             <View key={restaurant.id} style={styles.insightsContent}>
               <View style={styles.restaurantHeader}>
                 <View style={styles.restaurantImageContainer}>
@@ -108,6 +114,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {/* Vote Statistics */}
               {(() => {
                 const restaurantVotes = rankedRestaurants.find(r => r.id === restaurant.id);
+                console.log(`[InsightsTab] Vote data for ${restaurant.name}:`, {
+                  restaurantId: restaurant.id,
+                  foundVotes: !!restaurantVotes,
+                  hasMeta: !!restaurantVotes?.meta,
+                  hasVoteDetails: !!restaurantVotes?.meta?.voteDetails,
+                  likeVoters: restaurantVotes?.meta?.voteDetails?.likeVoters?.length || 0,
+                  dislikeVoters: restaurantVotes?.meta?.voteDetails?.dislikeVoters?.length || 0
+                });
                 if (!restaurantVotes?.meta?.voteDetails) return <></>;
 
                 const totalVotes = restaurantVotes.meta.voteDetails.likeVoters.length + restaurantVotes.meta.voteDetails.dislikeVoters.length;
@@ -214,7 +228,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 );
               })()}
             </View>
-          ))}
+          );
+          })}
         </View>
       </View>
 
