@@ -120,7 +120,9 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
                     <Text style={styles.voteBreakdown}>
-                      {restaurantVotes.meta.voteDetails.likeVoters.length} likes · {restaurantVotes.meta.voteDetails.dislikeVoters.length} dislikes
+                      {(() => {
+                        return `${restaurantVotes.meta.voteDetails.likeVoters.length} likes · ${restaurantVotes.meta.voteDetails.dislikeVoters.length} dislikes`;
+                      })()}
                     </Text>
                     <View style={styles.consensusBadge}>
                       <Text style={styles.consensusBadgeText}>
@@ -1769,30 +1771,30 @@ const styles = StyleSheet.create({
   },
   insightsContent: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 16,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   restaurantHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 12,
   },
   restaurantImageContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginRight: 12,
     backgroundColor: '#F1F5F9',
+    flexShrink: 0,
   },
   restaurantImage: {
     width: '100%',
@@ -1813,12 +1815,13 @@ const styles = StyleSheet.create({
   },
   restaurantTitleContainer: {
     flex: 1,
+    minWidth: 0,
   },
   restaurantName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 6,
   },
   restaurantSubtitle: {
     fontSize: 12,
@@ -2053,14 +2056,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   approvalSection: {
-    marginTop: 12,
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 20,
   },
   approvalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   approvalTitle: {
     fontSize: 14,
@@ -2091,13 +2094,13 @@ const styles = StyleSheet.create({
     textTransform: 'lowercase',
   },
   memberVotesSection: {
-    marginTop: 16,
+    marginTop: 20,
   },
   memberVotesTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   memberVotesList: {
     gap: 8,
