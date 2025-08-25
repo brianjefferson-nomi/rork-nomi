@@ -163,6 +163,10 @@ export const generateRestaurantDescription = async (reviews: string[], name: str
       }
     }
     
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
@@ -179,8 +183,11 @@ export const generateRestaurantDescription = async (reviews: string[], name: str
             content: `Generate a short description for ${name} based on these reviews: ${reviews.join('. ')}`
           }
         ]
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`AI API error: ${response.status}`);
@@ -211,6 +218,10 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
       }
     }
     
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
@@ -227,8 +238,11 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
             content: `Generate single-word vibe tags for a ${cuisine} restaurant based on these reviews: ${reviews.join('. ')}`
           }
         ]
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`AI API error: ${response.status}`);
@@ -358,26 +372,11 @@ export const searchGooglePlaces = async (query: string, location: string): Promi
 // New Google Maps Extractor API for enhanced location-based search
 export const searchGoogleMapsExtractor = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
   try {
-    console.log(`[GoogleMapsExtractor] Searching for: ${query} near ${lat}, ${lng}`);
-    
-    const response = await fetch(
-      `https://${API_CONFIG.rapidapi.hosts.googleMapsExtractor}/search?query=${encodeURIComponent(query + ' restaurant')}&lat=${lat}&lng=${lng}&radius=${radius}`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
-          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googleMapsExtractor
-        }
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Google Maps Extractor API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log(`[GoogleMapsExtractor] Found ${data.data?.length || 0} results`);
-    return data.data || [];
+    console.log(`[GoogleMapsExtractor] API currently experiencing 403 errors - disabled for stability`);
+    // Google Maps Extractor API is returning 403 errors, likely due to API key restrictions
+    // Returning empty results to prevent app crashes
+    console.log(`[GoogleMapsExtractor] Skipping search to maintain app stability`);
+    return [];
   } catch (error) {
     console.error('Error searching Google Maps Extractor:', error);
     return [];
@@ -416,26 +415,11 @@ export const searchLocalBusinessData = async (query: string, lat: number, lng: n
 // New Map Data API for location-based restaurant discovery
 export const searchMapData = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
   try {
-    console.log(`[MapData] Searching for: ${query} near ${lat}, ${lng}`);
-    
-    const response = await fetch(
-      `https://${API_CONFIG.rapidapi.hosts.mapData}/search?query=${encodeURIComponent(query + ' restaurant')}&lat=${lat}&lng=${lng}&radius=${radius}`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
-          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.mapData
-        }
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Map Data API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log(`[MapData] Found ${data.data?.length || 0} results`);
-    return data.data || [];
+    console.log(`[MapData] API currently experiencing 403 errors - disabled for stability`);
+    // Map Data API is returning 403 errors, likely due to API key restrictions
+    // Returning empty results to prevent app crashes
+    console.log(`[MapData] Skipping search to maintain app stability`);
+    return [];
   } catch (error) {
     console.error('Error searching Map Data:', error);
     return [];
@@ -1004,18 +988,12 @@ export const aggregateRestaurantData = async (query: string, location: string, u
     try {
       // Use location-based APIs for better proximity results
       const apiPromises = [
-        Promise.race([
-          searchGoogleMapsExtractor(query, userLocation.lat, userLocation.lng, 5000),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Google Maps Extractor timeout')), 8000))
-        ]),
+        Promise.resolve([]), // Google Maps Extractor disabled due to 403 errors
         Promise.race([
           searchLocalBusinessData(query, userLocation.lat, userLocation.lng, 5000),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Local Business Data timeout')), 8000))
         ]),
-        Promise.race([
-          searchMapData(query, userLocation.lat, userLocation.lng, 5000),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Map Data timeout')), 8000))
-        ]),
+        Promise.resolve([]), // Map Data disabled due to 403 errors
         Promise.race([
           searchGooglePlaces(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Google Places timeout')), 5000))
@@ -1035,7 +1013,7 @@ export const aggregateRestaurantData = async (query: string, location: string, u
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length}, Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length}, Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1167,6 +1145,10 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
       return generateFallbackMenuItems(cuisine || 'International');
     }
     
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
@@ -1183,8 +1165,11 @@ export const generateValidatedMenuItems = async (restaurantName: string, cuisine
             content: `Restaurant: ${restaurantName}, Cuisine: ${cuisine}, Reviews: ${(reviews || []).join('. ')}`
           }
         ]
-      })
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`AI API error: ${response.status}`);
