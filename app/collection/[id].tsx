@@ -361,6 +361,82 @@ export default function CollectionDetailScreen() {
               )}
             </ScrollView>
           </View>
+
+        {/* Contributor Statistics */}
+        <View style={styles.contributorStatsSection}>
+          <Text style={styles.sectionTitle}>Member Contributions</Text>
+          <View style={styles.contributorStatsList}>
+            {collection.collaborators && Array.isArray(collection.collaborators) ? (
+              collection.collaborators.map((member: any, index: number) => {
+                const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
+                const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
+                
+                // Calculate member's contribution statistics
+                const memberVotes = rankedRestaurants.flatMap(({ meta }) => [
+                  ...meta.voteDetails.likeVoters.filter(v => v.userId === memberId),
+                  ...meta.voteDetails.dislikeVoters.filter(v => v.userId === memberId)
+                ]);
+                
+                const memberDiscussions = discussions.filter(d => d.userId === memberId);
+                const totalVotes = memberVotes.length;
+                const totalDiscussions = memberDiscussions.length;
+                const likes = memberVotes.filter(v => v.reason?.includes('like')).length;
+                const dislikes = memberVotes.filter(v => v.reason?.includes('dislike')).length;
+                
+                // Calculate contribution rate
+                const totalPossibleVotes = rankedRestaurants.length;
+                const contributionRate = totalPossibleVotes > 0 ? (totalVotes / totalPossibleVotes) * 100 : 0;
+                
+                return (
+                  <View key={memberId} style={styles.contributorCard}>
+                    <View style={styles.contributorHeader}>
+                      <View style={styles.contributorAvatar}>
+                        <Text style={styles.contributorInitial}>
+                          {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
+                        </Text>
+                      </View>
+                      <View style={styles.contributorInfo}>
+                        <Text style={styles.contributorName}>{memberName}</Text>
+                        <Text style={styles.contributorStats}>
+                          {contributionRate.toFixed(0)}% participation • {totalVotes} votes • {totalDiscussions} discussions
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.contributorDetails}>
+                      <View style={styles.voteBreakdown}>
+                        <View style={styles.voteStat}>
+                          <ThumbsUp size={14} color="#22C55E" />
+                          <Text style={styles.voteStatText}>{likes} likes</Text>
+                        </View>
+                        <View style={styles.voteStat}>
+                          <ThumbsDown size={14} color="#EF4444" />
+                          <Text style={styles.voteStatText}>{dislikes} dislikes</Text>
+                        </View>
+                        <View style={styles.voteStat}>
+                          <MessageCircle size={14} color="#6B7280" />
+                          <Text style={styles.voteStatText}>{totalDiscussions} comments</Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.contributionBar}>
+                        <View 
+                          style={[
+                            styles.contributionFill, 
+                            { width: `${Math.min(contributionRate, 100)}%` }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.emptyContributors}>
+                <Text style={styles.emptyContributorsText}>No member contributions yet</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Group Analytics */}
@@ -1080,5 +1156,91 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 14,
     fontWeight: '600',
+  },
+  contributorStatsSection: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    marginTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  contributorStatsList: {
+    marginTop: 12,
+  },
+  contributorCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  contributorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contributorAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  contributorInitial: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  contributorInfo: {
+    flex: 1,
+  },
+  contributorName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  contributorStats: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  contributorDetails: {
+    marginTop: 8,
+  },
+  voteBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  voteStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  voteStatText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  contributionBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  contributionFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
+  },
+  emptyContributors: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  emptyContributorsText: {
+    fontSize: 14,
+    color: '#999',
   },
 });

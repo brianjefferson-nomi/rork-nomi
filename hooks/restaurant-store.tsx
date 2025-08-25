@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
 import { mockRestaurants, mockVotes, mockDiscussions } from '@/mocks/restaurants';
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
-import { aggregateRestaurantData, getUserLocation } from '@/services/api';
+import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage } from '@/services/api';
 import { dbHelpers, Database } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
 
@@ -387,6 +387,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         creator_id: user.id,
         occasion: planData.occasion,
         is_public: planData.isPublic || false,
+        cover_image: getCollectionCoverImage(planData.occasion),
         likes: 0,
         equal_voting: true,
         admin_weighted: false,

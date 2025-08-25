@@ -656,31 +656,38 @@ export const taContentNearby = async (lat: number, lng: number) => {
   }
 };
 
-// Get TripAdvisor restaurant photos (RapidAPI)
-export const getTripAdvisorPhotos = async (restaurantId: string): Promise<string[]> => {
+// Get TripAdvisor restaurant photos using the new API endpoint
+export const getTripAdvisorPhotos = async (locationId: string, language: string = 'en'): Promise<string[]> => {
   try {
-    console.log(`[TripAdvisor] Getting photos for: ${restaurantId}`);
-    const response = await fetch(
-      `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantPhotos?id=${restaurantId}`,
-      {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': TRIPADVISOR_API_KEY,
-          'X-RapidAPI-Host': 'tripadvisor16.p.rapidapi.com'
-        }
+    console.log(`[TripAdvisor] Getting photos for location: ${locationId}`);
+    
+    const url = `${TA_CONTENT_BASE}/location/${locationId}/photos?language=${language}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${TRIPADVISOR_API_KEY}`
       }
-    );
+    });
     
     if (!response.ok) {
-      console.log(`[TripAdvisor] Photos API error: ${response.status}`);
+      console.log(`[TripAdvisor] Photos API error: ${response.status} ${response.statusText}`);
       return [];
     }
     
     const data = await response.json();
-    const photos = data.data?.photos || [];
-    return photos.map((photo: any) => photo.images?.large?.url || photo.images?.medium?.url).filter(Boolean);
+    const photos = data.data || [];
+    
+    // Extract photo URLs
+    const photoUrls = photos.map((photo: any) => 
+      photo.images?.large?.url || photo.images?.medium?.url || photo.images?.small?.url
+    ).filter(Boolean);
+    
+    console.log(`[TripAdvisor] Retrieved ${photoUrls.length} photos`);
+    return photoUrls;
   } catch (error) {
-    console.error('Error getting TripAdvisor photos:', error);
+    console.error('[TripAdvisor] Error getting photos:', error);
     return [];
   }
 };
@@ -750,6 +757,63 @@ export const getDefaultRestaurantImage = (cuisine?: string) => {
   };
   
   return defaultImages[cuisine as keyof typeof defaultImages] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80';
+};
+
+// Generate unique collection cover images based on occasion
+export const getCollectionCoverImage = (occasion?: string): string => {
+  const occasionImages = {
+    'Birthday': 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800&h=600&fit=crop&q=80', // Birthday cake
+    'Date Night': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80', // Romantic dinner
+    'Business': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=600&fit=crop&q=80', // Business meeting
+    'Casual': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80', // Casual dining
+    'Late Night': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80', // Night city lights
+    'Brunch': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80', // Brunch spread
+    'Special Occasion': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80', // Fine dining
+    'Italian': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80', // Italian food
+    'Japanese': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600&fit=crop&q=80', // Sushi
+    'Mexican': 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=800&h=600&fit=crop&q=80', // Mexican food
+    'French': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80', // French cuisine
+    'Thai': 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&h=600&fit=crop&q=80', // Thai food
+    'Indian': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop&q=80', // Indian food
+    'American': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&h=600&fit=crop&q=80', // American food
+    'Chinese': 'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=800&h=600&fit=crop&q=80', // Chinese food
+    'Mediterranean': 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&q=80', // Mediterranean
+    'Korean': 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=800&h=600&fit=crop&q=80', // Korean BBQ
+    'Sushi': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600&fit=crop&q=80', // Sushi
+    'Pizza': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80', // Pizza
+    'Steakhouse': 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&h=600&fit=crop&q=80', // Steak
+    'Fine Dining': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80', // Fine dining
+    'Fast Food': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&h=600&fit=crop&q=80', // Fast food
+    'Cafe': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80', // Cafe
+    'Bar': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80', // Bar
+    'Seafood': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600&fit=crop&q=80', // Seafood
+    'Vegetarian': 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&q=80', // Vegetarian
+    'Vegan': 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&q=80', // Vegan
+    'Dessert': 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800&h=600&fit=crop&q=80', // Dessert
+    'Breakfast': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80', // Breakfast
+    'Lunch': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80', // Lunch
+    'Dinner': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80' // Dinner
+  };
+  
+  // Try to match the occasion exactly, then try partial matches
+  if (occasion && occasionImages[occasion as keyof typeof occasionImages]) {
+    return occasionImages[occasion as keyof typeof occasionImages];
+  }
+  
+  // Try partial matches for occasions
+  if (occasion) {
+    const lowerOccasion = occasion.toLowerCase();
+    for (const [key, image] of Object.entries(occasionImages)) {
+      if (lowerOccasion.includes(key.toLowerCase())) {
+        return image;
+      }
+    }
+  }
+  
+  // Return a random image from the collection for variety
+  const imageValues = Object.values(occasionImages);
+  const randomIndex = Math.floor(Math.random() * imageValues.length);
+  return imageValues[randomIndex];
 };
 
 // Enhanced location service with better city detection
