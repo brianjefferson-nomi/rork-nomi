@@ -46,6 +46,12 @@ export default function CollectionDetailScreen() {
   const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
   
   const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
+  
+  // Debug logging for ranked restaurants
+  console.log('[CollectionDetail] Ranked restaurants:', rankedRestaurants.length);
+  rankedRestaurants.forEach(({ restaurant, meta }, index) => {
+    console.log(`[CollectionDetail] Restaurant ${index + 1}: ${restaurant.name} - Likes: ${meta.likes}, Dislikes: ${meta.dislikes}`);
+  });
   const recommendations = collection ? getGroupRecommendations(id) : [];
   
   // Load discussions asynchronously
@@ -137,6 +143,19 @@ export default function CollectionDetailScreen() {
         }
       ]
     );
+  };
+
+  // Add test votes for debugging
+  const addTestVotes = () => {
+    if (rankedRestaurants.length > 0) {
+      const testRestaurant = rankedRestaurants[0].restaurant;
+      voteRestaurant(testRestaurant.id, 'like', id, 'Great food and atmosphere!');
+      if (rankedRestaurants.length > 1) {
+        const testRestaurant2 = rankedRestaurants[1].restaurant;
+        voteRestaurant(testRestaurant2.id, 'dislike', id, 'Too expensive for the quality');
+      }
+      Alert.alert('Test Votes Added', 'Added test votes to first two restaurants');
+    }
   };
 
   // Check if user is the owner of the collection
@@ -327,6 +346,12 @@ export default function CollectionDetailScreen() {
                 >
                   <Copy size={14} color="#6B7280" />
                   <Text style={styles.shareButtonText}>Copy Link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.shareButton}
+                  onPress={addTestVotes}
+                >
+                  <Text style={styles.shareButtonText}>Add Test Votes</Text>
                 </TouchableOpacity>
               </View>
             </View>

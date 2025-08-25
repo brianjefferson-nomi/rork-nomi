@@ -130,14 +130,14 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       // Use location-based search with user coordinates
       await searchRestaurants(searchQuery, location.lat, location.lng);
       addSearchQuery(searchQuery);
-      console.log(`Found ${searchResults.length} results near ${location.city}`);
+      console.log(`Search completed for: ${searchQuery}`);
     } catch (error) {
       console.error('Search error:', error);
       Alert.alert('Search Error', 'Failed to search restaurants. Please try again.');
     } finally {
       setIsSearching(false);
     }
-  }, [searchRestaurants, addSearchQuery, userLocation, searchResults.length]);
+  }, [searchRestaurants, addSearchQuery, userLocation]);
 
   const onSubmit = () => {
     performSearch(query);
@@ -277,7 +277,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
         </View>
       )}
 
-      {(query.length > 0 || searchResults.length > 0) && (
+      {(query.length > 0 || filtered.length > 0) && (
         <View style={styles.liveResults}>
           <View style={styles.liveHeader}>
             <Text style={styles.liveTitle}>

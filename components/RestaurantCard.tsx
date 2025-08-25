@@ -385,7 +385,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
               <Text style={styles.topPicksLabel}>🔥 Popular dishes</Text>
               <View style={styles.topPicksList}>
                 {specificMenuItems
-                  .slice(0, 3)
+                  .slice(0, 2)
                   .filter(Boolean)
                   .map((item, index) => (
                     <Text key={index} style={styles.topPickText} numberOfLines={1}>
