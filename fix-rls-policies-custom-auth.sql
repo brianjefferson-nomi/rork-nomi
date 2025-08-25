@@ -3,6 +3,7 @@
 -- Run this in your Supabase SQL Editor
 
 -- First, drop ALL existing policies to start fresh
+-- Drop old policies
 DROP POLICY IF EXISTS "Anyone can view public collections" ON collections;
 DROP POLICY IF EXISTS "Collection members can view private collections" ON collections;
 DROP POLICY IF EXISTS "Authenticated users can create collections" ON collections;
@@ -28,6 +29,21 @@ DROP POLICY IF EXISTS "Users can insert their own profile" ON users;
 DROP POLICY IF EXISTS "Anyone can view restaurants" ON restaurants;
 DROP POLICY IF EXISTS "Authenticated users can insert restaurants" ON restaurants;
 DROP POLICY IF EXISTS "Authenticated users can update restaurants" ON restaurants;
+
+-- Drop new policies that might already exist
+DROP POLICY IF EXISTS "Allow all collections operations" ON collections;
+DROP POLICY IF EXISTS "Allow all collection members operations" ON collection_members;
+DROP POLICY IF EXISTS "Allow all collection restaurants operations" ON collection_restaurants;
+DROP POLICY IF EXISTS "Allow all restaurant votes operations" ON restaurant_votes;
+DROP POLICY IF EXISTS "Allow all user reviews operations" ON user_reviews;
+DROP POLICY IF EXISTS "Allow all API calls operations" ON api_calls;
+DROP POLICY IF EXISTS "Allow all user activities operations" ON user_activities;
+DROP POLICY IF EXISTS "Allow all restaurant discussions operations" ON restaurant_discussions;
+DROP POLICY IF EXISTS "Allow all users operations" ON users;
+DROP POLICY IF EXISTS "Allow all restaurants operations" ON restaurants;
+DROP POLICY IF EXISTS "Allow all user relationships operations" ON user_relationships;
+DROP POLICY IF EXISTS "Allow all restaurant rankings operations" ON restaurant_rankings;
+DROP POLICY IF EXISTS "Allow all plan invitations operations" ON plan_invitations;
 
 -- Create simplified policies that work with custom authentication
 -- These policies allow all operations since authentication is handled at the application level
