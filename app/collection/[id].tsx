@@ -516,13 +516,25 @@ export default function CollectionDetailScreen() {
             </View>
           ) : (
             rankedRestaurants.map(({ restaurant, meta }, index) => (
-              <View key={restaurant?.id || index} style={styles.restaurantItem}>
-                <View style={styles.rankingHeader}>
-                  <View style={styles.rankBadge}>
-                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={16} color="#FFD700" />}
+              <View key={restaurant?.id || index} style={[
+                styles.restaurantItem,
+                meta?.rank === 1 && styles.winningRestaurantItem
+              ]}>
+                <View style={[
+                  styles.rankingHeader,
+                  meta?.rank === 1 && styles.winningRankingHeader
+                ]}>
+                  <View style={[
+                    styles.rankBadge,
+                    meta?.rank === 1 && styles.winningRankBadge
+                  ]}>
+                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={20} color="#FFD700" />}
                     {meta?.rank === 2 && <Text style={styles.silverRank}>🥈</Text>}
                     {meta?.rank === 3 && <Text style={styles.bronzeRank}>🥉</Text>}
-                    <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
+                    <Text style={[
+                      styles.rankNumber,
+                      meta?.rank === 1 && styles.winningRankNumber
+                    ]}>#{meta?.rank || index + 1}</Text>
                   </View>
                   
                   <View style={styles.badges}>
@@ -544,6 +556,12 @@ export default function CollectionDetailScreen() {
                     )}
                     {meta.trend === 'up' && <TrendingUp size={16} color="#22C55E" />}
                     {meta.trend === 'down' && <TrendingDown size={16} color="#EF4444" />}
+                    {meta?.rank === 1 && (
+                      <View style={[styles.badge, styles.winnerBadge]}>
+                        <Crown size={12} color="#FFF" />
+                        <Text style={styles.badgeText}>WINNER</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 
@@ -877,6 +895,22 @@ const styles = StyleSheet.create({
   restaurantItem: {
     marginBottom: 12,
   },
+  winningRestaurantItem: {
+    backgroundColor: '#FEF7E0',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   removeButton: {
     marginTop: -8,
     marginBottom: 8,
@@ -1046,6 +1080,20 @@ const styles = StyleSheet.create({
   bronzeRank: {
     fontSize: 16,
   },
+  winningRankingHeader: {
+    marginBottom: 12,
+  },
+  winningRankBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  winningRankNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#B45309',
+  },
   badges: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1067,6 +1115,11 @@ const styles = StyleSheet.create({
   },
   debatedBadge: {
     backgroundColor: '#F59E0B',
+  },
+  winnerBadge: {
+    backgroundColor: '#FFD700',
+    borderWidth: 2,
+    borderColor: '#B45309',
   },
   badgeText: {
     fontSize: 10,
