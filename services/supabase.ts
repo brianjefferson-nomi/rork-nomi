@@ -751,12 +751,56 @@ export const dbHelpers = {
       
       console.log('[Supabase] User found:', userData);
       
-      // Try to get plans where user is creator - handle both created_by and creator_id fields
-      let { data, error } = await supabase
+      // Get plans where user is creator OR member
+      let data: any[] = [];
+      let error: any = null;
+      
+      // First, get collections where user is creator
+      let { data: creatorCollections, error: creatorError } = await supabase
         .from('collections')
         .select('*')
         .or(`created_by.eq.${userId},creator_id.eq.${userId}`)
-        .limit(100); // Add limit to prevent potential issues
+        .limit(100);
+      
+      if (creatorError) {
+        console.error('[Supabase] Error fetching creator collections:', creatorError);
+        throw new Error(`Failed to fetch creator collections: ${creatorError.message}`);
+      }
+      
+      // Then, get collections where user is a member using a different approach
+      let memberCollections: any[] = [];
+      try {
+        // Get member collection IDs first
+        const { data: memberIds, error: memberIdsError } = await supabase
+          .from('collection_members')
+          .select('collection_id')
+          .eq('user_id', userId);
+        
+        if (!memberIdsError && memberIds && memberIds.length > 0) {
+          const collectionIds = memberIds.map(m => m.collection_id);
+          
+          // Get the actual collections
+          const { data: memberColls, error: memberCollsError } = await supabase
+            .from('collections')
+            .select('*')
+            .in('id', collectionIds)
+            .limit(100);
+          
+          if (!memberCollsError) {
+            memberCollections = memberColls || [];
+          }
+        }
+      } catch (memberError) {
+        console.error('[Supabase] Error fetching member collections:', memberError);
+        // If member query fails, just use creator collections
+        console.log('[Supabase] Falling back to creator collections only');
+      }
+      
+      // Combine and deduplicate collections
+      const allCollections = [...(creatorCollections || []), ...memberCollections];
+      data = allCollections.filter((collection, index, self) => 
+        index === self.findIndex(c => c.id === collection.id)
+      );
       
       if (error) {
         console.error('[Supabase] Error fetching user plans:', error);
