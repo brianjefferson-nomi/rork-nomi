@@ -802,6 +802,12 @@ export default function CollectionDetailScreen() {
                             userLiked && styles.likeButtonActive
                           ]}
                           onPress={() => {
+                            console.log('[CollectionDetail] Like button pressed:', {
+                              restaurantId: restaurant.id,
+                              collectionId: id,
+                              userLiked,
+                              userDisliked
+                            });
                             if (userDisliked) {
                               voteRestaurant(restaurant.id, 'dislike', id, '');
                               setTimeout(() => voteRestaurant(restaurant.id, 'like', id, ''), 100);
@@ -823,6 +829,12 @@ export default function CollectionDetailScreen() {
                             userDisliked && styles.dislikeButtonActive
                           ]}
                           onPress={() => {
+                            console.log('[CollectionDetail] Dislike button pressed:', {
+                              restaurantId: restaurant.id,
+                              collectionId: id,
+                              userLiked,
+                              userDisliked
+                            });
                             if (userLiked) {
                               voteRestaurant(restaurant.id, 'like', id, '');
                               setTimeout(() => voteRestaurant(restaurant.id, 'dislike', id, ''), 100);
@@ -895,6 +907,13 @@ export default function CollectionDetailScreen() {
               <TouchableOpacity 
                 style={styles.modalButton}
                 onPress={() => {
+                  console.log('[CollectionDetail] Vote modal submitted:', {
+                    showVoteModal,
+                    restaurantId: showVoteModal?.restaurantId,
+                    vote: showVoteModal?.vote,
+                    collectionId: id,
+                    voteReason
+                  });
                   if (showVoteModal) {
                     voteRestaurant(showVoteModal.restaurantId, showVoteModal.vote, id, voteReason);
                   }
