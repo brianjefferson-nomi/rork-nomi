@@ -1127,8 +1127,16 @@ export const dbHelpers = {
   },
 
   // Collection operations (new names)
-  async createCollection(collectionData: Database['public']['Tables']['collections']['Insert']) {
-    return this.createPlan(collectionData);
+  async createCollection(collectionData: Database['public']['Tables']['collections']['Insert'] & { collection_type?: 'public' | 'private' | 'shared' }) {
+    // Ensure collection_type is set and is_public is derived from it
+    const enhancedData = {
+      ...collectionData,
+      collection_type: collectionData.collection_type || 'public',
+      is_public: collectionData.collection_type === 'public' || collectionData.is_public
+    };
+    
+    console.log('[Supabase] Creating collection with type:', enhancedData.collection_type);
+    return this.createPlan(enhancedData);
   },
 
   async getCollectionById(id: string) {
@@ -1660,5 +1668,197 @@ export const dbHelpers = {
     
     if (error) throw error;
     return data || [];
+  },
+
+  // User favorites operations
+  async updateUserFavorites(userId: string, favoriteRestaurants: string[]) {
+    console.log('[Supabase] Updating user favorites:', { userId, favoriteRestaurants });
+    
+    const { data, error } = await supabase
+      .from('users')
+      .update({ 
+        favorite_restaurants: favoriteRestaurants,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Supabase] Error updating user favorites:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] User favorites updated successfully:', data);
+    return data;
+  },
+
+  async getUserFavorites(userId: string) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('favorite_restaurants')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data?.favorite_restaurants || [];
+  },
+
+  // User notes operations
+  async createUserNote(noteData: {
+    user_id: string;
+    restaurant_id: string;
+    note_text: string;
+  }) {
+    console.log('[Supabase] Creating user note:', noteData);
+    
+    const { data, error } = await supabase
+      .from('user_notes')
+      .insert(noteData)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Supabase] Error creating user note:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] User note created successfully:', data);
+    return data;
+  },
+
+  async updateUserNote(noteId: string, noteText: string) {
+    const { data, error } = await supabase
+      .from('user_notes')
+      .update({ 
+        note_text: noteText,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', noteId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteUserNote(noteId: string) {
+    const { error } = await supabase
+      .from('user_notes')
+      .delete()
+      .eq('id', noteId);
+    
+    if (error) throw error;
+  },
+
+  async getUserNotes(userId: string, restaurantId?: string) {
+    let query = supabase
+      .from('user_notes')
+      .select('*, restaurants(name, image_url)')
+      .eq('user_id', userId);
+    
+    if (restaurantId) {
+      query = query.eq('restaurant_id', restaurantId);
+    }
+    
+    const { data, error } = await query.order('updated_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Collection type operations
+  async getCollectionsByType(userId: string, collectionType?: 'public' | 'private' | 'shared') {
+    console.log('[Supabase] Getting collections by type:', { userId, collectionType });
+    
+    let query = supabase
+      .from('collections')
+      .select('*, collection_members(user_id, role)');
+    
+    if (collectionType === 'public') {
+      // Public collections are visible to everyone
+      query = query.eq('collection_type', 'public');
+    } else if (collectionType === 'private') {
+      // Private collections are only visible to the creator
+      query = query.eq('collection_type', 'private').eq('created_by', userId);
+    } else if (collectionType === 'shared') {
+      // Shared collections are visible to creator and members
+      query = query.eq('collection_type', 'shared').or(`created_by.eq.${userId},collection_members.user_id.eq.${userId}`);
+    } else {
+      // Get all collections the user has access to
+      query = query.or(`collection_type.eq.public,created_by.eq.${userId},collection_members.user_id.eq.${userId}`);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('[Supabase] Error getting collections by type:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] Collections retrieved:', data?.length || 0);
+    return data || [];
+  },
+
+  async addMemberToCollection(collectionId: string, userId: string, role: 'member' | 'admin' = 'member') {
+    console.log('[Supabase] Adding member to collection:', { collectionId, userId, role });
+    
+    const { data, error } = await supabase
+      .from('collection_members')
+      .insert({
+        collection_id: collectionId,
+        user_id: userId,
+        role
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Supabase] Error adding member to collection:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] Member added successfully:', data);
+    return data;
+  },
+
+  async removeMemberFromCollection(collectionId: string, userId: string) {
+    console.log('[Supabase] Removing member from collection:', { collectionId, userId });
+    
+    const { error } = await supabase
+      .from('collection_members')
+      .delete()
+      .eq('collection_id', collectionId)
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('[Supabase] Error removing member from collection:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] Member removed successfully');
+  },
+
+  async updateCollectionType(collectionId: string, collectionType: 'public' | 'private' | 'shared') {
+    console.log('[Supabase] Updating collection type:', { collectionId, collectionType });
+    
+    const { data, error } = await supabase
+      .from('collections')
+      .update({
+        collection_type: collectionType,
+        is_public: collectionType === 'public',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', collectionId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[Supabase] Error updating collection type:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] Collection type updated successfully:', data);
+    return data;
   }
 };

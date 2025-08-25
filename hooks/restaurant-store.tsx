@@ -54,6 +54,10 @@ interface RestaurantStore {
   updateCollectionSettings: (collectionId: string, settings: any) => Promise<void>;
   getRestaurantVotingDetails: (restaurantId: string, planId: string) => any;
   addRestaurantComment: (restaurantId: string, collectionId: string, commentText: string) => Promise<void>;
+  getCollectionsByType: (userId: string, collectionType?: 'public' | 'private' | 'shared') => Promise<any[]>;
+  addMemberToCollection: (collectionId: string, userId: string, role?: 'member' | 'admin') => Promise<any>;
+  removeMemberFromCollection: (collectionId: string, userId: string) => Promise<void>;
+  updateCollectionType: (collectionId: string, collectionType: 'public' | 'private' | 'shared') => Promise<any>;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -248,6 +252,29 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
+  // Load favorites from database
+  const favoritesQuery = useQuery({
+    queryKey: ['userFavorites', user?.id],
+    queryFn: async () => {
+      try {
+        console.log('[RestaurantStore] Loading favorites from database');
+        const favorites = await dbHelpers.getUserFavorites(user?.id || '');
+        console.log('[RestaurantStore] Loaded favorites from database:', favorites);
+        return favorites;
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading favorites from database:', error);
+        // Fallback to AsyncStorage
+        const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
+        return storedFavorites ? JSON.parse(storedFavorites) : [];
+      }
+    },
+    enabled: !!user?.id,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+
   // Load discussions from database
   const discussionsQuery = useQuery({
     queryKey: ['discussions'],
@@ -275,10 +302,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
     queryFn: async () => {
-      const [storedVotes, storedDiscussions, storedFavorites, storedNotes, storedSearchHistory, location] = await Promise.all([
+      const [storedVotes, storedDiscussions, storedNotes, storedSearchHistory, location] = await Promise.all([
         AsyncStorage.getItem('userVotes'),
         AsyncStorage.getItem('discussions'),
-        AsyncStorage.getItem('favoriteRestaurants'),
         AsyncStorage.getItem('restaurantNotes'),
         AsyncStorage.getItem('searchHistory'),
         getUserLocation()
@@ -294,12 +320,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         restaurants: restaurantsWithNotes,
         userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : mockVotes),
         discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions),
-        favoriteRestaurants: storedFavorites ? JSON.parse(storedFavorites) : [],
+        favoriteRestaurants: favoritesQuery.data || [],
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
       };
     },
-    enabled: !!restaurantsQuery.data,
+    enabled: !!restaurantsQuery.data && !!favoritesQuery.data,
     retry: 1,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -448,7 +474,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   // Persist favorites
   const { mutate: mutateFavorites } = useMutation({
     mutationFn: async (newFavorites: string[]) => {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      console.log('[RestaurantStore] Saving favorites to database:', newFavorites);
+      
+      // Save to database
+      await dbHelpers.updateUserFavorites(user.id, newFavorites);
+      
+      // Also save to AsyncStorage for offline access
       await AsyncStorage.setItem('favoriteRestaurants', JSON.stringify(newFavorites));
+      
       return newFavorites;
     },
     onSuccess: (data) => {
@@ -1327,6 +1364,65 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log(`[Location] Switched to ${city}`);
   }, []);
 
+  // Collection type operations
+  const getCollectionsByType = useCallback(async (userId: string, collectionType?: 'public' | 'private' | 'shared') => {
+    try {
+      console.log('[RestaurantStore] Getting collections by type:', { userId, collectionType });
+      const collections = await dbHelpers.getCollectionsByType(userId, collectionType);
+      console.log('[RestaurantStore] Collections retrieved:', collections.length);
+      return collections;
+    } catch (error) {
+      console.error('[RestaurantStore] Error getting collections by type:', error);
+      return [];
+    }
+  }, []);
+
+  const addMemberToCollection = useCallback(async (collectionId: string, userId: string, role: 'member' | 'admin' = 'member') => {
+    try {
+      console.log('[RestaurantStore] Adding member to collection:', { collectionId, userId, role });
+      const result = await dbHelpers.addMemberToCollection(collectionId, userId, role);
+      console.log('[RestaurantStore] Member added successfully:', result);
+      
+      // Refresh collections data
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
+      
+      return result;
+    } catch (error) {
+      console.error('[RestaurantStore] Error adding member to collection:', error);
+      throw error;
+    }
+  }, [user?.id, queryClient]);
+
+  const removeMemberFromCollection = useCallback(async (collectionId: string, userId: string) => {
+    try {
+      console.log('[RestaurantStore] Removing member from collection:', { collectionId, userId });
+      await dbHelpers.removeMemberFromCollection(collectionId, userId);
+      console.log('[RestaurantStore] Member removed successfully');
+      
+      // Refresh collections data
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error removing member from collection:', error);
+      throw error;
+    }
+  }, [user?.id, queryClient]);
+
+  const updateCollectionType = useCallback(async (collectionId: string, collectionType: 'public' | 'private' | 'shared') => {
+    try {
+      console.log('[RestaurantStore] Updating collection type:', { collectionId, collectionType });
+      const result = await dbHelpers.updateCollectionType(collectionId, collectionType);
+      console.log('[RestaurantStore] Collection type updated successfully:', result);
+      
+      // Refresh collections data
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
+      
+      return result;
+    } catch (error) {
+      console.error('[RestaurantStore] Error updating collection type:', error);
+      throw error;
+    }
+  }, [user?.id, queryClient]);
+
   // Memoize the store value to prevent unnecessary re-renders
   const storeValue = useMemo(() => ({
     restaurants,
@@ -1372,6 +1468,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     updateCollectionSettings,
     getRestaurantVotingDetails,
     addRestaurantComment,
+    getCollectionsByType,
+    addMemberToCollection,
+    removeMemberFromCollection,
+    updateCollectionType,
   }), [
     restaurants,
     plansQuery.data,
@@ -1416,6 +1516,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     updateCollectionSettings,
     getRestaurantVotingDetails,
     addRestaurantComment,
+    getCollectionsByType,
+    addMemberToCollection,
+    removeMemberFromCollection,
+    updateCollectionType,
   ]);
 
   return storeValue;
