@@ -633,6 +633,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     mutateSearchHistory([]);
   }, [mutateSearchHistory]);
 
+
+
   const getQuickSuggestions = useCallback(() => {
     const locationSuggestions = userLocation?.city === 'New York' 
       ? ['Italian in Manhattan', 'Sushi in SoHo', 'Brunch in Brooklyn', 'Pizza in Queens']

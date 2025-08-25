@@ -77,11 +77,10 @@ export function SearchWizard({ testID }: SearchWizardProps) {
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    // Use search results if available, otherwise filter from all restaurants
-    const resultsToFilter = searchResults.length > 0 ? searchResults : restaurants;
     
     // If we have a query and search results, show search results
     if (q && searchResults.length > 0) {
+      console.log(`[SearchWizard] Using search results: ${searchResults.length} results`);
       return searchResults.filter(r => {
         const matchPrice = price === 'All' || r.priceRange === price;
         const matchRating = r.rating >= rating;
@@ -90,13 +89,25 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       });
     }
     
-    // Otherwise, filter from all restaurants
-    return resultsToFilter.filter(r => {
-      const matchQuery = !q || r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) || r.neighborhood.toLowerCase().includes(q);
+    // If we have a query but no search results, filter from all restaurants
+    if (q) {
+      console.log(`[SearchWizard] Filtering from all restaurants for query: ${q}`);
+      return restaurants.filter(r => {
+        const matchQuery = r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) || r.neighborhood.toLowerCase().includes(q);
+        const matchPrice = price === 'All' || r.priceRange === price;
+        const matchRating = r.rating >= rating;
+        const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
+        return matchQuery && matchPrice && matchRating && matchHours;
+      });
+    }
+    
+    // If no query, show all restaurants
+    console.log(`[SearchWizard] Showing all restaurants: ${restaurants.length} results`);
+    return restaurants.filter(r => {
       const matchPrice = price === 'All' || r.priceRange === price;
       const matchRating = r.rating >= rating;
       const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
-      return matchQuery && matchPrice && matchRating && matchHours;
+      return matchPrice && matchRating && matchHours;
     });
   }, [restaurants, searchResults, query, price, rating, isOpenNow]);
 
@@ -170,6 +181,11 @@ export function SearchWizard({ testID }: SearchWizardProps) {
           onChangeText={(t) => {
             setQuery(t);
             setShowSuggestions(true);
+            // Clear search results when user starts typing a new query
+            if (t.length === 0) {
+              // Clear search results when input is empty
+              console.log('[SearchWizard] Clearing search results - empty query');
+            }
           }}
           onFocus={() => setShowSuggestions(true)}
           onSubmitEditing={onSubmit}

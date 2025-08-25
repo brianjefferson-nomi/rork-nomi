@@ -353,22 +353,49 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         )}
 
         {/* Top Picks - moved to bottom */}
-        {(restaurant.aiTopPicks || restaurant.menuHighlights) && 
-         ((restaurant.aiTopPicks?.length || 0) > 0 || (restaurant.menuHighlights?.length || 0) > 0) && (
-          <View style={styles.topPicksContainer}>
-            <Text style={styles.topPicksLabel}>🔥 Popular dishes</Text>
-            <View style={styles.topPicksList}>
-              {[...(restaurant.aiTopPicks || []), ...(restaurant.menuHighlights || [])]
-                .slice(0, 2)
-                .filter(Boolean)
-                .map((item, index) => (
-                  <Text key={index} style={styles.topPickText} numberOfLines={1}>
-                    • {item}
-                  </Text>
-                ))}
+        {(() => {
+          // Get menu highlights from various sources
+          const menuHighlights = restaurant.menuHighlights || [];
+          const aiTopPicks = restaurant.aiTopPicks || [];
+          
+          // Filter out generic dishes and only show specific menu items
+          const filterGenericDishes = (dishes: string[]) => {
+            const genericTerms = [
+              'chef special', 'house favorite', 'seasonal dish', 'signature dish', 
+              'popular item', 'daily special', 'chef\'s choice', 'house special',
+              'special', 'favorite', 'dish', 'item', 'choice', 'recommended'
+            ];
+            
+            return dishes.filter(dish => {
+              const lowerDish = dish.toLowerCase();
+              return !genericTerms.some(term => lowerDish.includes(term));
+            });
+          };
+          
+          const specificMenuItems = [
+            ...filterGenericDishes(menuHighlights),
+            ...filterGenericDishes(aiTopPicks)
+          ];
+          
+          // If no specific menu items, don't show the section
+          if (specificMenuItems.length === 0) return null;
+          
+          return (
+            <View style={styles.topPicksContainer}>
+              <Text style={styles.topPicksLabel}>🔥 Popular dishes</Text>
+              <View style={styles.topPicksList}>
+                {specificMenuItems
+                  .slice(0, 3)
+                  .filter(Boolean)
+                  .map((item, index) => (
+                    <Text key={index} style={styles.topPickText} numberOfLines={1}>
+                      • {item}
+                    </Text>
+                  ))}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
       </View>
     </TouchableOpacity>
   );
