@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
 import { mockRestaurants, mockVotes, mockDiscussions } from '@/mocks/restaurants';
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
-import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, searchRestaurantsWithAPI } from '@/services/api';
+import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI } from '@/services/api';
 import { dbHelpers, Database } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
 
@@ -581,8 +581,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[RestaurantStore] Creating plan:', planData);
     
     try {
-      // Get cover image first
-      const coverImage = await getUnsplashCollectionCoverImage(planData.occasion || 'General');
+      // Get cover image
+      let coverImage: string;
+      try {
+        coverImage = await getUnsplashCollectionCoverImage(planData.occasion || 'General');
+      } catch (error) {
+        console.warn('[RestaurantStore] Unsplash API failed, using fallback image:', error);
+        coverImage = getCollectionCoverImageFallback(planData.occasion || 'General');
+      }
       
       // Determine collection type
       const collectionType = planData.collection_type || (planData.isPublic ? 'public' : 'private');

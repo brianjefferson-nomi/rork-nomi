@@ -4235,3 +4235,27 @@ export const getUnsplashCollectionCoverImage = async (occasion: string): Promise
     return getCollectionCoverImage(occasion);
   }
 };
+
+// Fallback function for when Unsplash is completely unavailable
+export const getCollectionCoverImageFallback = (occasion: string): string => {
+  const fallbackImages = {
+    'dinner': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80',
+    'lunch': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80',
+    'breakfast': 'https://images.unsplash.com/photo-1494859802809-d069c3b71a8a?w=800&h=600&fit=crop&q=80',
+    'brunch': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=800&h=600&fit=crop&q=80',
+    'date night': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80',
+    'celebration': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80',
+    'business': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80',
+    'casual': 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80'
+  };
+  
+  const lowerOccasion = occasion.toLowerCase();
+  for (const [key, image] of Object.entries(fallbackImages)) {
+    if (lowerOccasion.includes(key)) {
+      return image;
+    }
+  }
+  
+  // Default fallback
+  return 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80';
+};

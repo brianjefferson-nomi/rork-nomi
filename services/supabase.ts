@@ -661,6 +661,62 @@ export const dbHelpers = {
     return data;
   },
 
+  // Admin function to fix RLS policies (use with caution)
+  async fixRLSPolicies() {
+    try {
+      console.log('[Supabase] Fixing RLS policies...');
+      
+      // Drop existing policies
+      await supabase.rpc('exec_sql', {
+        sql: `
+          DROP POLICY IF EXISTS "Collections access policy" ON collections;
+          DROP POLICY IF EXISTS "Users can create collections" ON collections;
+          DROP POLICY IF EXISTS "Users can update their own collections" ON collections;
+          DROP POLICY IF EXISTS "Users can delete their own collections" ON collections;
+          DROP POLICY IF EXISTS "Public collections are viewable by everyone" ON collections;
+          DROP POLICY IF EXISTS "Private collections are viewable by creator only" ON collections;
+          DROP POLICY IF EXISTS "Shared collections are viewable by creator and members" ON collections;
+        `
+      });
+      
+      // Create simplified policies
+      await supabase.rpc('exec_sql', {
+        sql: `
+          CREATE POLICY "Collections SELECT policy" ON collections
+          FOR SELECT USING (
+            collection_type = 'public' OR
+            created_by = auth.uid() OR
+            creator_id = auth.uid()
+          );
+          
+          CREATE POLICY "Collections INSERT policy" ON collections
+          FOR INSERT WITH CHECK (
+            created_by = auth.uid() OR
+            creator_id = auth.uid()
+          );
+          
+          CREATE POLICY "Collections UPDATE policy" ON collections
+          FOR UPDATE USING (
+            created_by = auth.uid() OR
+            creator_id = auth.uid()
+          );
+          
+          CREATE POLICY "Collections DELETE policy" ON collections
+          FOR DELETE USING (
+            created_by = auth.uid() OR
+            creator_id = auth.uid()
+          );
+        `
+      });
+      
+      console.log('[Supabase] RLS policies fixed successfully');
+      return true;
+    } catch (error) {
+      console.error('[Supabase] Error fixing RLS policies:', error);
+      return false;
+    }
+  },
+
   // Collection operations (alias for plans)
   async createPlan(planData: Database['public']['Tables']['collections']['Insert']) {
     try {
