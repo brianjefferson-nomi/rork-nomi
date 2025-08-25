@@ -1089,10 +1089,14 @@ export default function CollectionDetailScreen() {
             );
           })()}
         </View>
+            </View>
           </>
         )}
 
-        {/* Vote Modal */}
+        <View style={{ height: 32 }} />
+      </ScrollView>
+
+      {/* Vote Modal */}
         <Modal visible={!!showVoteModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -1219,8 +1223,6 @@ export default function CollectionDetailScreen() {
 
 
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
     </>
   );
 }
