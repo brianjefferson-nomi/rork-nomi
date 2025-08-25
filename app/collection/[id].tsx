@@ -151,7 +151,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </View>
                         <View style={styles.voterList}>
                           {filteredLikeVoters.map((voter: any, index: number) => (
-                            <View key={`${voter.userId}-${index}`} style={styles.voterItem}>
+                            <View key={`like-${voter.userId}-${index}`} style={styles.voterItem}>
                               <View style={styles.voterAvatar}>
                                 <Text style={styles.voterInitial}>
                                   {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
@@ -174,7 +174,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </View>
                         <View style={styles.voterList}>
                           {filteredDislikeVoters.map((voter: any, index: number) => (
-                            <View key={`${voter.userId}-${index}`} style={styles.voterItem}>
+                            <View key={`dislike-${voter.userId}-${index}`} style={styles.voterItem}>
                               <View style={styles.voterAvatar}>
                                 <Text style={styles.voterInitial}>
                                   {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
@@ -326,8 +326,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <View style={styles.restaurantActivityGroup}>
                             <Text style={styles.activityLabel}>Liked:</Text>
                             <Text style={styles.restaurantList} numberOfLines={2}>
-                              {stats.likedRestaurants.slice(0, 3).join(', ')}
-                              {stats.likedRestaurants.length > 3 && '...'}
+                              {(() => {
+                                const restaurantNames = stats.likedRestaurants.slice(0, 3).join(', ');
+                                return stats.likedRestaurants.length > 3 ? `${restaurantNames}...` : restaurantNames;
+                              })()}
                             </Text>
                           </View>
                         )}
@@ -335,8 +337,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <View style={styles.restaurantActivityGroup}>
                             <Text style={styles.activityLabel}>Disliked:</Text>
                             <Text style={styles.restaurantList} numberOfLines={2}>
-                              {stats.dislikedRestaurants.slice(0, 3).join(', ')}
-                              {stats.dislikedRestaurants.length > 3 && '...'}
+                              {(() => {
+                                const restaurantNames = stats.dislikedRestaurants.slice(0, 3).join(', ');
+                                return stats.dislikedRestaurants.length > 3 ? `${restaurantNames}...` : restaurantNames;
+                              })()}
                             </Text>
                           </View>
                         )}
