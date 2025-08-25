@@ -28,7 +28,14 @@ interface RestaurantStore {
   getQuickSuggestions: () => string[];
   addRestaurantToPlan: (planId: string, restaurantId: string) => Promise<void>;
   removeRestaurantFromPlan: (planId: string, restaurantId: string) => Promise<void>;
-  createPlan: (plan: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => Promise<void>;
+  createPlan: (plan: { 
+    name: string; 
+    description?: string; 
+    plannedDate?: string; 
+    isPublic?: boolean; 
+    occasion?: string;
+    collection_type?: 'public' | 'private' | 'shared';
+  }) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
   toggleFavorite: (restaurantId: string) => void;
   voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => void;
@@ -549,7 +556,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
   }, [user?.id, plansQuery.data, queryClient]);
 
-    const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => {
+    const createPlan = useCallback(async (planData: { 
+      name: string; 
+      description?: string; 
+      plannedDate?: string; 
+      isPublic?: boolean; 
+      occasion?: string;
+      collection_type?: 'public' | 'private' | 'shared';
+    }) => {
     if (!user?.id) {
       console.error('[RestaurantStore] No user ID available for plan creation');
       throw new Error('User not authenticated');
@@ -561,13 +575,17 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       // Get cover image first
       const coverImage = await getUnsplashCollectionCoverImage(planData.occasion || 'General');
       
+      // Determine collection type
+      const collectionType = planData.collection_type || (planData.isPublic ? 'public' : 'private');
+      
       const planInsertData = {
         name: planData.name,
         description: planData.description,
         created_by: user.id,
         creator_id: user.id,
         occasion: planData.occasion,
-        is_public: planData.isPublic || false,
+        collection_type: collectionType,
+        is_public: collectionType === 'public',
         cover_image: coverImage,
         likes: 0,
         equal_voting: true,
