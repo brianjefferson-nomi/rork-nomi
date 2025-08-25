@@ -661,6 +661,74 @@ export const dbHelpers = {
     return data;
   },
 
+  // Diagnostic function to test database connectivity and RLS
+  async testDatabaseConnection() {
+    try {
+      console.log('[Supabase] Testing database connection...');
+      
+      // Test basic connection
+      const { data: testData, error: testError } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error('[Supabase] Basic connection test failed:', {
+          error: testError,
+          message: testError.message || 'No message',
+          code: testError.code || 'No code'
+        });
+        return { success: false, error: testError };
+      }
+      
+      console.log('[Supabase] Basic connection test passed');
+      
+      // Test collections table access
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from('collections')
+        .select('id, name, created_by')
+        .limit(1);
+      
+      if (collectionsError) {
+        console.error('[Supabase] Collections table access test failed:', {
+          error: collectionsError,
+          message: collectionsError.message || 'No message',
+          code: collectionsError.code || 'No code'
+        });
+        return { success: false, error: collectionsError };
+      }
+      
+      console.log('[Supabase] Collections table access test passed');
+      
+      // Test RLS policies
+      const { data: rlsTestData, error: rlsTestError } = await supabase
+        .from('collections')
+        .select('id, name, collection_type, created_by')
+        .eq('collection_type', 'public')
+        .limit(1);
+      
+      if (rlsTestError) {
+        console.error('[Supabase] RLS policy test failed:', {
+          error: rlsTestError,
+          message: rlsTestError.message || 'No message',
+          code: rlsTestError.code || 'No code'
+        });
+        return { success: false, error: rlsTestError };
+      }
+      
+      console.log('[Supabase] RLS policy test passed');
+      
+      return { success: true, data: { testData, collectionsData, rlsTestData } };
+    } catch (error) {
+      console.error('[Supabase] Database connection test error:', {
+        error: error,
+        message: error instanceof Error ? error.message : String(error),
+        errorType: typeof error
+      });
+      return { success: false, error };
+    }
+  },
+
   // Admin function to fix RLS policies (use with caution)
   async fixRLSPolicies() {
     try {
@@ -825,9 +893,12 @@ export const dbHelpers = {
       if (creatorError) {
         console.error('[Supabase] Error fetching creator collections:', {
           error: creatorError,
-          message: creatorError.message,
-          details: creatorError.details,
-          hint: creatorError.hint
+          message: creatorError.message || 'No message',
+          details: creatorError.details || 'No details',
+          hint: creatorError.hint || 'No hint',
+          code: creatorError.code || 'No code',
+          errorType: typeof creatorError,
+          errorKeys: Object.keys(creatorError || {})
         });
         // Continue with empty creator collections instead of failing completely
       }
@@ -842,9 +913,12 @@ export const dbHelpers = {
       if (memberError) {
         console.error('[Supabase] Error fetching member collections:', {
           error: memberError,
-          message: memberError.message,
-          details: memberError.details,
-          hint: memberError.hint
+          message: memberError.message || 'No message',
+          details: memberError.details || 'No details',
+          hint: memberError.hint || 'No hint',
+          code: memberError.code || 'No code',
+          errorType: typeof memberError,
+          errorKeys: Object.keys(memberError || {})
         });
       } else if (memberCollections && memberCollections.length > 0) {
         const collectionIds = memberCollections.map(m => m.collection_id);
@@ -859,9 +933,12 @@ export const dbHelpers = {
         if (memberCollsError) {
           console.error('[Supabase] Error fetching member collection details:', {
             error: memberCollsError,
-            message: memberCollsError.message,
-            details: memberCollsError.details,
-            hint: memberCollsError.hint
+            message: memberCollsError.message || 'No message',
+            details: memberCollsError.details || 'No details',
+            hint: memberCollsError.hint || 'No hint',
+            code: memberCollsError.code || 'No code',
+            errorType: typeof memberCollsError,
+            errorKeys: Object.keys(memberCollsError || {})
           });
         } else {
           memberCollectionsData = memberColls || [];
@@ -884,9 +961,11 @@ export const dbHelpers = {
       
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        error: error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: typeof error,
+        errorKeys: error && typeof error === 'object' ? Object.keys(error) : []
       });
       return [];
     }
@@ -1270,12 +1349,15 @@ export const dbHelpers = {
       
       if (error) {
         console.error('[Supabase] Error fetching user votes:', {
-          error,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
+          error: error,
+          message: error.message || 'No message',
+          details: error.details || 'No details',
+          hint: error.hint || 'No hint',
+          code: error.code || 'No code',
           userId,
-          collectionId
+          collectionId,
+          errorType: typeof error,
+          errorKeys: Object.keys(error || {})
         });
         return [];
       }

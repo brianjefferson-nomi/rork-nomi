@@ -186,6 +186,30 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
+  // Test database connection on startup
+  const dbTestQuery = useQuery({
+    queryKey: ['dbTest'],
+    queryFn: async () => {
+      try {
+        console.log('[RestaurantStore] Testing database connection...');
+        const result = await dbHelpers.testDatabaseConnection();
+        console.log('[RestaurantStore] Database test result:', result);
+        return result;
+      } catch (error) {
+        console.error('[RestaurantStore] Database test error:', {
+          error: error,
+          message: error instanceof Error ? error.message : String(error),
+          errorType: typeof error
+        });
+        return { success: false, error };
+      }
+    },
+    retry: 1,
+    retryDelay: 2000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+
   // Load votes from database
   const votesQuery = useQuery({
     queryKey: ['userVotes', user?.id],
@@ -207,10 +231,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         }));
       } catch (error) {
         console.error('[RestaurantStore] Error loading votes from database:', {
-          error,
-          message: error instanceof Error ? error.message : 'Unknown error',
+          error: error,
+          message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          userId: user?.id
+          userId: user?.id,
+          errorType: typeof error,
+          errorKeys: error && typeof error === 'object' ? Object.keys(error) : []
         });
         return [];
       }
