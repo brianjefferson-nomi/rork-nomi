@@ -23,6 +23,12 @@ const UNSPLASH_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const UNSPLASH_HOST = 'unsplash-image-search-api.p.rapidapi.com';
 const YELP_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const YELP_HOST = 'yelp-business-api.p.rapidapi.com';
+const YELP_API3_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const YELP_API3_HOST = 'yelp-api3.p.rapidapi.com';
+const WORLDWIDE_RESTAURANTS_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const WORLDWIDE_RESTAURANTS_HOST = 'worldwide-restaurants.p.rapidapi.com';
+const UBER_EATS_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -34,6 +40,9 @@ const API_CONFIG = {
       localBusinessData: 'local-business-data.p.rapidapi.com',
       mapData: 'map-data.p.rapidapi.com',
       yelp: 'yelp-business-api.p.rapidapi.com',
+      yelpApi3: 'yelp-api3.p.rapidapi.com',
+      worldwideRestaurants: 'worldwide-restaurants.p.rapidapi.com',
+      uberEats: 'uber-eats-scraper-api.p.rapidapi.com',
       tripadvisor: 'tripadvisor16.p.rapidapi.com',
       unsplash: 'unsplash-image-search.p.rapidapi.com',
       stockPhotos: 'stock-photos-and-videos.p.rapidapi.com',
@@ -1098,10 +1107,18 @@ export const aggregateRestaurantData = async (query: string, location: string, u
         Promise.race([
           searchRestaurantsWithYelp(query, userLocation.city, 20),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 8000))
+        ]),
+        Promise.race([
+          searchRestaurantsWithWorldwideAPI(query, userLocation.city, 20),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Worldwide Restaurants timeout')), 8000))
+        ]),
+        Promise.race([
+          searchRestaurantsWithUberEats(query, `${userLocation.city}, ${userLocation.lat}, ${userLocation.lng}`, 'en-US', 15),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Uber Eats timeout')), 8000))
         ])
       ];
 
-      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults, foursquareResults, yelpResults] = await Promise.allSettled(apiPromises);
+      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults, foursquareResults, yelpResults, worldwideResults, uberEatsResults] = await Promise.allSettled(apiPromises);
 
       const mapsExtractorData = mapsExtractorResults.status === 'fulfilled' ? mapsExtractorResults.value : [];
       const localBusinessData = localBusinessResults.status === 'fulfilled' ? localBusinessResults.value : [];
@@ -1110,8 +1127,10 @@ export const aggregateRestaurantData = async (query: string, location: string, u
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
       const foursquareData = foursquareResults.status === 'fulfilled' ? foursquareResults.value : [];
       const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
+      const worldwideData = worldwideResults.status === 'fulfilled' ? worldwideResults.value : [];
+      const uberEatsData = uberEatsResults.status === 'fulfilled' ? uberEatsResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}, Yelp: ${yelpData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}, Yelp: ${yelpData.length}, Worldwide: ${worldwideData.length}, Uber Eats: ${uberEatsData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1121,6 +1140,8 @@ export const aggregateRestaurantData = async (query: string, location: string, u
         tripAdvisorData, 
         foursquareData,
         yelpData,
+        worldwideData,
+        uberEatsData,
         userLocation
       );
     } catch (error) {
@@ -1338,6 +1359,8 @@ const combineLocationBasedResults = async (
   tripAdvisorResults: any[], 
   foursquareResults: any[],
   yelpResults: any[],
+  worldwideResults: any[],
+  uberEatsResults: any[],
   userLocation: { lat: number; lng: number; city: string }
 ) => {
   const combined: any[] = [];
@@ -1582,9 +1605,10 @@ const combineLocationBasedResults = async (
     
     if (combined.length < 10 && restaurant.id) {
       try {
-        const [details, reviews] = await Promise.all([
+        const [details, reviews, enhancedRestaurant] = await Promise.all([
           getYelpRestaurantDetails(restaurant.id),
-          getYelpRestaurantReviews(restaurant.id, 5)
+          getYelpRestaurantReviews(restaurant.id, 5),
+          enhanceRestaurantWithYelpMedia(transformedRestaurant, 5)
         ]);
         
         if (details) {
@@ -1593,6 +1617,11 @@ const combineLocationBasedResults = async (
         }
         
         enhancedReviews = reviews.map((review: any) => review.text || review.comment).filter(Boolean);
+        
+        // Use enhanced photos from Yelp media
+        if (enhancedRestaurant.photos && enhancedRestaurant.photos.length > 0) {
+          enhancedPhotos = enhancedRestaurant.photos;
+        }
       } catch (error) {
         console.error('[Yelp] Error getting additional data:', error);
       }
@@ -1618,6 +1647,102 @@ const combineLocationBasedResults = async (
       totalReviews: transformedRestaurant.totalReviews,
       vibeTags: transformedRestaurant.vibeTags,
       topPicks: transformedRestaurant.topPicks
+    });
+  }
+
+  // Worldwide Restaurants
+  for (const restaurant of worldwideResults) {
+    if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
+    seenNames.add(restaurant.name.toLowerCase());
+
+    // Transform Worldwide Restaurants data to our format
+    const transformedRestaurant = transformWorldwideRestaurantData(restaurant);
+    if (!transformedRestaurant) continue;
+
+    // Get additional photos for top results
+    let enhancedPhotos: string[] = transformedRestaurant.photos || [];
+    
+    if (combined.length < 10 && restaurant.id) {
+      try {
+        const photos = await getWorldwideRestaurantPhotos(restaurant.id, 5);
+        if (photos.length > 0) {
+          enhancedPhotos = photos;
+        }
+      } catch (error) {
+        console.error('[Worldwide Restaurants] Error getting additional data:', error);
+      }
+    }
+
+    combined.push({
+      id: transformedRestaurant.id,
+      name: transformedRestaurant.name,
+      cuisine: transformedRestaurant.cuisine,
+      rating: transformedRestaurant.rating,
+      priceLevel: transformedRestaurant.priceLevel,
+      address: formatAddress(transformedRestaurant.address, userLocation.city),
+      phone: transformedRestaurant.phone,
+      website: transformedRestaurant.website,
+      photos: enhancedPhotos,
+      reviews: transformedRestaurant.reviews || [],
+      hours: transformedRestaurant.hours,
+      source: 'worldwide_restaurants',
+      location: { 
+        lat: restaurant.latitude || restaurant.lat || userLocation.lat, 
+        lng: restaurant.longitude || restaurant.lng || userLocation.lng 
+      },
+      totalReviews: transformedRestaurant.totalReviews,
+      vibeTags: transformedRestaurant.vibeTags,
+      topPicks: transformedRestaurant.topPicks
+    });
+  }
+
+  // Uber Eats (for delivery options)
+  for (const restaurant of uberEatsResults) {
+    if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
+    seenNames.add(restaurant.name.toLowerCase());
+
+    // Transform Uber Eats data to our format
+    const transformedRestaurant = transformUberEatsData(restaurant);
+    if (!transformedRestaurant) continue;
+
+    // Get additional details for top results
+    if (combined.length < 10 && restaurant.id) {
+      try {
+        const details = await getUberEatsRestaurantDetails(restaurant.id, `${userLocation.city}, ${userLocation.lat}, ${userLocation.lng}`);
+        if (details) {
+          transformedRestaurant.description = details.description || transformedRestaurant.description;
+          transformedRestaurant.hours = details.hours || transformedRestaurant.hours;
+          transformedRestaurant.deliveryTime = details.delivery_time || transformedRestaurant.deliveryTime;
+          transformedRestaurant.deliveryFee = details.delivery_fee || transformedRestaurant.deliveryFee;
+        }
+      } catch (error) {
+        console.error('[Uber Eats] Error getting additional data:', error);
+      }
+    }
+
+    combined.push({
+      id: transformedRestaurant.id,
+      name: transformedRestaurant.name,
+      cuisine: transformedRestaurant.cuisine,
+      rating: transformedRestaurant.rating,
+      priceLevel: transformedRestaurant.priceLevel,
+      address: formatAddress(transformedRestaurant.address, userLocation.city),
+      phone: transformedRestaurant.phone,
+      website: transformedRestaurant.website,
+      photos: transformedRestaurant.photos,
+      reviews: transformedRestaurant.reviews || [],
+      hours: transformedRestaurant.hours,
+      source: 'uber_eats',
+      location: { 
+        lat: restaurant.latitude || restaurant.lat || userLocation.lat, 
+        lng: restaurant.longitude || restaurant.lng || userLocation.lng 
+      },
+      totalReviews: transformedRestaurant.totalReviews,
+      vibeTags: transformedRestaurant.vibeTags,
+      topPicks: transformedRestaurant.topPicks,
+      deliveryAvailable: true,
+      deliveryTime: transformedRestaurant.deliveryTime,
+      deliveryFee: transformedRestaurant.deliveryFee
     });
   }
 
@@ -2478,6 +2603,655 @@ export const searchRestaurantsWithYelp = async (
   } catch (error) {
     console.error('[API] Error in Yelp API search:', error);
     return [];
+  }
+};
+
+// Yelp API3 Search Suggestions
+export const getYelpSearchSuggestions = async (
+  location: string = 'US',
+  query?: string
+): Promise<any[]> => {
+  try {
+    console.log('[Yelp API3] Getting search suggestions for:', location);
+    
+    const params = new URLSearchParams({
+      location: encodeURIComponent(location)
+    });
+    
+    // Add query parameter if provided
+    if (query) {
+      params.append('query', query);
+    }
+    
+    const url = `https://yelp-api3.p.rapidapi.com/api/search-suggestions/?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': YELP_API3_HOST,
+        'x-rapidapi-key': YELP_API3_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Yelp API3 error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Yelp API3] Retrieved ${data.suggestions?.length || 0} search suggestions`);
+    return data.suggestions || [];
+  } catch (error) {
+    console.error('[Yelp API3] Error getting search suggestions:', error);
+    return [];
+  }
+};
+
+export const getYelpAutocompleteSuggestions = async (
+  query: string,
+  location: string = 'US'
+): Promise<string[]> => {
+  try {
+    console.log('[Yelp API3] Getting autocomplete suggestions for:', query);
+    
+    const suggestions = await getYelpSearchSuggestions(location, query);
+    
+    // Extract restaurant names and categories from suggestions
+    const autocompleteSuggestions: string[] = [];
+    
+    suggestions.forEach((suggestion: any) => {
+      // Add restaurant names
+      if (suggestion.name && typeof suggestion.name === 'string') {
+        autocompleteSuggestions.push(suggestion.name);
+      }
+      
+      // Add cuisine types/categories
+      if (suggestion.category && typeof suggestion.category === 'string') {
+        autocompleteSuggestions.push(suggestion.category);
+      }
+      
+      // Add location suggestions
+      if (suggestion.location && typeof suggestion.location === 'string') {
+        autocompleteSuggestions.push(suggestion.location);
+      }
+    });
+    
+    // Remove duplicates and limit results
+    const uniqueSuggestions = [...new Set(autocompleteSuggestions)].slice(0, 10);
+    
+    console.log(`[Yelp API3] Generated ${uniqueSuggestions.length} autocomplete suggestions`);
+    return uniqueSuggestions;
+  } catch (error) {
+    console.error('[Yelp API3] Error getting autocomplete suggestions:', error);
+    return [];
+  }
+};
+
+export const getYelpPopularSearches = async (
+  location: string = 'US'
+): Promise<string[]> => {
+  try {
+    console.log('[Yelp API3] Getting popular searches for:', location);
+    
+    const suggestions = await getYelpSearchSuggestions(location);
+    
+    // Extract popular search terms
+    const popularSearches: string[] = [];
+    
+    suggestions.forEach((suggestion: any) => {
+      // Add popular restaurant types
+      if (suggestion.category && typeof suggestion.category === 'string') {
+        popularSearches.push(suggestion.category);
+      }
+      
+      // Add popular location searches
+      if (suggestion.location && typeof suggestion.location === 'string') {
+        popularSearches.push(suggestion.location);
+      }
+    });
+    
+    // Remove duplicates and limit results
+    const uniqueSearches = [...new Set(popularSearches)].slice(0, 15);
+    
+    console.log(`[Yelp API3] Generated ${uniqueSearches.length} popular searches`);
+    return uniqueSearches;
+  } catch (error) {
+    console.error('[Yelp API3] Error getting popular searches:', error);
+    return [];
+  }
+};
+
+// Yelp API3 Business Media Search
+export const getYelpBusinessMedia = async (
+  limit: number = 10,
+  offset: number = 0
+): Promise<any[]> => {
+  try {
+    console.log('[Yelp API3] Getting business media, limit:', limit, 'offset:', offset);
+    
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString()
+    });
+    
+    const url = `https://yelp-api3.p.rapidapi.com/api/search-business-media/?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': YELP_API3_HOST,
+        'x-rapidapi-key': YELP_API3_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Yelp API3 error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Yelp API3] Retrieved ${data.media?.length || 0} business media items`);
+    return data.media || [];
+  } catch (error) {
+    console.error('[Yelp API3] Error getting business media:', error);
+    return [];
+  }
+};
+
+export const getYelpRestaurantPhotos = async (
+  limit: number = 10
+): Promise<string[]> => {
+  try {
+    console.log('[Yelp API3] Getting restaurant photos, limit:', limit);
+    
+    const mediaItems = await getYelpBusinessMedia(limit, 0);
+    
+    // Extract photo URLs from media items
+    const photoUrls: string[] = [];
+    
+    mediaItems.forEach((item: any) => {
+      // Check for photo URLs in various possible fields
+      if (item.photo_url && typeof item.photo_url === 'string') {
+        photoUrls.push(item.photo_url);
+      } else if (item.image_url && typeof item.image_url === 'string') {
+        photoUrls.push(item.image_url);
+      } else if (item.url && typeof item.url === 'string' && item.url.includes('http')) {
+        photoUrls.push(item.url);
+      } else if (item.media_url && typeof item.media_url === 'string') {
+        photoUrls.push(item.media_url);
+      }
+    });
+    
+    // Remove duplicates and limit results
+    const uniquePhotos = [...new Set(photoUrls)].slice(0, limit);
+    
+    console.log(`[Yelp API3] Extracted ${uniquePhotos.length} unique restaurant photos`);
+    return uniquePhotos;
+  } catch (error) {
+    console.error('[Yelp API3] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+export const getYelpRestaurantMediaByCategory = async (
+  category: string = 'restaurants',
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[Yelp API3] Getting restaurant media for category:', category);
+    
+    const mediaItems = await getYelpBusinessMedia(limit * 2, 0); // Get more items to filter by category
+    
+    // Filter media items by category
+    const filteredMedia = mediaItems.filter((item: any) => {
+      const itemCategory = item.category || item.business_category || item.type || '';
+      return itemCategory.toLowerCase().includes(category.toLowerCase()) ||
+             itemCategory.toLowerCase().includes('restaurant') ||
+             itemCategory.toLowerCase().includes('food');
+    });
+    
+    // Limit results
+    const limitedMedia = filteredMedia.slice(0, limit);
+    
+    console.log(`[Yelp API3] Found ${limitedMedia.length} media items for category: ${category}`);
+    return limitedMedia;
+  } catch (error) {
+    console.error('[Yelp API3] Error getting restaurant media by category:', error);
+    return [];
+  }
+};
+
+export const enhanceRestaurantWithYelpMedia = async (
+  restaurant: any,
+  limit: number = 5
+): Promise<any> => {
+  try {
+    console.log('[Yelp API3] Enhancing restaurant with media:', restaurant.name);
+    
+    // Get restaurant photos
+    const photos = await getYelpRestaurantPhotos(limit);
+    
+    // Get category-specific media
+    const cuisine = restaurant.cuisine || 'restaurant';
+    const categoryMedia = await getYelpRestaurantMediaByCategory(cuisine, 3);
+    
+    // Combine and enhance photos
+    const enhancedPhotos = [...new Set([...photos, ...categoryMedia.map((item: any) => item.photo_url || item.image_url).filter(Boolean)])];
+    
+    // Update restaurant with enhanced media
+    const enhancedRestaurant = {
+      ...restaurant,
+      photos: enhancedPhotos.length > 0 ? enhancedPhotos : restaurant.photos,
+      yelpMedia: categoryMedia
+    };
+    
+    console.log(`[Yelp API3] Enhanced restaurant with ${enhancedPhotos.length} photos`);
+    return enhancedRestaurant;
+  } catch (error) {
+    console.error('[Yelp API3] Error enhancing restaurant with media:', error);
+    return restaurant;
+  }
+};
+
+// Worldwide Restaurants API Integration
+export const searchWorldwideRestaurants = async (
+  query: string,
+  location?: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[Worldwide Restaurants API] Searching restaurants for:', query);
+    
+    const formData = new URLSearchParams();
+    formData.append('query', query);
+    if (location) {
+      formData.append('location', location);
+    }
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://worldwide-restaurants.p.rapidapi.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': WORLDWIDE_RESTAURANTS_HOST,
+        'x-rapidapi-key': WORLDWIDE_RESTAURANTS_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Worldwide Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Worldwide Restaurants API] Found ${data.results?.length || 0} restaurants`);
+    return data.results || [];
+  } catch (error) {
+    console.error('[Worldwide Restaurants API] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+export const getWorldwideRestaurantPhotos = async (
+  restaurantId: string,
+  limit: number = 10
+): Promise<string[]> => {
+  try {
+    console.log('[Worldwide Restaurants API] Getting photos for restaurant:', restaurantId);
+    
+    const formData = new URLSearchParams();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://worldwide-restaurants.p.rapidapi.com/photos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': WORLDWIDE_RESTAURANTS_HOST,
+        'x-rapidapi-key': WORLDWIDE_RESTAURANTS_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Worldwide Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract photo URLs from the response
+    const photoUrls: string[] = [];
+    if (data.photos && Array.isArray(data.photos)) {
+      data.photos.forEach((photo: any) => {
+        if (photo.url && typeof photo.url === 'string') {
+          photoUrls.push(photo.url);
+        } else if (photo.photo_url && typeof photo.photo_url === 'string') {
+          photoUrls.push(photo.photo_url);
+        } else if (photo.image_url && typeof photo.image_url === 'string') {
+          photoUrls.push(photo.image_url);
+        }
+      });
+    }
+    
+    console.log(`[Worldwide Restaurants API] Retrieved ${photoUrls.length} photos`);
+    return photoUrls;
+  } catch (error) {
+    console.error('[Worldwide Restaurants API] Error getting photos:', error);
+    return [];
+  }
+};
+
+export const getWorldwideRestaurantTypeahead = async (
+  query: string,
+  location?: string
+): Promise<string[]> => {
+  try {
+    console.log('[Worldwide Restaurants API] Getting typeahead suggestions for:', query);
+    
+    const formData = new URLSearchParams();
+    formData.append('query', query);
+    if (location) {
+      formData.append('location', location);
+    }
+    
+    const response = await fetch('https://worldwide-restaurants.p.rapidapi.com/typeahead', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': WORLDWIDE_RESTAURANTS_HOST,
+        'x-rapidapi-key': WORLDWIDE_RESTAURANTS_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Worldwide Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract suggestions from the response
+    const suggestions: string[] = [];
+    if (data.suggestions && Array.isArray(data.suggestions)) {
+      data.suggestions.forEach((suggestion: any) => {
+        if (suggestion.name && typeof suggestion.name === 'string') {
+          suggestions.push(suggestion.name);
+        } else if (suggestion.text && typeof suggestion.text === 'string') {
+          suggestions.push(suggestion.text);
+        } else if (suggestion.query && typeof suggestion.query === 'string') {
+          suggestions.push(suggestion.query);
+        }
+      });
+    }
+    
+    console.log(`[Worldwide Restaurants API] Retrieved ${suggestions.length} typeahead suggestions`);
+    return suggestions;
+  } catch (error) {
+    console.error('[Worldwide Restaurants API] Error getting typeahead suggestions:', error);
+    return [];
+  }
+};
+
+export const transformWorldwideRestaurantData = (restaurant: any): any => {
+  try {
+    return {
+      id: restaurant.id || restaurant.restaurant_id || `worldwide_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: restaurant.name || restaurant.restaurant_name || 'Unknown Restaurant',
+      cuisine: restaurant.cuisine || restaurant.cuisine_type || restaurant.category || 'Restaurant',
+      priceLevel: restaurant.price_level || restaurant.price || 2,
+      photos: restaurant.photos || restaurant.images || [],
+      address: restaurant.address || restaurant.location || '',
+      neighborhood: restaurant.neighborhood || restaurant.city || '',
+      hours: restaurant.hours || restaurant.opening_hours || 'Hours vary',
+      vibeTags: restaurant.tags || restaurant.categories || [],
+      description: restaurant.description || restaurant.summary || 'A great dining experience awaits.',
+      topPicks: restaurant.menu_highlights || restaurant.popular_dishes || [],
+      rating: restaurant.rating || restaurant.avg_rating || 0,
+      reviews: restaurant.reviews || [],
+      phone: restaurant.phone || restaurant.phone_number || '',
+      website: restaurant.website || restaurant.url || '',
+      distance: restaurant.distance ? `${(restaurant.distance / 1609.34).toFixed(1)} mi` : '',
+      proximity: restaurant.distance || 0,
+      totalReviews: restaurant.review_count || restaurant.total_reviews || 0,
+      source: 'worldwide_restaurants_api'
+    };
+  } catch (error) {
+    console.error('[Worldwide Restaurants API] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+export const searchRestaurantsWithWorldwideAPI = async (
+  query: string,
+  location: string = 'New York, NY',
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Worldwide Restaurants API');
+    
+    // Search using Worldwide Restaurants API
+    const worldwideResults = await searchWorldwideRestaurants(query, location, limit);
+    
+    // Transform results
+    const transformedResults = worldwideResults
+      .map(transformWorldwideRestaurantData)
+      .filter(Boolean);
+    
+    // Enhance with additional data for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get photos for the restaurant
+          const photos = await getWorldwideRestaurantPhotos(restaurant.id, 5);
+          if (photos.length > 0) {
+            restaurant.photos = photos;
+          }
+          
+          return restaurant;
+        } catch (error) {
+          console.error('[Worldwide Restaurants API] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Worldwide Restaurants API data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Worldwide Restaurants API search:', error);
+    return [];
+  }
+};
+
+// Uber Eats API Integration
+export const searchUberEatsRestaurants = async (
+  query: string,
+  address: string,
+  locale: string = 'en-US',
+  maxRows: number = 15,
+  page: number = 1
+): Promise<any[]> => {
+  try {
+    console.log('[Uber Eats API] Searching restaurants for:', query, 'at:', address);
+    
+    const requestData = {
+      scraper: {
+        maxRows,
+        query,
+        address,
+        locale,
+        page
+      }
+    };
+    
+    const response = await fetch('https://uber-eats-scraper-api.p.rapidapi.com/api/job', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': UBER_EATS_HOST,
+        'x-rapidapi-key': UBER_EATS_KEY
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Uber Eats API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Uber Eats API] Found ${data.restaurants?.length || 0} restaurants`);
+    return data.restaurants || [];
+  } catch (error) {
+    console.error('[Uber Eats API] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+export const getUberEatsRestaurantDetails = async (
+  restaurantId: string,
+  address: string
+): Promise<any | null> => {
+  try {
+    console.log('[Uber Eats API] Getting restaurant details for:', restaurantId);
+    
+    const requestData = {
+      scraper: {
+        restaurantId,
+        address
+      }
+    };
+    
+    const response = await fetch('https://uber-eats-scraper-api.p.rapidapi.com/api/job', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': UBER_EATS_HOST,
+        'x-rapidapi-key': UBER_EATS_KEY
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Uber Eats API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log('[Uber Eats API] Retrieved restaurant details');
+    return data;
+  } catch (error) {
+    console.error('[Uber Eats API] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+export const transformUberEatsData = (restaurant: any): any => {
+  try {
+    return {
+      id: restaurant.id || restaurant.restaurant_id || `ubereats_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: restaurant.name || restaurant.restaurant_name || 'Unknown Restaurant',
+      cuisine: restaurant.cuisine || restaurant.cuisine_type || restaurant.category || 'Restaurant',
+      priceLevel: restaurant.price_level || restaurant.price || 2,
+      photos: restaurant.photos || restaurant.images || restaurant.image_url ? [restaurant.image_url] : [],
+      address: restaurant.address || restaurant.location || '',
+      neighborhood: restaurant.neighborhood || restaurant.city || '',
+      hours: restaurant.hours || restaurant.opening_hours || 'Hours vary',
+      vibeTags: restaurant.tags || restaurant.categories || [],
+      description: restaurant.description || restaurant.summary || 'Available for delivery via Uber Eats.',
+      topPicks: restaurant.menu_highlights || restaurant.popular_dishes || restaurant.featured_items || [],
+      rating: restaurant.rating || restaurant.avg_rating || 0,
+      reviews: restaurant.reviews || [],
+      phone: restaurant.phone || restaurant.phone_number || '',
+      website: restaurant.website || restaurant.url || '',
+      distance: restaurant.distance ? `${(restaurant.distance / 1609.34).toFixed(1)} mi` : '',
+      proximity: restaurant.distance || 0,
+      totalReviews: restaurant.review_count || restaurant.total_reviews || 0,
+      deliveryAvailable: true,
+      deliveryTime: restaurant.delivery_time || restaurant.estimated_delivery || '30-45 min',
+      deliveryFee: restaurant.delivery_fee || restaurant.fee || '$2.99',
+      source: 'uber_eats_api'
+    };
+  } catch (error) {
+    console.error('[Uber Eats API] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+export const searchRestaurantsWithUberEats = async (
+  query: string,
+  address: string,
+  locale: string = 'en-US',
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Uber Eats API');
+    
+    // Search using Uber Eats API
+    const uberEatsResults = await searchUberEatsRestaurants(query, address, locale, limit);
+    
+    // Transform results
+    const transformedResults = uberEatsResults
+      .map(transformUberEatsData)
+      .filter(Boolean);
+    
+    // Enhance with additional data for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get detailed information if available
+          const details = await getUberEatsRestaurantDetails(restaurant.id, address);
+          if (details) {
+            restaurant.description = details.description || restaurant.description;
+            restaurant.hours = details.hours || restaurant.hours;
+            restaurant.deliveryTime = details.delivery_time || restaurant.deliveryTime;
+            restaurant.deliveryFee = details.delivery_fee || restaurant.deliveryFee;
+          }
+          
+          return restaurant;
+        } catch (error) {
+          console.error('[Uber Eats API] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Uber Eats API data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Uber Eats API search:', error);
+    return [];
+  }
+};
+
+export const checkDeliveryAvailability = async (
+  restaurantName: string,
+  address: string
+): Promise<{ available: boolean; deliveryTime?: string; deliveryFee?: string }> => {
+  try {
+    console.log('[Uber Eats API] Checking delivery availability for:', restaurantName);
+    
+    const results = await searchUberEatsRestaurants(restaurantName, address, 'en-US', 5);
+    
+    // Check if the restaurant is available for delivery
+    const matchingRestaurant = results.find(restaurant => 
+      restaurant.name?.toLowerCase().includes(restaurantName.toLowerCase()) ||
+      restaurantName.toLowerCase().includes(restaurant.name?.toLowerCase())
+    );
+    
+    if (matchingRestaurant) {
+      return {
+        available: true,
+        deliveryTime: matchingRestaurant.delivery_time || matchingRestaurant.estimated_delivery || '30-45 min',
+        deliveryFee: matchingRestaurant.delivery_fee || matchingRestaurant.fee || '$2.99'
+      };
+    }
+    
+    return { available: false };
+  } catch (error) {
+    console.error('[Uber Eats API] Error checking delivery availability:', error);
+    return { available: false };
   }
 };
 

@@ -1,9 +1,10 @@
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Mic, Search, ChevronDown, SlidersHorizontal, X, MapPin, Clock, TrendingUp, History } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
 import { router } from 'expo-router';
+import { getYelpAutocompleteSuggestions, getYelpPopularSearches } from '@/services/api';
 
 interface SearchWizardProps {
   testID?: string;
@@ -25,7 +26,49 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const [rating, setRating] = useState<number>(0);
   const [isOpenNow, setIsOpenNow] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [yelpSuggestions, setYelpSuggestions] = useState<string[]>([]);
+  const [yelpPopularSearches, setYelpPopularSearches] = useState<string[]>([]);
+  const [isLoadingYelpSuggestions, setIsLoadingYelpSuggestions] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
+
+  // Load Yelp popular searches on component mount
+  useEffect(() => {
+    const loadYelpPopularSearches = async () => {
+      try {
+        const popularSearches = await getYelpPopularSearches(userLocation?.city === 'New York' ? 'NY' : 'CA');
+        setYelpPopularSearches(popularSearches);
+      } catch (error) {
+        console.error('[SearchWizard] Error loading Yelp popular searches:', error);
+      }
+    };
+    
+    loadYelpPopularSearches();
+  }, [userLocation?.city]);
+
+  // Get Yelp autocomplete suggestions when query changes
+  useEffect(() => {
+    const getYelpSuggestions = async () => {
+      if (query.length < 2) {
+        setYelpSuggestions([]);
+        return;
+      }
+      
+      setIsLoadingYelpSuggestions(true);
+      try {
+        const suggestions = await getYelpAutocompleteSuggestions(query, userLocation?.city === 'New York' ? 'NY' : 'CA');
+        setYelpSuggestions(suggestions);
+      } catch (error) {
+        console.error('[SearchWizard] Error getting Yelp suggestions:', error);
+        setYelpSuggestions([]);
+      } finally {
+        setIsLoadingYelpSuggestions(false);
+      }
+    };
+
+    // Debounce the API call
+    const timeoutId = setTimeout(getYelpSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [query, userLocation?.city]);
 
   const suggestions: SuggestionItem[] = useMemo(() => {
     const historySuggestions = searchHistory.slice(0, 3).map((label, idx) => ({
@@ -34,23 +77,26 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       type: 'history' as const
     }));
     
-    const locationBasedSuggestions = userLocation?.city === 'New York' 
-      ? [
-          'Italian in Manhattan',
-          'Sushi in SoHo', 
-          'Brunch in Brooklyn',
-          'Pizza in Queens',
-          'Best steakhouses NYC',
-          'Rooftop bars Manhattan'
-        ]
-      : [
-          'Tacos in Hollywood',
-          'Sushi in Beverly Hills',
-          'Brunch in Santa Monica', 
-          'Korean BBQ in Koreatown',
-          'Best steakhouses LA',
-          'Rooftop bars West Hollywood'
-        ];
+    // Use Yelp popular searches if available, otherwise fallback to hardcoded suggestions
+    const locationBasedSuggestions = yelpPopularSearches.length > 0 
+      ? yelpPopularSearches.slice(0, 6)
+      : (userLocation?.city === 'New York' 
+        ? [
+            'Italian in Manhattan',
+            'Sushi in SoHo', 
+            'Brunch in Brooklyn',
+            'Pizza in Queens',
+            'Best steakhouses NYC',
+            'Rooftop bars Manhattan'
+          ]
+        : [
+            'Tacos in Hollywood',
+            'Sushi in Beverly Hills',
+            'Brunch in Santa Monica', 
+            'Korean BBQ in Koreatown',
+            'Best steakhouses LA',
+            'Rooftop bars West Hollywood'
+          ]);
     
     const trendingSuggestions = locationBasedSuggestions.map((label, idx) => ({
       id: `trending-${idx}`,
@@ -73,7 +119,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       }));
     
     return [...historySuggestions, ...trendingSuggestions, ...cuisineSuggestions, ...neighborhoodSuggestions];
-  }, [searchHistory, restaurants, userLocation]);
+  }, [searchHistory, restaurants, userLocation, yelpPopularSearches]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -218,6 +264,38 @@ export function SearchWizard({ testID }: SearchWizardProps) {
             )}
           </View>
           <ScrollView style={{ maxHeight: 160 }}>
+            {/* Yelp Autocomplete Suggestions */}
+            {query.length >= 2 && yelpSuggestions.length > 0 && (
+              <>
+                <View style={styles.suggestionSection}>
+                  <Text style={styles.suggestionSectionTitle}>Yelp Suggestions</Text>
+                </View>
+                {yelpSuggestions.map((suggestion, idx) => (
+                  <TouchableOpacity 
+                    key={`yelp-${idx}`} 
+                    style={[styles.suggestionItem, styles.yelpSuggestionItem]} 
+                    onPress={() => {
+                      setQuery(suggestion);
+                      performSearch(suggestion);
+                      setShowSuggestions(false);
+                      inputRef.current?.blur();
+                    }}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+            
+            {/* Loading indicator for Yelp suggestions */}
+            {query.length >= 2 && isLoadingYelpSuggestions && (
+              <View style={styles.suggestionItem}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.suggestionText}>Loading suggestions...</Text>
+              </View>
+            )}
+            
+            {/* Regular suggestions */}
             {suggestions.map(s => (
               <TouchableOpacity key={s.id} style={styles.suggestionItem} onPress={() => {
                 setQuery(s.label);
