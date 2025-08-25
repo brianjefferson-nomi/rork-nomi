@@ -38,8 +38,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
                 const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
                   const uniqueVoters = new Set([
-                    ...meta.voteDetails.likeVoters.map(v => v.userId),
-                    ...meta.voteDetails.dislikeVoters.map(v => v.userId)
+                    ...meta.voteDetails.likeVoters.map((v, index) => v.userId),
+                    ...meta.voteDetails.dislikeVoters.map((v, index) => v.userId)
                   ]);
                   return total + uniqueVoters.size;
                 }, 0);
@@ -118,7 +118,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Likes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
+                          {filteredLikeVoters.length > 0 ? filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ') : 'None'}
                         </Text>
                       </View>
                     )}
@@ -129,7 +129,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Dislikes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
+                          {filteredDislikeVoters.length > 0 ? filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ') : 'None'}
                         </Text>
                       </View>
                     )}
@@ -717,7 +717,7 @@ export default function CollectionDetailScreen() {
                 <View style={styles.votingSection}>
                   <View style={styles.voteStats}>
                     <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                    <Text style={styles.voteBreakdown}>{meta.likes} likes · {meta.dislikes} dislikes</Text>
+                    <Text style={styles.voteBreakdown}>{meta.likes} likes • {meta.dislikes} dislikes</Text>
                     {meta.consensus && (
                       <View style={[styles.consensusMeter, getConsensusStyle(meta.consensus)]}>
                         <Text style={styles.consensusText}>{meta.consensus} consensus</Text>
