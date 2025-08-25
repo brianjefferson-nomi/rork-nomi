@@ -171,16 +171,6 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <View style={styles.headerText}>
               <Text style={styles.greeting}>Find your next spot</Text>
-              <View style={styles.locationIndicator}>
-                <MapPin size={14} color="#666" />
-                <TouchableOpacity 
-                  style={styles.locationSwitcher}
-                  onPress={() => switchToCity(city === 'New York' ? 'Los Angeles' : 'New York')}
-                >
-                  <Text style={styles.locationText}>{city}</Text>
-                  <Text style={styles.switchText}>• Switch</Text>
-                </TouchableOpacity>
-              </View>
             </View>
             <TouchableOpacity 
               onPress={() => {

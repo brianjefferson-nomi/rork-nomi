@@ -209,24 +209,32 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
         {/* Vibe tags - prominently displayed */}
-        {(restaurant.aiVibes || restaurant.vibe || []).length > 0 && (
-          <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 6).map((v, i) => {
-              if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
-              const firstWord = v.split(' ')[0];
-              if (!firstWord || firstWord.length === 0) return null;
-              const firstChar = firstWord.charAt(0);
-              const restOfWord = firstWord.slice(1);
-              const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-              if (!cleanTag || cleanTag.length === 0) return null;
-              return (
-                <View key={i} style={styles.vibeTag}>
-                  <Text style={styles.vibeText}>{cleanTag}</Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {(() => {
+          const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
+          console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
+          
+          // Add some default vibe tags if none exist
+          const displayTags = vibeTags.length > 0 ? vibeTags : ['Popular', 'Local'];
+          
+          return (
+            <View style={styles.vibeContainer}>
+              {displayTags.slice(0, 6).map((v, i) => {
+                if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
+                const firstWord = v.split(' ')[0];
+                if (!firstWord || firstWord.length === 0) return null;
+                const firstChar = firstWord.charAt(0);
+                const restOfWord = firstWord.slice(1);
+                const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+                if (!cleanTag || cleanTag.length === 0) return null;
+                return (
+                  <View key={i} style={styles.vibeTag}>
+                    <Text style={styles.vibeText}>{cleanTag}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
         
         {/* Location and distance */}
         <View style={styles.locationRow}>
