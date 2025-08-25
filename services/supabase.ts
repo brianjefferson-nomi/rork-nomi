@@ -1413,11 +1413,17 @@ export const dbHelpers = {
     return data;
   },
 
-  async getUserActivities(userId: string, limit: number = 50) {
-    const { data, error } = await supabase
+  async getUserActivities(userId: string, collectionId?: string, limit: number = 50) {
+    let query = supabase
       .from('user_activities')
-      .select('*, restaurants(name, image_url), collections(name)')
-      .eq('user_id', userId)
+      .select('*, users(name, avatar_url), restaurants(name, image_url), collections(name)')
+      .eq('user_id', userId);
+    
+    if (collectionId) {
+      query = query.eq('collection_id', collectionId);
+    }
+    
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(limit);
     
@@ -1586,5 +1592,53 @@ export const dbHelpers = {
 
   async updateCollectionSettings(collectionId: string, settings: Database['public']['Tables']['collections']['Update']) {
     return this.updateCollection(collectionId, settings);
+  },
+
+  // Restaurant comment operations
+  async getRestaurantComments(collectionId: string, restaurantId?: string) {
+    const { data, error } = await supabase
+      .rpc('get_restaurant_comments', { 
+        p_collection_id: collectionId, 
+        p_restaurant_id: restaurantId || null 
+      });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async addRestaurantComment(restaurantId: string, collectionId: string, commentText: string) {
+    const { data, error } = await supabase
+      .rpc('add_restaurant_comment', {
+        p_restaurant_id: restaurantId,
+        p_collection_id: collectionId,
+        p_comment_text: commentText
+      });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createUserActivity(activityData: Database['public']['Tables']['user_activities']['Insert']) {
+    const { data, error } = await supabase
+      .from('user_activities')
+      .insert(activityData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+
+
+  async getCollectionActivities(collectionId: string) {
+    const { data, error } = await supabase
+      .from('user_activities')
+      .select('*, users(name, avatar_url), restaurants(name, image_url)')
+      .eq('collection_id', collectionId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
   }
 };

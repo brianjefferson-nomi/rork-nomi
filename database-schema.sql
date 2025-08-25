@@ -8,7 +8,7 @@ CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'declined');
 CREATE TYPE user_role AS ENUM ('admin', 'member');
 CREATE TYPE vote_visibility AS ENUM ('public', 'anonymous', 'admin_only');
 CREATE TYPE consensus_level AS ENUM ('strong', 'moderate', 'mixed', 'low');
-CREATE TYPE activity_type AS ENUM ('review', 'photo', 'tip', 'checkin', 'favorite', 'collection', 'vote');
+CREATE TYPE activity_type AS ENUM ('review', 'photo', 'tip', 'checkin', 'favorite', 'collection', 'vote', 'comment');
 CREATE TYPE authority_level AS ENUM ('regular', 'verified', 'admin');
 
 -- Users table (profiles)
@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS user_activities (
   restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
   collection_id UUID REFERENCES collections(id) ON DELETE CASCADE,
   content TEXT,
+  comment_text TEXT, -- For restaurant comments in shared collections
   metadata JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -253,6 +254,9 @@ CREATE INDEX IF NOT EXISTS idx_api_calls_user_id ON api_calls(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_calls_created_at ON api_calls(created_at);
 CREATE INDEX IF NOT EXISTS idx_user_activities_user_id ON user_activities(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_activities_type ON user_activities(type);
+CREATE INDEX IF NOT EXISTS idx_user_activities_restaurant_id ON user_activities(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_user_activities_collection_id ON user_activities(collection_id);
+CREATE INDEX IF NOT EXISTS idx_user_activities_comment_text ON user_activities(comment_text) WHERE comment_text IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_restaurant_discussions_restaurant_id ON restaurant_discussions(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_discussions_collection_id ON restaurant_discussions(collection_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_rankings_collection_id ON restaurant_rankings(collection_id);
@@ -272,6 +276,7 @@ CREATE TRIGGER update_restaurants_updated_at BEFORE UPDATE ON restaurants FOR EA
 CREATE TRIGGER update_collections_updated_at BEFORE UPDATE ON collections FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_restaurant_votes_updated_at BEFORE UPDATE ON restaurant_votes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_reviews_updated_at BEFORE UPDATE ON user_reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_activities_updated_at BEFORE UPDATE ON user_activities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_plan_invitations_updated_at BEFORE UPDATE ON plan_invitations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_restaurant_discussions_updated_at BEFORE UPDATE ON restaurant_discussions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_restaurant_rankings_updated_at BEFORE UPDATE ON restaurant_rankings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -360,7 +365,20 @@ CREATE POLICY "Users can view activities in public collections" ON user_activiti
     WHERE id = user_activities.collection_id AND is_public = true
   )
 );
-CREATE POLICY "System can insert activities" ON user_activities FOR INSERT WITH CHECK (true);
+CREATE POLICY "Collection members can view activities" ON user_activities FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM collection_members 
+    WHERE collection_id = user_activities.collection_id AND user_id = auth.uid()
+  )
+);
+CREATE POLICY "Collection members can create activities" ON user_activities FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM collection_members 
+    WHERE collection_id = user_activities.collection_id AND user_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can update their own activities" ON user_activities FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own activities" ON user_activities FOR DELETE USING (auth.uid() = user_id);
 
 -- Restaurant discussions policies
 CREATE POLICY "Anyone can view discussions in public collections" ON restaurant_discussions FOR SELECT USING (
