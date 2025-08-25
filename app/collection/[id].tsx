@@ -89,7 +89,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           {rankedRestaurants.slice(0, 6).map((restaurant, index) => (
             <View key={restaurant.id} style={styles.insightsContent}>
               <View style={styles.restaurantHeader}>
-                <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+                <View style={styles.restaurantTitleContainer}>
+                  <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+                  <Text style={styles.restaurantSubtitle}>Restaurant #{index + 1} in ranking</Text>
+                </View>
                 <View style={styles.restaurantRank}>
                   <Text style={styles.rankText}>#{index + 1}</Text>
                 </View>
@@ -229,27 +232,50 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
       <View style={styles.memberActivitySection}>
         <Text style={styles.sectionTitle}>🎯 Member Activity & Insights</Text>
         {(() => {
-          const memberVotingStats: { [key: string]: { likes: number; dislikes: number; comments: number; name: string } } = {};
+          const memberVotingStats: { [key: string]: { 
+            likes: number; 
+            dislikes: number; 
+            comments: number; 
+            name: string;
+            likedRestaurants: string[];
+            dislikedRestaurants: string[];
+          } } = {};
           
-          rankedRestaurants.forEach(({ meta }) => {
-            meta.voteDetails.likeVoters.forEach((voter: any) => {
+          rankedRestaurants.forEach((restaurant, restaurantIndex) => {
+            restaurant.meta.voteDetails.likeVoters.forEach((voter: any) => {
               if (collection.is_public && !collectionMembers.includes(voter.userId)) return;
               if (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User') return;
               
               if (!memberVotingStats[voter.userId]) {
-                memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, comments: 0, name: voter.name };
+                memberVotingStats[voter.userId] = { 
+                  likes: 0, 
+                  dislikes: 0, 
+                  comments: 0, 
+                  name: voter.name,
+                  likedRestaurants: [],
+                  dislikedRestaurants: []
+                };
               }
               memberVotingStats[voter.userId].likes++;
+              memberVotingStats[voter.userId].likedRestaurants.push(restaurant.name);
             });
             
-            meta.voteDetails.dislikeVoters.forEach((voter: any) => {
+            restaurant.meta.voteDetails.dislikeVoters.forEach((voter: any) => {
               if (collection.is_public && !collectionMembers.includes(voter.userId)) return;
               if (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User') return;
               
               if (!memberVotingStats[voter.userId]) {
-                memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, comments: 0, name: voter.name };
+                memberVotingStats[voter.userId] = { 
+                  likes: 0, 
+                  dislikes: 0, 
+                  comments: 0, 
+                  name: voter.name,
+                  likedRestaurants: [],
+                  dislikedRestaurants: []
+                };
               }
               memberVotingStats[voter.userId].dislikes++;
+              memberVotingStats[voter.userId].dislikedRestaurants.push(restaurant.name);
             });
           });
 
@@ -258,7 +284,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             if (!discussion.userName || discussion.userName === 'Unknown' || discussion.userName === 'Unknown User') return;
             
             if (!memberVotingStats[discussion.userId]) {
-              memberVotingStats[discussion.userId] = { likes: 0, dislikes: 0, comments: 0, name: discussion.userName };
+              memberVotingStats[discussion.userId] = { 
+                likes: 0, 
+                dislikes: 0, 
+                comments: 0, 
+                name: discussion.userName,
+                likedRestaurants: [],
+                dislikedRestaurants: []
+              };
             }
             memberVotingStats[discussion.userId].comments++;
           });
@@ -285,6 +318,30 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         <Text style={styles.statValue}>{stats.comments}</Text>
                       </View>
                     </View>
+                    
+                    {/* Restaurant Activity Details */}
+                    {(stats.likedRestaurants.length > 0 || stats.dislikedRestaurants.length > 0) && (
+                      <View style={styles.memberRestaurantActivity}>
+                        {stats.likedRestaurants.length > 0 && (
+                          <View style={styles.restaurantActivityGroup}>
+                            <Text style={styles.activityLabel}>Liked:</Text>
+                            <Text style={styles.restaurantList} numberOfLines={2}>
+                              {stats.likedRestaurants.slice(0, 3).join(', ')}
+                              {stats.likedRestaurants.length > 3 && '...'}
+                            </Text>
+                          </View>
+                        )}
+                        {stats.dislikedRestaurants.length > 0 && (
+                          <View style={styles.restaurantActivityGroup}>
+                            <Text style={styles.activityLabel}>Disliked:</Text>
+                            <Text style={styles.restaurantList} numberOfLines={2}>
+                              {stats.dislikedRestaurants.slice(0, 3).join(', ')}
+                              {stats.dislikedRestaurants.length > 3 && '...'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -1863,11 +1920,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  restaurantName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+  restaurantTitleContainer: {
     flex: 1,
+  },
+  restaurantName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  restaurantSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
   },
   restaurantRank: {
     backgroundColor: '#FEF3C7',
@@ -2045,6 +2110,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#475569',
+  },
+  memberRestaurantActivity: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  restaurantActivityGroup: {
+    marginBottom: 8,
+  },
+  activityLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  restaurantList: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 14,
   },
   noActivity: {
     fontSize: 14,
