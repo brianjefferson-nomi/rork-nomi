@@ -109,6 +109,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
                 });
 
+                const likeVoterNames = filteredLikeVoters.length > 0 
+                  ? filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')
+                  : 'None';
+                
+                const dislikeVoterNames = filteredDislikeVoters.length > 0 
+                  ? filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')
+                  : 'None';
+
                 return (
                   <View style={styles.votingDetails}>
                     {filteredLikeVoters.length > 0 && (
@@ -118,7 +126,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Likes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredLikeVoters.length > 0 ? filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ') : 'None'}
+                          {likeVoterNames}
                         </Text>
                       </View>
                     )}
@@ -129,7 +137,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Dislikes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredDislikeVoters.length > 0 ? filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ') : 'None'}
+                          {dislikeVoterNames}
                         </Text>
                       </View>
                     )}
