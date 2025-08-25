@@ -174,7 +174,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       }
       
       // Use location-based search with user coordinates
-      await searchRestaurants(searchQuery, location.lat, location.lng);
+      await searchRestaurants(searchQuery);
       addSearchQuery(searchQuery);
       console.log(`Search completed for: ${searchQuery}`);
     } catch (error) {
@@ -267,13 +267,13 @@ export function SearchWizard({ testID }: SearchWizardProps) {
             {/* Yelp Autocomplete Suggestions */}
             {query.length >= 2 && yelpSuggestions.length > 0 && (
               <>
-                <View style={styles.suggestionSection}>
-                  <Text style={styles.suggestionSectionTitle}>Yelp Suggestions</Text>
+                <View style={styles.suggestionsSection}>
+                  <Text style={styles.suggestionsTitle}>Yelp Suggestions</Text>
                 </View>
                 {yelpSuggestions.map((suggestion, idx) => (
                   <TouchableOpacity 
                     key={`yelp-${idx}`} 
-                    style={[styles.suggestionItem, styles.yelpSuggestionItem]} 
+                    style={styles.suggestionItem} 
                     onPress={() => {
                       setQuery(suggestion);
                       performSearch(suggestion);
@@ -449,6 +449,10 @@ const styles = StyleSheet.create({
     color: '#999',
     fontWeight: '600',
     textTransform: 'uppercase',
+  },
+  suggestionsSection: {
+    marginTop: 12,
+    marginBottom: 8,
   },
   clearHistory: { fontSize: 12, color: '#FF6B6B', fontWeight: '600' },
   suggestionItem: { paddingHorizontal: 12, paddingVertical: 10 },

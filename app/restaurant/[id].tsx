@@ -106,14 +106,16 @@ export default function RestaurantDetailScreen() {
   const isFavorite = favoriteRestaurants.includes(restaurant.id);
 
   const handleSaveNote = () => {
-    addUserNote(restaurant.id, noteText);
+    if (noteText) {
+      addUserNote(restaurant.id, noteText);
+    }
     setEditingNote(false);
   };
 
   const handleAddToCollection = () => {
     const availableCollections = collections.filter(c => {
       // Handle both restaurant_ids and restaurants fields, and ensure they exist
-      const restaurantIds = c.restaurant_ids || c.restaurants || [];
+      const restaurantIds = c.restaurant_ids || [];
       return !restaurantIds.includes(restaurant.id);
     });
     

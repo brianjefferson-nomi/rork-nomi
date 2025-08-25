@@ -33,20 +33,20 @@ export default function JoinPlanScreen() {
       }
 
       // Check if user is already a collaborator
-      if (plan.collaborators.includes(user!.id) || plan.creator_id === user!.id) {
+      if (plan.collaborators && Array.isArray(plan.collaborators) && plan.collaborators.includes(user!.id) || plan.creator_id === user!.id) {
         Alert.alert('Info', 'You are already part of this plan.');
         router.push(`/collection/${plan.id}` as any);
         return;
       }
 
       // Add user to collaborators
-      const updatedCollaborators = [...plan.collaborators, user!.id];
+      const updatedCollaborators = plan.collaborators && Array.isArray(plan.collaborators) ? [...plan.collaborators, user!.id] : [user!.id];
       await dbHelpers.updatePlan(plan.id, {
         collaborators: updatedCollaborators,
         updated_at: new Date().toISOString()
       });
 
-      Alert.alert('Success', `You've joined "${plan.name}"!`, [
+      Alert.alert('Success', `You've joined "${plan.name || 'the plan'}"!`, [
         {
           text: 'View Plan',
           onPress: () => {
