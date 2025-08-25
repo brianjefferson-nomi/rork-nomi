@@ -106,7 +106,7 @@ SET
     ELSE ARRAY['welcoming', 'comfortable', 'friendly', 'casual', 'enjoyable']
   END,
   ai_top_picks = CASE 
-    WHEN cuisine ILIKE '%italian%' THEN ARRAY['Handmade Pasta', 'Wood-Fired Pizza', 'Tiramisu', 'Bruschetta', 'Osso Buco']
+    WHEN cuisine ILIKE '%italian%' THEN ARRAY['Wood-Fired Pizza', 'Tiramisu', 'Bruschetta', 'Osso Buco']
     WHEN cuisine ILIKE '%japanese%' OR cuisine ILIKE '%sushi%' THEN ARRAY['Fresh Sushi', 'Miso Soup', 'Tempura', 'Sashimi', 'Green Tea']
     WHEN cuisine ILIKE '%mexican%' THEN ARRAY['Street Tacos', 'Guacamole', 'Enchiladas', 'Margaritas', 'Churros']
     WHEN cuisine ILIKE '%chinese%' THEN ARRAY['Dim Sum', 'Peking Duck', 'Kung Pao Chicken', 'Hot & Sour Soup', 'Fortune Cookies']

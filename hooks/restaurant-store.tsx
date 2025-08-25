@@ -812,28 +812,75 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       // Use the enhanced location-based API
       const results = await aggregateRestaurantData(query, location.city, location.lat, location.lng);
       
-      // Convert API results to Restaurant format
-      const mappedResults = results.map(result => ({
-        id: result.id,
-        name: result.name,
-        cuisine: result.cuisine,
-        priceRange: (result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
-        imageUrl: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-        images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
-        address: result.address,
-        neighborhood: result.neighborhood || location.city,
-        hours: result.hours,
-        vibe: result.vibeTags || [],
-        description: result.description,
-        menuHighlights: result.topPicks || [],
-        rating: result.rating,
-        reviews: result.reviews || [],
-        phone: result.phone,
-        website: result.website,
-                 userNotes: undefined,
-        isFavorite: false,
-        distance: result.distance,
-        proximity: result.proximity
+      // Save search results to database and convert to Restaurant format
+      const mappedResults = await Promise.all(results.map(async (result) => {
+        try {
+          // Check if restaurant already exists in database
+          const existingRestaurant = restaurants.find(r => r.id === result.id);
+          if (existingRestaurant) {
+            console.log(`[RestaurantStore] Restaurant ${result.name} already exists in database`);
+            return existingRestaurant;
+          }
+          
+          // Save new restaurant to database
+          const restaurantData = {
+            id: result.id,
+            restaurant_code: `rest_${result.id}_${Date.now()}`,
+            name: result.name,
+            cuisine: result.cuisine,
+            price_range: result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$',
+            image_url: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+            images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
+            address: result.address,
+            neighborhood: result.neighborhood || location.city,
+            hours: result.hours,
+            vibe_tags: result.vibeTags || [],
+            description: result.description,
+            menu_highlights: result.topPicks || [],
+            rating: result.rating,
+            reviews: result.reviews || [],
+            phone: result.phone,
+            website: result.website,
+            ai_description: result.description,
+            ai_vibes: result.vibeTags,
+            ai_top_picks: result.topPicks,
+            latitude: result.location?.lat,
+            longitude: result.location?.lng
+          };
+          
+          await dbHelpers.createRestaurant(restaurantData);
+          console.log(`[RestaurantStore] Saved ${result.name} to database`);
+          
+          // Map to Restaurant format for return
+          const mappedRestaurant = mapDatabaseRestaurant(restaurantData);
+          return mappedRestaurant;
+          
+        } catch (error) {
+          console.error(`[RestaurantStore] Error saving ${result.name}:`, error);
+          // Return a basic restaurant object if saving fails
+          return {
+            id: result.id,
+            name: result.name,
+            cuisine: result.cuisine,
+            priceRange: (result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
+            imageUrl: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+            images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
+            address: result.address,
+            neighborhood: result.neighborhood || location.city,
+            hours: result.hours,
+            vibe: result.vibeTags || [],
+            description: result.description,
+            menuHighlights: result.topPicks || [],
+            rating: result.rating,
+            reviews: result.reviews || [],
+            phone: result.phone,
+            website: result.website,
+            userNotes: undefined,
+            isFavorite: false,
+            distance: result.distance,
+            proximity: result.proximity
+          };
+        }
       }));
       
       console.log(`[RestaurantStore] Found ${mappedResults.length} location-based results`);
@@ -852,7 +899,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       setSearchResults(fallbackResults);
       return fallbackResults;
     }
-  }, [restaurants, userLocation]);
+  }, [restaurants, userLocation, mapDatabaseRestaurant]);
 
   const refreshLocation = useCallback(async () => {
     try {
