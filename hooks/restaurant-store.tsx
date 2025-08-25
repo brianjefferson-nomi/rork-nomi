@@ -67,6 +67,19 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
+  // Add timeout mechanism to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.log('[RestaurantStore] Loading timeout reached, forcing data display');
+      // Force the app to show data even if queries are still loading
+      if (restaurants.length === 0) {
+        setRestaurants(mockRestaurants);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [restaurants.length]);
+
   // Load user plans from database
   const plansQuery = useQuery({
     queryKey: ['userPlans', user?.id],
@@ -121,7 +134,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       // Fallback to mock data
       console.log('[RestaurantStore] Using mock data as fallback');
       return mockRestaurants;
-    }
+    },
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   // Load votes from database
@@ -148,7 +165,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return [];
       }
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   // Load discussions from database
@@ -167,7 +188,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         console.error('[RestaurantStore] Error loading discussions from storage:', error);
         return [];
       }
-    }
+    },
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   // Load initial data and user location
@@ -198,7 +223,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         userLocation: location
       };
     },
-    enabled: !!restaurantsQuery.data && !!votesQuery.data && !!discussionsQuery.data
+    enabled: !!restaurantsQuery.data,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
   // Helper function to map database restaurant format to component format
@@ -1076,7 +1105,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     userVotes,
     discussions,
     favoriteRestaurants,
-    isLoading: dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading,
+    isLoading: (dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading) && !dataQuery.data,
     searchHistory,
     searchResults,
     userLocation,
