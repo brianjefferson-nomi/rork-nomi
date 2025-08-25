@@ -304,6 +304,7 @@ export default function CollectionDetailScreen() {
       setIsLoadingDiscussions(true);
       getCollectionDiscussions(id)
         .then((data) => {
+          console.log('[CollectionDetail] Loaded discussions:', data?.length || 0, data);
           setDiscussions(data || []);
         })
         .catch((error) => {
@@ -706,29 +707,72 @@ export default function CollectionDetailScreen() {
 
                 {/* Vote Actions */}
                 <View style={styles.voteActions}>
-                  <TouchableOpacity 
-                    style={[styles.voteButton, styles.likeButton]}
-                    onPress={() => setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' })}
-                  >
-                    <ThumbsUp size={16} color="#22C55E" />
-                    <Text style={styles.voteCount}>{meta.likes}</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.voteButton, styles.dislikeButton]}
-                    onPress={() => setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' })}
-                  >
-                    <ThumbsDown size={16} color="#EF4444" />
-                    <Text style={styles.voteCount}>{meta.dislikes}</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.voteButton, styles.commentButton]}
-                    onPress={() => setShowDiscussionModal(restaurant.id)}
-                  >
-                    <MessageCircle size={16} color="#6B7280" />
-                    <Text style={styles.voteCount}>{meta.discussionCount}</Text>
-                  </TouchableOpacity>
+                  {(() => {
+                    const userVote = meta.voteDetails?.likeVoters?.find((v: any) => v.userId === user?.id) || 
+                                   meta.voteDetails?.dislikeVoters?.find((v: any) => v.userId === user?.id);
+                    const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
+                    const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
+                    
+                    return (
+                      <>
+                        <TouchableOpacity 
+                          style={[
+                            styles.voteButton, 
+                            styles.likeButton,
+                            userLiked && styles.voteButtonActive
+                          ]}
+                          onPress={() => {
+                            if (userDisliked) {
+                              // Remove dislike and add like
+                              voteRestaurant('dislike', restaurant.id, id, '');
+                              setTimeout(() => voteRestaurant('like', restaurant.id, id, ''), 100);
+                            } else if (userLiked) {
+                              // Remove like
+                              voteRestaurant('like', restaurant.id, id, '');
+                            } else {
+                              // Add like
+                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
+                            }
+                          }}
+                        >
+                          <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
+                          <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                          style={[
+                            styles.voteButton, 
+                            styles.dislikeButton,
+                            userDisliked && styles.voteButtonActive
+                          ]}
+                          onPress={() => {
+                            if (userLiked) {
+                              // Remove like and add dislike
+                              voteRestaurant('like', restaurant.id, id, '');
+                              setTimeout(() => voteRestaurant('dislike', restaurant.id, id, ''), 100);
+                            } else if (userDisliked) {
+                              // Remove dislike
+                              voteRestaurant('dislike', restaurant.id, id, '');
+                            } else {
+                              // Add dislike
+                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
+                            }
+                          }}
+                        >
+                          <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
+                          <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                          style={[styles.voteButton, styles.commentButton]}
+                          onPress={() => setShowDiscussionModal(restaurant.id)}
+                        >
+                          <MessageCircle size={16} color="#6B7280" />
+                          <Text style={styles.voteCount}>{meta.discussionCount}</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  })()}
                 </View>
 
                 {/* Member Votes Section */}
@@ -1399,13 +1443,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   rankBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   winningRankBadge: {
     backgroundColor: '#FFD700',
@@ -1904,6 +1956,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
+  },
+  voteCountActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  voteButtonActive: {
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
   },
   commentButton: {
     backgroundColor: '#F9FAFB',
