@@ -1035,12 +1035,31 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     
     console.log('[RestaurantStore] Restaurant pool:', pool.length, pool.map(r => ({ id: r.id, name: r.name })));
     
-    // Use all votes for the collection, not just user votes
-    const planVotes = planId 
+    // Combine local userVotes with allVotesQuery.data for immediate updates
+    const localVotes = userVotes.filter((v: any) => !planId || v.collectionId === planId);
+    const remoteVotes = planId 
       ? (allVotesQuery.data?.filter((v: any) => v.collectionId === planId) || [])
       : (allVotesQuery.data || []);
     
-    console.log('[RestaurantStore] Plan votes:', planVotes.length, planVotes.map(v => ({ restaurantId: v.restaurantId, vote: v.vote })));
+    // Merge votes, prioritizing local votes for the current user
+    const currentUserId = user?.id;
+    const otherUserVotes = remoteVotes.filter((v: any) => v.userId !== currentUserId);
+    const planVotes = [...localVotes, ...otherUserVotes];
+    
+    console.log('[RestaurantStore] Vote breakdown:', {
+      localVotes: localVotes.length,
+      remoteVotes: remoteVotes.length,
+      otherUserVotes: otherUserVotes.length,
+      finalPlanVotes: planVotes.length,
+      currentUserId
+    });
+    
+    console.log('[RestaurantStore] Plan votes:', planVotes.map(v => ({ 
+      restaurantId: v.restaurantId, 
+      vote: v.vote, 
+      userId: v.userId,
+      isLocal: localVotes.includes(v)
+    })));
     
     const discussionCounts = discussions
       .filter((d: any) => !planId || d.collectionId === planId)
@@ -1063,7 +1082,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     
     console.log('[RestaurantStore] Using votes for ranking:', {
       totalVotes: planVotes.length,
-      userVotes: userVotes.filter((v: any) => v.collectionId === planId).length,
+      userVotes: localVotes.length,
       allVotes: planVotes.length
     });
     
@@ -1082,7 +1101,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     })));
     
     return result;
-  }, [plansQuery.data, restaurants, userVotes, allVotesQuery.data, discussions]);
+  }, [plansQuery.data, restaurants, userVotes, allVotesQuery.data, discussions, user?.id]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
     const plan = plansQuery.data?.find((p: any) => p.id === planId);
