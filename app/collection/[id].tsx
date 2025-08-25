@@ -1087,507 +1087,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-                        }, 0);
-                        return totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
-                      })()}%
-                    </Text>
-                    <Text style={styles.analyticLabel}>Participation</Text>
-                  </View>
-                  <View style={styles.analyticCard}>
-                    <Text style={styles.analyticValue}>
-                      {(() => {
-                        const totalVotes = rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0);
-                        const unanimousVotes = rankedRestaurants.filter(({ meta }) => meta.dislikes === 0).length;
-                        return totalVotes > 0 ? Math.round((unanimousVotes / rankedRestaurants.length) * 100) : 0;
-                      })()}%
-                    </Text>
-                    <Text style={styles.analyticLabel}>Consensus</Text>
-                  </View>
-                  <View style={styles.analyticCard}>
-                    <Text style={styles.analyticValue}>
-                      {rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0)}
-                    </Text>
-                    <Text style={styles.analyticLabel}>Total Votes</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Member Voting Insights */}
-              <View style={styles.memberActivitySection}>
-                <Text style={styles.sectionTitle}>Member Voting Insights</Text>
-                {(() => {
-                  // Get collection members for privacy filtering
-                  const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
-                    ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
-                    : [];
-                  
-                  // Collect member voting stats
-                  const memberVotingStats: Record<string, { likes: number; dislikes: number; total: number }> = {};
-                  
-                  rankedRestaurants.forEach(({ restaurant, meta }) => {
-                    // Add votes - only from collection members if private
-                    meta.voteDetails.likeVoters.forEach(voter => {
-                      // For private collections, only show activity from actual members
-                      if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                        return;
-                      }
-                      
-                      // For shared collections, only show activity from actual collection members
-                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
-                        return;
-                      }
-                      
-                      // Suppress content for unknown members in shared collections
-                      if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
-                        return;
-                      }
-                      
-                      // Track member voting stats
-                      if (!memberVotingStats[voter.userId]) {
-                        memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                      }
-                      memberVotingStats[voter.userId].likes++;
-                      memberVotingStats[voter.userId].total++;
-                    });
-                    
-                    meta.voteDetails.dislikeVoters.forEach(voter => {
-                      // For private collections, only show activity from actual members
-                      if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                        return;
-                      }
-                      
-                      // For shared collections, only show activity from actual collection members
-                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
-                        return;
-                      }
-                      
-                      // Suppress content for unknown members in shared collections
-                      if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
-                        return;
-                      }
-                      
-                      // Track member voting stats
-                      if (!memberVotingStats[voter.userId]) {
-                        memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                      }
-                      memberVotingStats[voter.userId].dislikes++;
-                      memberVotingStats[voter.userId].total++;
-                    });
-                  });
-                  
-                  const activeMembers = Object.entries(memberVotingStats)
-                    .filter(([userId, stats]) => stats.total > 0)
-                    .filter(([userId, stats]) => {
-                      // Suppress unknown members in shared collections
-                      if (collection.is_public) {
-                        const member = collection.collaborators?.find((m: any) => 
-                          typeof m === 'string' ? m === userId : m.userId === userId
-                        );
-                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                        return memberName && memberName !== 'Unknown' && memberName !== 'Unknown User';
-                      }
-                      return true;
-                    })
-                    .sort(([,a], [,b]) => b.total - a.total)
-                    .slice(0, 6);
-                  
-                  return activeMembers.length > 0 ? (
-                    <View style={styles.insightsGrid}>
-                      {activeMembers.map(([userId, stats]) => {
-                        const member = collection.collaborators?.find((m: any) => 
-                          typeof m === 'string' ? m === userId : m.userId === userId
-                        );
-                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                        const firstName = memberName ? memberName.split(' ')[0] : 'Unknown';
-                        const percentage = Math.round((stats.likes / stats.total) * 100);
-                        
-                        return (
-                          <View key={userId} style={styles.memberInsight}>
-                            <View style={styles.memberInsightHeader}>
-                              <View style={styles.memberInsightAvatar}>
-                                <Text style={styles.memberInsightInitial}>
-                                  {firstName ? firstName.charAt(0).toUpperCase() : '?'}
-                                </Text>
-                              </View>
-                              <Text style={styles.memberInsightName}>{firstName}</Text>
-                            </View>
-                            <View style={styles.memberInsightStats}>
-                              <Text style={styles.memberInsightVotes}>
-                                {stats.total} votes • {percentage}% positive
-                              </Text>
-                              <Text style={styles.memberInsightPercentage}>
-                                👍 {stats.likes} • 👎 {stats.dislikes}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={styles.emptyActivityContainer}>
-                      <Text style={styles.emptyActivityText}>
-                        {collection.is_public ? 'No member activity yet' : 'No collection member activity yet'}
-                      </Text>
-                      <Text style={styles.emptyActivitySubtext}>
-                        {collection.is_public 
-                          ? 'Start voting and commenting to see activity here!' 
-                          : 'Collection members can vote and comment to see activity here!'}
-                      </Text>
-                    </View>
-                  );
-                })()}
-              </View>
-            </View>
-          </>
-        )}
-          {(() => {
-            // Get collection members for privacy filtering
-            const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
-              ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
-              : [];
-            
-            console.log('[CollectionDetail] Collection members:', collectionMembers);
-            console.log('[CollectionDetail] Collection is public:', collection.is_public);
-            console.log('[CollectionDetail] Current user:', user?.id);
-            console.log('[CollectionDetail] Collection data:', collection);
-            console.log('[CollectionDetail] Collection collaborators:', collection.collaborators);
-            
-            // Collect all member activity across all restaurants
-            const allMemberActivity: any[] = [];
-            const memberVotingStats: Record<string, { likes: number; dislikes: number; total: number }> = {};
-            
-            rankedRestaurants.forEach(({ restaurant, meta }) => {
-              console.log('[CollectionDetail] Restaurant:', restaurant.name);
-              console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
-              console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
-              console.log('[CollectionDetail] Meta vote details structure:', {
-                likeVoters: meta.voteDetails.likeVoters.map(v => ({ userId: v.userId, name: v.name })),
-                dislikeVoters: meta.voteDetails.dislikeVoters.map(v => ({ userId: v.userId, name: v.name }))
-              });
-              
-              // Add votes - show all activity for public collections, only members for private
-              meta.voteDetails.likeVoters.forEach(voter => {
-                // For private collections, only show activity from actual members
-                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                  console.log('[CollectionDetail] Filtering out non-member like voter:', voter.userId);
-                  return;
-                }
-                
-                // Track member voting stats
-                if (!memberVotingStats[voter.userId]) {
-                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                }
-                memberVotingStats[voter.userId].likes++;
-                memberVotingStats[voter.userId].total++;
-                
-                allMemberActivity.push({
-                  type: 'vote',
-                  vote: 'like',
-                  restaurantName: restaurant.name,
-                  userName: voter.name,
-                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                  userId: voter.userId,
-                  reason: voter.reason,
-                  timestamp: voter.timestamp,
-                  restaurantId: restaurant.id
-                });
-              });
-              
-              meta.voteDetails.dislikeVoters.forEach(voter => {
-                // For private collections, only show activity from actual members
-                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                  console.log('[CollectionDetail] Filtering out non-member dislike voter:', voter.userId);
-                  return;
-                }
-                
-                // Track member voting stats
-                if (!memberVotingStats[voter.userId]) {
-                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                }
-                memberVotingStats[voter.userId].dislikes++;
-                memberVotingStats[voter.userId].total++;
-                
-                allMemberActivity.push({
-                  type: 'vote',
-                  vote: 'dislike',
-                  restaurantName: restaurant.name,
-                  userName: voter.name,
-                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                  userId: voter.userId,
-                  reason: voter.reason,
-                  timestamp: voter.timestamp,
-                  restaurantId: restaurant.id
-                });
-              });
-            });
-            
-            console.log('[CollectionDetail] Discussions:', discussions);
-            
-            // Add discussions - show all activity for public collections, only members for private
-            discussions.forEach(discussion => {
-              console.log('[CollectionDetail] Processing discussion:', discussion);
-              // For private collections, only show activity from actual members
-              if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
-                console.log('[CollectionDetail] Filtering out non-member discussion:', discussion.userId);
-                return;
-              }
-              
-              // For shared collections, only show activity from actual collection members
-              if (collection.is_public && !collectionMembers.includes(discussion.userId)) {
-                console.log('[CollectionDetail] Filtering out non-member discussion in shared collection:', discussion.userId);
-                return;
-              }
-              allMemberActivity.push({
-                type: 'comment',
-                restaurantName: discussion.restaurantName || 'Collection',
-                userName: discussion.userName,
-                firstName: discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown',
-                userId: discussion.userId,
-                message: discussion.message,
-                timestamp: discussion.timestamp
-              });
-            });
-            
-            console.log('[CollectionDetail] All member activity:', allMemberActivity);
-            console.log('[CollectionDetail] Member voting stats:', memberVotingStats);
-            
-            // Sort by timestamp (most recent first)
-            allMemberActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-            
-            return allMemberActivity.length > 0 ? (
-              <View style={styles.memberActivityList}>
-                {/* Member Voting Insights */}
-                <View style={styles.insightsSection}>
-                  <Text style={styles.insightsTitle}>📊 Member Voting Insights</Text>
-                  <View style={styles.insightsGrid}>
-                    {Object.entries(memberVotingStats)
-                      .filter(([userId, stats]) => stats.total > 0)
-                      .sort(([,a], [,b]) => b.total - a.total)
-                      .slice(0, 6)
-                      .map(([userId, stats]) => {
-                        const member = collection.collaborators?.find((m: any) => {
-                          if (typeof m === 'string') return m === userId;
-                          return m.userId === userId;
-                        });
-                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                        const firstName = memberName.split(' ')[0];
-                        const likePercentage = stats.total > 0 ? Math.round((stats.likes / stats.total) * 100) : 0;
-                        
-                        return (
-                          <View key={userId} style={styles.memberInsight}>
-                            <View style={styles.memberInsightHeader}>
-                              <View style={styles.memberInsightAvatar}>
-                                <Text style={styles.memberInsightInitial}>
-                                  {firstName.charAt(0).toUpperCase()}
-                                </Text>
-                              </View>
-                              <Text style={styles.memberInsightName}>{firstName}</Text>
-                            </View>
-                            <View style={styles.memberInsightStats}>
-                              <Text style={styles.memberInsightVotes}>{stats.total} votes</Text>
-                              <Text style={styles.memberInsightPercentage}>{likePercentage}% likes</Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                  </View>
-                </View>
-                
-
-                
-                {/* Restaurant Voting Summary */}
-                <View style={styles.restaurantVotingSection}>
-                  <Text style={styles.restaurantVotingTitle}>🏆 Restaurant Voting Summary</Text>
-                  {rankedRestaurants
-                    .filter(({ meta }) => meta.likes > 0 || meta.dislikes > 0)
-                    .slice(0, 5)
-                    .map(({ restaurant, meta }, index) => (
-                      <View key={restaurant.id} style={styles.restaurantVotingItem}>
-                        <View style={styles.restaurantVotingHeader}>
-                          <Text style={styles.restaurantVotingName}>{restaurant.name}</Text>
-                          <View style={styles.restaurantVotingBadge}>
-                            <Text style={styles.restaurantVotingRank}>#{meta.rank}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.restaurantVotingStats}>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>👍 Likes</Text>
-                            <Text style={styles.voteStatValue}>{meta.likes}</Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>👎 Dislikes</Text>
-                            <Text style={styles.voteStatValue}>{meta.dislikes}</Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>📊 Approval</Text>
-                            <Text style={styles.voteStatValue}>{meta.approvalPercent}%</Text>
-                          </View>
-                        </View>
-                        {meta.voteDetails.likeVoters.length > 0 && (
-                          <Text style={styles.restaurantVotingVoters}>
-                            Liked by: {meta.voteDetails.likeVoters.map(v => v.name).join(', ')}
-                          </Text>
-                        )}
-                      </View>
-                    ))}
-                </View>
-              </View>
-            ) : (
-              <View style={styles.emptyActivityContainer}>
-                <Text style={styles.emptyActivityText}>
-                  {collection.is_public ? 'No member activity yet' : 'No collection member activity yet'}
-                </Text>
-                <Text style={styles.emptyActivitySubtext}>
-                  {collection.is_public 
-                    ? 'Start voting and commenting to see activity here!' 
-                    : 'Collection members can vote and comment to see activity here!'}
-                </Text>
-              </View>
-            );
-          })()}
-        </View>
-          </>
-        )}
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
-
-      {/* Vote Modal */}
-      <Modal visible={!!showVoteModal} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>
-                {showVoteModal?.vote === 'like' ? 'Why do you like this?' : 'Why don\'t you like this?'}
-              </Text>
-              <TextInput
-                style={styles.reasonInput}
-                placeholder="Share your thoughts (optional)"
-                value={voteReason}
-                onChangeText={setVoteReason}
-                multiline
-                numberOfLines={3}
-              />
-              <View style={styles.modalActions}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => {
-                    if (showVoteModal) {
-                      voteRestaurant(showVoteModal.restaurantId, showVoteModal.vote, id, voteReason);
-                    }
-                    setShowVoteModal(null);
-                    setVoteReason('');
-                  }}
-                >
-                  <Text style={styles.modalButtonText}>Submit Vote</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setShowVoteModal(null);
-                    setVoteReason('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Discussion Modal */}
-        <Modal visible={!!showDiscussionModal} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Start a Discussion</Text>
-              <TextInput
-                style={styles.reasonInput}
-                placeholder="What would you like to discuss about this restaurant?"
-                value={discussionMessage}
-                onChangeText={setDiscussionMessage}
-                multiline
-                numberOfLines={4}
-              />
-              <View style={styles.modalActions}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => {
-                    if (showDiscussionModal && discussionMessage.trim()) {
-                      addDiscussion(showDiscussionModal, id, discussionMessage);
-                    }
-                    setShowDiscussionModal(null);
-                    setDiscussionMessage('');
-                  }}
-                >
-                  <Text style={styles.modalButtonText}>Post Discussion</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setShowDiscussionModal(null);
-                    setDiscussionMessage('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Invite Modal */}
-        <Modal visible={showInviteModal} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Invite to Collection</Text>
-              <TextInput
-                style={styles.reasonInput}
-                placeholder="Email address"
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.reasonInput}
-                placeholder="Personal message (optional)"
-                value={inviteMessage}
-                onChangeText={setInviteMessage}
-                multiline
-                numberOfLines={3}
-              />
-              <View style={styles.modalActions}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={handleInviteUser}
-                >
-                  <Text style={styles.modalButtonText}>Send Invitation</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setShowInviteModal(false);
-                    setInviteEmail('');
-                    setInviteMessage('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-
-
-    </>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAFAFA',
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1781,238 +1280,350 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
   },
-  recommendationsSection: {
+  tabContainer: {
+    flexDirection: 'row',
     backgroundColor: '#FFF',
-    padding: 16,
-    marginTop: 8,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  recommendationCard: {
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  recommendationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
+  activeTab: {
+    borderBottomColor: '#3B82F6',
   },
-  recommendationDescription: {
-    fontSize: 13,
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
     color: '#6B7280',
-    marginBottom: 4,
   },
-  recommendationReasoning: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontStyle: 'italic',
+  activeTabText: {
+    color: '#3B82F6',
+    fontWeight: '600',
   },
   rankingHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  rankBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-  },
-  rankNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  silverRank: {
-    fontSize: 16,
-  },
-  bronzeRank: {
-    fontSize: 16,
-  },
   winningRankingHeader: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 12,
+    padding: 8,
     marginBottom: 12,
   },
-  winningRankBadge: {
-    backgroundColor: '#1A1A1A',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    flexDirection: 'row',
+  rankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginRight: 12,
   },
-  winningRankNumber: {
+  winningRankBadge: {
+    backgroundColor: '#FFD700',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  silverRank: {
+    backgroundColor: '#C0C0C0',
+  },
+  bronzeRank: {
+    backgroundColor: '#CD7F32',
+  },
+  rankNumber: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    color: '#FFF',
+  },
+  winningRankNumber: {
+    color: '#1A1A1A',
+    fontSize: 18,
   },
   badges: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
+    marginTop: 8,
   },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    gap: 4,
+    backgroundColor: '#F3F4F6',
+  },
+  winnerBadge: {
+    backgroundColor: '#FEF3C7',
   },
   favoritesBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#EF4444',
   },
   unanimousBadge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#10B981',
   },
   debatedBadge: {
     backgroundColor: '#F59E0B',
   },
-  winnerBadge: {
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
   badgeText: {
     fontSize: 10,
-    color: '#FFF',
     fontWeight: '600',
+    color: '#6B7280',
   },
   votingSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
     marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
   },
   voteStats: {
-    flex: 1,
+    marginBottom: 8,
   },
   approvalText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  voteBreakdown: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
+    marginBottom: 4,
+  },
+  voteBreakdown: {
+    fontSize: 11,
+    color: '#9CA3AF',
   },
   consensusMeter: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  consensusStrong: {
-    backgroundColor: '#D1FAE5',
-  },
-  consensusModerate: {
-    backgroundColor: '#FEF3C7',
-  },
-  consensusMixed: {
-    backgroundColor: '#FED7AA',
-  },
-  consensusLow: {
-    backgroundColor: '#FEE2E2',
+    marginBottom: 8,
   },
   consensusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   voteActions: {
     flexDirection: 'row',
     gap: 8,
   },
   voteButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 8,
     gap: 4,
   },
   likeButton: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#EFF6FF',
   },
   dislikeButton: {
     backgroundColor: '#FEF2F2',
   },
   discussButton: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F3F4F6',
   },
   voteButtonText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: '500',
   },
   voteReasons: {
     marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
   },
   reasonsTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#374151',
     marginBottom: 4,
   },
   reasonText: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#6B7280',
     marginBottom: 2,
   },
+  memberVotingSection: {
+    marginTop: 12,
+  },
+  memberVotingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  memberVotesList: {
+    gap: 8,
+  },
+  memberVoteItem: {
+    backgroundColor: '#FFF',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  memberVoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  memberVoteAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  memberVoteInitial: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  memberVoteInfo: {
+    flex: 1,
+  },
+  memberVoteName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  memberVoteBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  likeVoteBadge: {
+    backgroundColor: '#EFF6FF',
+  },
+  dislikeVoteBadge: {
+    backgroundColor: '#FEF2F2',
+  },
+  memberVoteBadgeText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  memberVoteReason: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  emptyVotesContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  noVotesText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  noVotesSubtext: {
+    fontSize: 11,
+    color: '#D1D5DB',
+    marginTop: 2,
+  },
+  memberCommentsSection: {
+    marginTop: 12,
+  },
+  memberCommentsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  memberCommentsList: {
+    gap: 8,
+  },
+  memberCommentItem: {
+    backgroundColor: '#FFF',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  memberCommentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  memberCommentAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  memberCommentInitial: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  memberCommentInfo: {
+    flex: 1,
+  },
+  memberCommentName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  memberCommentDetail: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+  memberCommentText: {
+    fontSize: 12,
+    color: '#4B5563',
+    lineHeight: 16,
+  },
   discussionsSection: {
+    backgroundColor: '#FFF',
     padding: 16,
+    marginTop: 8,
   },
   discussionItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   discussionUser: {
     fontSize: 12,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 4,
   },
   discussionMessage: {
-    fontSize: 13,
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   discussionTime: {
-    fontSize: 11,
-    color: '#9CA3AF',
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    width: '90%',
-    maxWidth: 400,
+    margin: 20,
+    maxWidth: 320,
+    width: '100%',
   },
   modalTitle: {
     fontSize: 18,
@@ -2023,13 +1634,14 @@ const styles = StyleSheet.create({
   },
   reasonInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#E5E7EB',
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
-    color: '#374151',
-    textAlignVertical: 'top',
+    color: '#1A1A1A',
     marginBottom: 16,
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   modalActions: {
     flexDirection: 'row',
@@ -2055,503 +1667,123 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Detailed voting styles
-  detailedVotingSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  detailedVotingTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  voteBreakdownSection: {
-    marginBottom: 12,
-  },
-  breakdownTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  userVoteItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  userVoteName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  userVoteDetails: {
-    marginLeft: 8,
-  },
-  voteDetail: {
-    marginBottom: 4,
-  },
-  voteType: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  likeVote: {
-    color: '#22C55E',
-  },
-  dislikeVote: {
-    color: '#EF4444',
-  },
-  voteReason: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontStyle: 'italic',
-    marginLeft: 8,
-  },
-  commentsSection: {
-    marginTop: 8,
-  },
-  userCommentItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  userCommentName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  userCommentDetails: {
-    marginLeft: 8,
-  },
-  commentDetail: {
-    marginBottom: 4,
-  },
-  commentText: {
-    fontSize: 11,
-    color: '#374151',
-    fontStyle: 'italic',
-  },
-  commentTime: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-
-  // Member voting styles
-  memberVotingSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  memberVotingTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  memberVotesList: {
-    gap: 8,
-  },
-  memberVoteItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  memberVoteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  memberVoteAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  memberVoteInitial: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberVoteName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  memberVoteInfo: {
-    flex: 1,
-  },
-  memberVoteRestaurant: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  memberVoteBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 32,
-    alignItems: 'center',
-  },
-  likeVoteBadge: {
-    backgroundColor: '#D1FAE5',
-  },
-  dislikeVoteBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  memberVoteBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  memberVoteReason: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontStyle: 'italic',
-    marginLeft: 32,
-  },
-  noVotesText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    paddingVertical: 12,
-  },
-
-  // Member comments styles
-  memberCommentsSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  memberCommentsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  memberCommentsList: {
-    gap: 8,
-  },
-  memberCommentItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  memberCommentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  memberCommentAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  memberCommentInitial: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberCommentName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  memberCommentInfo: {
-    flex: 1,
-  },
-  memberCommentDetail: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  memberCommentText: {
-    fontSize: 12,
-    color: '#374151',
-    fontStyle: 'italic',
-  },
-  memberCommentTime: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-
-  // Member activity styles
-  memberActivitySection: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  memberActivityList: {
-    marginTop: 16,
-  },
-  memberActivityItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  memberActivityHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  memberActivityAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  memberActivityInitial: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberActivityInfo: {
-    flex: 1,
-  },
-  memberActivityName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 2,
-  },
-  memberActivityAction: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  memberActivityTime: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  memberActivityContent: {
-    fontSize: 12,
-    color: '#374151',
-    fontStyle: 'italic',
-    marginLeft: 44,
-  },
-  emptyActivityContainer: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  emptyActivityText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  emptyActivitySubtext: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
-  emptyVotesContainer: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  noVotesSubtext: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-
-  // Enhanced Member Activity styles
-  insightsSection: {
-    marginBottom: 20,
-  },
-  insightsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  insightsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    gap: 10,
-  },
-  memberInsight: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
-    width: '45%', // Adjust as needed for two columns
-    alignItems: 'center',
-  },
-  memberInsightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  memberInsightAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  memberInsightInitial: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberInsightName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  memberInsightStats: {
-    alignItems: 'center',
-  },
-  memberInsightVotes: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  memberInsightPercentage: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  recentActivitySection: {
-    marginBottom: 20,
-  },
-  recentActivityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  restaurantVotingSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  restaurantVotingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  restaurantVotingItem: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  restaurantVotingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  restaurantVotingName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    flex: 1,
-    marginRight: 10,
-  },
-  restaurantVotingBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  restaurantVotingRank: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  restaurantVotingStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 8,
-  },
-  voteStat: {
-    alignItems: 'center',
-  },
-  voteStatLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  voteStatValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  restaurantVotingVoters: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontStyle: 'italic',
-  },
-  
-  // Tab styles
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    marginBottom: 8,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#3B82F6',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  activeTabText: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
   insightsContainer: {
     padding: 20,
   },
-  insightsContent: {
-    gap: 20,
+  insightsSection: {
+    marginBottom: 24,
+  },
+  insightsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
   },
   insightsGrid: {
     gap: 12,
+  },
+  insightsContent: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  restaurantName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  votingDetails: {
+    gap: 6,
+  },
+  voteGroup: {
+    gap: 4,
+  },
+  voteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  voteLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  voterNames: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  noVotes: {
+    fontSize: 11,
+    color: '#D1D5DB',
+    fontStyle: 'italic',
+  },
+  commentsSection: {
+    marginTop: 8,
+    gap: 4,
+  },
+  commentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  commentsLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  commentItem: {
+    gap: 2,
+  },
+  commentAuthor: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  commentText: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  memberActivitySection: {
+    marginBottom: 24,
+  },
+  memberStatsGrid: {
+    gap: 12,
+  },
+  memberStatCard: {
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  memberName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 6,
+  },
+  memberStats: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  noActivity: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 16,
   },
 });
