@@ -1667,7 +1667,62 @@ export function useCollectionRestaurants(collectionId: string) {
   }, [restaurants, plans, collectionId]);
 }
 
-// Alias for backward compatibility
+// Enhanced collection hook with member details
 export function useCollectionById(id: string) {
-  return usePlanById(id);
+  const { plans } = useRestaurants();
+  const collection = plans.find((p: any) => p.id === id);
+  
+  // Fetch collection members with proper names
+  const membersQuery = useQuery({
+    queryKey: ['collectionMembers', id],
+    queryFn: async () => {
+      if (!id) return [];
+      try {
+        console.log('[RestaurantStore] Fetching collection members for:', id);
+        const members = await dbHelpers.getCollectionMembers(id);
+        console.log('[RestaurantStore] Fetched collection members:', members.length);
+        return members;
+      } catch (error) {
+        console.error('[RestaurantStore] Error fetching collection members:', error);
+        return [];
+      }
+    },
+    enabled: !!id,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+  
+  return useMemo(() => {
+    if (!collection) return null;
+    
+    // Enhanced collection with proper member data
+    return {
+      ...collection,
+      // Use fetched members data instead of raw collaborators
+      collaborators: membersQuery.data && membersQuery.data.length > 0 
+        ? membersQuery.data
+        : collection.collaborators && Array.isArray(collection.collaborators) 
+          ? collection.collaborators.map((member: any) => {
+              // If member is already an object with name, return as is
+              if (typeof member === 'object' && member.name) {
+                return member;
+              }
+              // If member is a string (UUID), create a proper member object
+              if (typeof member === 'string') {
+                return {
+                  userId: member,
+                  name: member.length > 10 ? `Member ${member.substring(0, 8)}` : member,
+                  role: 'member',
+                  isVerified: false
+                };
+              }
+              return member;
+            })
+          : [],
+      // Add loading state for members
+      membersLoading: membersQuery.isLoading
+    };
+  }, [collection, membersQuery.data, membersQuery.isLoading]);
 }

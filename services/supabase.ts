@@ -1301,13 +1301,44 @@ export const dbHelpers = {
   },
 
   async getCollectionMembers(collectionId: string) {
-    const { data, error } = await supabase
-      .from('collection_members')
-      .select('*, users(name, avatar_url, is_local_expert, expert_areas)')
-      .eq('collection_id', collectionId);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      console.log('[Supabase] Getting collection members for:', collectionId);
+      
+      const { data, error } = await supabase
+        .from('collection_members')
+        .select('*, users(id, name, avatar_url, is_local_expert, expert_areas)')
+        .eq('collection_id', collectionId);
+      
+      if (error) {
+        console.error('[Supabase] Error fetching collection members:', {
+          error: JSON.stringify(error, null, 2),
+          message: error.message || 'No message',
+          code: error.code || 'No code',
+          collectionId
+        });
+        return [];
+      }
+      
+      console.log('[Supabase] Successfully fetched collection members:', data?.length || 0);
+      
+      // Transform the data to include proper member information
+      return (data || []).map((member: any) => ({
+        userId: member.user_id,
+        name: member.users?.name || `Member ${member.user_id?.substring(0, 8)}`,
+        avatar_url: member.users?.avatar_url,
+        role: member.role || 'member',
+        isVerified: member.users?.is_local_expert || false,
+        expert_areas: member.users?.expert_areas || [],
+        joined_at: member.joined_at
+      }));
+    } catch (error) {
+      console.error('[Supabase] getCollectionMembers error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error),
+        collectionId
+      });
+      return [];
+    }
   },
 
   async removeCollectionMember(collectionId: string, userId: string) {
@@ -1430,19 +1461,48 @@ export const dbHelpers = {
   },
 
   async getRestaurantVotes(restaurantId: string, collectionId?: string) {
-    let query = supabase
-      .from('restaurant_votes')
-      .select('*, users(name, avatar_url)')
-      .eq('restaurant_id', restaurantId);
-    
-    if (collectionId) {
-      query = query.eq('collection_id', collectionId);
+    try {
+      console.log('[Supabase] Getting restaurant votes for:', restaurantId, 'collection:', collectionId);
+      
+      let query = supabase
+        .from('restaurant_votes')
+        .select('*, users(id, name, avatar_url)')
+        .eq('restaurant_id', restaurantId);
+      
+      if (collectionId) {
+        query = query.eq('collection_id', collectionId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('[Supabase] Error fetching restaurant votes:', {
+          error: JSON.stringify(error, null, 2),
+          message: error.message || 'No message',
+          code: error.code || 'No code',
+          restaurantId,
+          collectionId
+        });
+        return [];
+      }
+      
+      console.log('[Supabase] Successfully fetched restaurant votes:', data?.length || 0);
+      
+      // Transform the data to include proper user information
+      return (data || []).map((vote: any) => ({
+        ...vote,
+        userName: vote.users?.name || `User ${vote.user_id?.substring(0, 8)}`,
+        userAvatar: vote.users?.avatar_url
+      }));
+    } catch (error) {
+      console.error('[Supabase] getRestaurantVotes error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error),
+        restaurantId,
+        collectionId
+      });
+      return [];
     }
-    
-    const { data, error } = await query;
-    
-    if (error) throw error;
-    return data || [];
   },
 
   async getCollectionVotes(collectionId: string) {
