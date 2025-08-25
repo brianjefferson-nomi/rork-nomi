@@ -204,12 +204,110 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
           console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
           
-          // Add some default vibe tags if none exist
-          const displayTags = vibeTags.length > 0 ? vibeTags : ['Popular', 'Local'];
+          // Generate more specific vibe tags based on restaurant characteristics
+          const generateSpecificTags = () => {
+            const description = (restaurant.aiDescription || restaurant.description || '').toLowerCase();
+            const cuisine = restaurant.cuisine.toLowerCase();
+            const priceRange = restaurant.priceRange;
+            const name = restaurant.name.toLowerCase();
+            
+            const specificTags = [];
+            
+            // Price-based tags
+            if (priceRange === '$$$$') {
+              specificTags.push('Luxury', 'Fine Dining');
+            } else if (priceRange === '$$$') {
+              specificTags.push('Upscale', 'Sophisticated');
+            } else if (priceRange === '$$') {
+              specificTags.push('Casual', 'Comfortable');
+            } else {
+              specificTags.push('Affordable', 'Quick Bite');
+            }
+            
+            // Cuisine-based tags
+            if (cuisine.includes('italian')) {
+              specificTags.push('Authentic', 'Traditional');
+            } else if (cuisine.includes('japanese') || cuisine.includes('sushi')) {
+              specificTags.push('Fresh', 'Artisanal');
+            } else if (cuisine.includes('mexican')) {
+              specificTags.push('Spicy', 'Vibrant');
+            } else if (cuisine.includes('french')) {
+              specificTags.push('Elegant', 'Refined');
+            } else if (cuisine.includes('american')) {
+              specificTags.push('Classic', 'Comfort');
+            } else if (cuisine.includes('thai')) {
+              specificTags.push('Aromatic', 'Bold');
+            } else if (cuisine.includes('indian')) {
+              specificTags.push('Spiced', 'Rich');
+            }
+            
+            // Description-based tags
+            if (description.includes('romantic') || description.includes('intimate')) {
+              specificTags.push('Romantic');
+            }
+            if (description.includes('cozy') || description.includes('warm')) {
+              specificTags.push('Cozy');
+            }
+            if (description.includes('trendy') || description.includes('modern')) {
+              specificTags.push('Trendy');
+            }
+            if (description.includes('rustic') || description.includes('farm')) {
+              specificTags.push('Rustic');
+            }
+            if (description.includes('elegant') || description.includes('sophisticated')) {
+              specificTags.push('Elegant');
+            }
+            if (description.includes('bustling') || description.includes('energetic')) {
+              specificTags.push('Bustling');
+            }
+            if (description.includes('quiet') || description.includes('serene')) {
+              specificTags.push('Serene');
+            }
+            if (description.includes('authentic') || description.includes('traditional')) {
+              specificTags.push('Authentic');
+            }
+            if (description.includes('innovative') || description.includes('creative')) {
+              specificTags.push('Innovative');
+            }
+            if (description.includes('family') || description.includes('friendly')) {
+              specificTags.push('Family-friendly');
+            }
+            if (description.includes('date') || description.includes('romantic')) {
+              specificTags.push('Date Night');
+            }
+            if (description.includes('business') || description.includes('professional')) {
+              specificTags.push('Business');
+            }
+            if (description.includes('outdoor') || description.includes('patio')) {
+              specificTags.push('Outdoor');
+            }
+            if (description.includes('rooftop') || description.includes('view')) {
+              specificTags.push('Rooftop');
+            }
+            if (description.includes('historic') || description.includes('landmark')) {
+              specificTags.push('Historic');
+            }
+            if (description.includes('local') || description.includes('neighborhood')) {
+              specificTags.push('Local');
+            }
+            if (description.includes('organic') || description.includes('farm-to-table')) {
+              specificTags.push('Farm-to-table');
+            }
+            if (description.includes('vegan') || description.includes('vegetarian')) {
+              specificTags.push('Plant-based');
+            }
+            
+            // Remove duplicates and limit to 4 tags
+            const uniqueTags = [...new Set(specificTags)];
+            return uniqueTags.slice(0, 4);
+          };
+          
+          // Use specific tags if available, otherwise fallback to default
+          const displayTags = vibeTags.length > 0 ? vibeTags : generateSpecificTags();
           
           return (
             <View style={styles.vibeContainer}>
-              {displayTags.slice(0, 6).map((v, i) => {
+              {displayTags.slice(0, 4).map((v, i) => {
                 if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
                 const firstWord = v.split(' ')[0];
                 if (!firstWord || firstWord.length === 0) return null;
@@ -237,12 +335,6 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             {restaurant.neighborhood}
             {restaurant.distance && ` • ${restaurant.distance}`}
           </Text>
-        </View>
-        
-        {/* Hours */}
-        <View style={styles.hoursRow}>
-          <Clock size={14} color="#666" />
-          <Text style={styles.hoursText}>{formatHours(restaurant.hours)}</Text>
         </View>
         
         {/* Description */}
@@ -398,16 +490,6 @@ const styles = StyleSheet.create({
     color: '#717171',
     marginLeft: 4,
     flex: 1,
-  },
-  hoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  hoursText: {
-    fontSize: 14,
-    color: '#717171',
-    marginLeft: 4,
   },
   vibeContainer: {
     flexDirection: 'row',
