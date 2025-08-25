@@ -531,8 +531,28 @@ export default function CollectionDetailScreen() {
                   {(() => {
                     const restaurantVotes: any[] = [];
                     
+                    // Get collection members for privacy filtering
+                    const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
+                      ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+                      : [];
+                    
                     // Only show votes for this specific restaurant
                     meta.voteDetails.likeVoters.forEach(voter => {
+                      // For private collections, only show activity from actual members
+                      if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // For shared collections, only show activity from actual collection members
+                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // Suppress content for unknown members in shared collections
+                      if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
+                        return;
+                      }
+                      
                       restaurantVotes.push({
                         type: 'like',
                         userName: voter.name,
@@ -543,6 +563,21 @@ export default function CollectionDetailScreen() {
                     });
                     
                     meta.voteDetails.dislikeVoters.forEach(voter => {
+                      // For private collections, only show activity from actual members
+                      if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // For shared collections, only show activity from actual collection members
+                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // Suppress content for unknown members in shared collections
+                      if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
+                        return;
+                      }
+                      
                       restaurantVotes.push({
                         type: 'dislike',
                         userName: voter.name,
@@ -592,9 +627,35 @@ export default function CollectionDetailScreen() {
                 {/* Member Comments */}
                 <View style={styles.memberCommentsSection}>
                   <Text style={styles.memberCommentsTitle}>Member Comments</Text>
-                  {discussions.length > 0 ? (
-                    <View style={styles.memberCommentsList}>
-                      {discussions.slice(0, 6).map((discussion, index) => (
+                  {(() => {
+                    // Get collection members for privacy filtering
+                    const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
+                      ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+                      : [];
+                    
+                    // Filter discussions to only show collection members
+                    const filteredDiscussions = discussions.filter(discussion => {
+                      // For private collections, only show activity from actual members
+                      if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                        return false;
+                      }
+                      
+                      // For shared collections, only show activity from actual collection members
+                      if (collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                        return false;
+                      }
+                      
+                      // Suppress content for unknown members in shared collections
+                      if (collection.is_public && (!discussion.userName || discussion.userName === 'Unknown' || discussion.userName === 'Unknown User')) {
+                        return false;
+                      }
+                      
+                      return true;
+                    });
+                    
+                    return filteredDiscussions.length > 0 ? (
+                      <View style={styles.memberCommentsList}>
+                        {filteredDiscussions.slice(0, 6).map((discussion, index) => (
                         <View key={index} style={styles.memberCommentItem}>
                           <View style={styles.memberCommentHeader}>
                             <View style={styles.memberCommentAvatar}>
@@ -620,7 +681,8 @@ export default function CollectionDetailScreen() {
                       <Text style={styles.noVotesText}>No comments yet</Text>
                       <Text style={styles.noVotesSubtext}>Members can comment to see activity here</Text>
                     </View>
-                  )}
+                  );
+                })()}
                 </View>
                 
                 <TouchableOpacity 
