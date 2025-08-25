@@ -226,21 +226,23 @@ export default function RestaurantDetailScreen() {
           </View>
 
           <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe || []).map((v, i) => {
-              // Ensure single word and capitalized with safety checks
-              if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
-              const firstWord = v.split(' ')[0];
-              if (!firstWord || firstWord.length === 0) return null;
-              const firstChar = firstWord.charAt(0);
-              const restOfWord = firstWord.slice(1);
-              const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-              if (!cleanTag || cleanTag.length === 0) return null;
-              return (
-                <View key={i} style={styles.vibeTag}>
-                  <Text style={styles.vibeText}>{cleanTag}</Text>
-                </View>
-              );
-            })}
+            {(restaurant.aiVibes || restaurant.vibe || [])
+              .filter(v => v && typeof v === 'string' && v.trim().length > 0)
+              .map((v, i) => {
+                // Ensure single word and capitalized with safety checks
+                const firstWord = v.split(' ')[0];
+                if (!firstWord || firstWord.length === 0) return null;
+                const firstChar = firstWord.charAt(0);
+                const restOfWord = firstWord.slice(1);
+                const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+                if (!cleanTag || cleanTag.length === 0) return null;
+                return (
+                  <View key={i} style={styles.vibeTag}>
+                    <Text style={styles.vibeText}>{cleanTag}</Text>
+                  </View>
+                );
+              })
+              .filter(Boolean)}
           </View>
 
           <Text style={styles.description}>{restaurant.aiDescription || restaurant.description}</Text>

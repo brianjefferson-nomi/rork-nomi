@@ -307,20 +307,22 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           
           return (
             <View style={styles.vibeContainer}>
-              {displayTags.slice(0, 4).map((v, i) => {
-                if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
-                const firstWord = v.split(' ')[0];
-                if (!firstWord || firstWord.length === 0) return null;
-                const firstChar = firstWord.charAt(0);
-                const restOfWord = firstWord.slice(1);
-                const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-                if (!cleanTag || cleanTag.length === 0) return null;
-                return (
-                  <View key={i} style={styles.vibeTag}>
-                    <Text style={styles.vibeText}>{cleanTag}</Text>
-                  </View>
-                );
-              })}
+              {displayTags.slice(0, 4)
+                .filter(v => v && typeof v === 'string' && v.trim().length > 0)
+                .map((v, i) => {
+                  const firstWord = v.split(' ')[0];
+                  if (!firstWord || firstWord.length === 0) return null;
+                  const firstChar = firstWord.charAt(0);
+                  const restOfWord = firstWord.slice(1);
+                  const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+                  if (!cleanTag || cleanTag.length === 0) return null;
+                  return (
+                    <View key={i} style={styles.vibeTag}>
+                      <Text style={styles.vibeText}>{cleanTag}</Text>
+                    </View>
+                  );
+                })
+                .filter(Boolean)}
             </View>
           );
         })()}

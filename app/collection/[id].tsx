@@ -459,30 +459,30 @@ export default function CollectionDetailScreen() {
                   </View>
                   
                   <View style={styles.badges}>
-                    {meta.badge === 'group_favorite' && (
-                      <View style={[styles.badge, styles.favoritesBadge]}>
-                        <Award size={12} color="#FFF" />
-                        <Text style={styles.badgeText}>Group Favorite</Text>
-                      </View>
-                    )}
-                    {meta.badge === 'unanimous' && (
-                      <View style={[styles.badge, styles.unanimousBadge]}>
-                        <Text style={styles.badgeText}>Unanimous</Text>
-                      </View>
-                    )}
-                    {meta.badge === 'debated' && (
-                      <View style={[styles.badge, styles.debatedBadge]}>
-                        <Text style={styles.badgeText}>Debated</Text>
-                      </View>
-                    )}
-                    {meta.trend === 'up' && <TrendingUp size={16} color="#22C55E" />}
-                    {meta.trend === 'down' && <TrendingDown size={16} color="#EF4444" />}
                     {meta?.rank === 1 && (
                       <View style={[styles.badge, styles.winnerBadge]}>
                         <Crown size={12} color="#FFF" />
                         <Text style={styles.badgeText}>WINNER</Text>
                       </View>
                     )}
+                    {meta?.rank !== 1 && meta.badge === 'group_favorite' && (
+                      <View style={[styles.badge, styles.favoritesBadge]}>
+                        <Award size={12} color="#FFF" />
+                        <Text style={styles.badgeText}>Group Favorite</Text>
+                      </View>
+                    )}
+                    {meta?.rank !== 1 && meta.badge === 'unanimous' && (
+                      <View style={[styles.badge, styles.unanimousBadge]}>
+                        <Text style={styles.badgeText}>Unanimous</Text>
+                      </View>
+                    )}
+                    {meta?.rank !== 1 && meta.badge === 'debated' && (
+                      <View style={[styles.badge, styles.debatedBadge]}>
+                        <Text style={styles.badgeText}>Debated</Text>
+                      </View>
+                    )}
+                    {meta.trend === 'up' && <TrendingUp size={16} color="#22C55E" />}
+                    {meta.trend === 'down' && <TrendingDown size={16} color="#EF4444" />}
                   </View>
                 </View>
                 
