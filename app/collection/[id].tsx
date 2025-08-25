@@ -125,7 +125,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
                     <Text style={styles.voteBreakdown}>
-                      {meta.voteDetails.likeVoters.length} likes · {meta.voteDetails.dislikeVoters.length} dislikes
+                      {meta.voteDetails.likeVoters.length} likes • {meta.voteDetails.dislikeVoters.length} dislikes
                     </Text>
                     <View style={styles.consensusBadge}>
                       <Text style={styles.consensusBadgeText}>
@@ -1169,35 +1169,35 @@ const styles = StyleSheet.create({
   },
   restaurantItem: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F3F4F6',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   winningRestaurantItem: {
-    backgroundColor: '#FEF7E0',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 28,
     borderWidth: 2,
     borderColor: '#F59E0B',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   removeButton: {
     marginTop: -8,
@@ -1430,10 +1430,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   approvalText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
+    color: '#111827',
+    marginBottom: 6,
   },
   voteBreakdown: {
     fontSize: 13,
@@ -1830,10 +1830,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   restaurantName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   restaurantSubtitle: {
     fontSize: 11,
