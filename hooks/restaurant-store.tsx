@@ -701,11 +701,16 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user?.id]);
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
     try {
+      console.log('[RestaurantStore] Loading discussions and comments for collection:', collectionId, 'restaurant:', restaurantId);
+      
       // Get both restaurant discussions and user activity comments
       const [discussions, comments] = await Promise.all([
         dbHelpers.getCollectionDiscussions(collectionId, restaurantId),
         dbHelpers.getRestaurantComments(collectionId, restaurantId)
       ]);
+
+      console.log('[RestaurantStore] Loaded discussions:', discussions?.length || 0, discussions);
+      console.log('[RestaurantStore] Loaded comments:', comments?.length || 0, comments);
 
       // Combine and format the data
       const combinedData = [
@@ -731,10 +736,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         }))
       ];
 
+      console.log('[RestaurantStore] Combined data:', combinedData?.length || 0, combinedData);
+
       // Sort by timestamp (newest first)
-      return combinedData.sort((a, b) => 
+      const sortedData = combinedData.sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
+
+      console.log('[RestaurantStore] Final sorted data:', sortedData?.length || 0, sortedData);
+      return sortedData;
     } catch (error) {
       console.error('[RestaurantStore] Error loading discussions and comments:', error);
       // Fallback to just discussions if comments fail

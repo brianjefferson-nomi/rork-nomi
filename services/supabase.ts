@@ -1609,13 +1609,20 @@ export const dbHelpers = {
 
   // Restaurant comment operations
   async getRestaurantComments(collectionId: string, restaurantId?: string) {
+    console.log('[Supabase] Getting restaurant comments for collection:', collectionId, 'restaurant:', restaurantId);
+    
     const { data, error } = await supabase
       .rpc('get_restaurant_comments', { 
         p_collection_id: collectionId, 
         p_restaurant_id: restaurantId || null 
       });
     
-    if (error) throw error;
+    if (error) {
+      console.error('[Supabase] Error getting restaurant comments:', error);
+      throw error;
+    }
+    
+    console.log('[Supabase] Restaurant comments result:', data?.length || 0, data);
     return data || [];
   },
 

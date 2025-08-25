@@ -896,7 +896,7 @@ export default function CollectionDetailScreen() {
                 style={styles.modalButton}
                 onPress={() => {
                   if (showVoteModal) {
-                    voteRestaurant(showVoteModal.vote, showVoteModal.restaurantId, id, voteReason);
+                    voteRestaurant(showVoteModal.restaurantId, showVoteModal.vote, id, voteReason);
                   }
                   setShowVoteModal(null);
                   setVoteReason('');
@@ -1697,6 +1697,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#EF4444',
+  },
+  likeButtonActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#059669',
+  },
+  dislikeButtonActive: {
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
+  },
+  voteCountActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   discussButton: {
     backgroundColor: '#F9FAFB',
