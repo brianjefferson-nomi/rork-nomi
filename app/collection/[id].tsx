@@ -30,7 +30,8 @@ export default function CollectionDetailScreen() {
     getGroupRecommendations,
     getCollectionDiscussions,
     inviteToCollection,
-    updateCollectionSettings 
+    updateCollectionSettings,
+    getRestaurantVotingDetails
   } = useRestaurants();
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
@@ -361,6 +362,7 @@ export default function CollectionDetailScreen() {
               )}
             </ScrollView>
           </View>
+        </View>
 
         {/* Contributor Statistics */}
         <View style={styles.contributorStatsSection}>
@@ -404,7 +406,7 @@ export default function CollectionDetailScreen() {
                     </View>
                     
                     <View style={styles.contributorDetails}>
-                      <View style={styles.voteBreakdown}>
+                      <View style={styles.voteBreakdownRow}>
                         <View style={styles.voteStat}>
                           <ThumbsUp size={14} color="#22C55E" />
                           <Text style={styles.voteStatText}>{likes} likes</Text>
@@ -575,6 +577,62 @@ export default function CollectionDetailScreen() {
                     ))}
                   </View>
                 )}
+
+                {/* Detailed Voting Information */}
+                <View style={styles.detailedVotingSection}>
+                  <Text style={styles.detailedVotingTitle}>Voting Details</Text>
+                  
+                  {/* Vote Breakdown by User */}
+                  <View style={styles.voteBreakdownSection}>
+                    <Text style={styles.breakdownTitle}>Votes by Member:</Text>
+                    {(() => {
+                      const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
+                      return votingDetails.voteBreakdown.map((userVote: any, idx: number) => (
+                        <View key={idx} style={styles.userVoteItem}>
+                          <Text style={styles.userVoteName}>{userVote.userName}</Text>
+                          <View style={styles.userVoteDetails}>
+                            {userVote.votes.map((vote: any, voteIdx: number) => (
+                              <View key={voteIdx} style={styles.voteDetail}>
+                                <Text style={[
+                                  styles.voteType, 
+                                  vote.vote === 'like' ? styles.likeVote : styles.dislikeVote
+                                ]}>
+                                  {vote.vote === 'like' ? '👍' : '👎'} {vote.vote}
+                                </Text>
+                                {vote.reason && (
+                                  <Text style={styles.voteReason}>"{vote.reason}"</Text>
+                                )}
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      ));
+                    })()}
+                  </View>
+
+                  {/* Comments by User */}
+                  <View style={styles.commentsSection}>
+                    <Text style={styles.breakdownTitle}>Comments by Member:</Text>
+                    {(() => {
+                      const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
+                      return votingDetails.discussionBreakdown.map((userComment: any, idx: number) => (
+                        <View key={idx} style={styles.userCommentItem}>
+                          <Text style={styles.userCommentName}>{userComment.userName}</Text>
+                          <View style={styles.userCommentDetails}>
+                            {userComment.comments.map((comment: any, commentIdx: number) => (
+                              <View key={commentIdx} style={styles.commentDetail}>
+                                <Text style={styles.commentText}>"{comment.message}"</Text>
+                                <Text style={styles.commentTime}>
+                                  {comment.timestamp ? new Date(comment.timestamp).toLocaleDateString() : 'Unknown date'}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </View>
                 
                 <TouchableOpacity 
                   style={styles.removeButton}
@@ -1210,7 +1268,7 @@ const styles = StyleSheet.create({
   contributorDetails: {
     marginTop: 8,
   },
-  voteBreakdown: {
+  voteBreakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 8,
@@ -1242,5 +1300,92 @@ const styles = StyleSheet.create({
   emptyContributorsText: {
     fontSize: 14,
     color: '#999',
+  },
+  // Detailed voting styles
+  detailedVotingSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  detailedVotingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  voteBreakdownSection: {
+    marginBottom: 12,
+  },
+  breakdownTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  userVoteItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  userVoteName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  userVoteDetails: {
+    marginLeft: 8,
+  },
+  voteDetail: {
+    marginBottom: 4,
+  },
+  voteType: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  likeVote: {
+    color: '#22C55E',
+  },
+  dislikeVote: {
+    color: '#EF4444',
+  },
+  voteReason: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginLeft: 8,
+  },
+  commentsSection: {
+    marginTop: 8,
+  },
+  userCommentItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  userCommentName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  userCommentDetails: {
+    marginLeft: 8,
+  },
+  commentDetail: {
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 11,
+    color: '#374151',
+    fontStyle: 'italic',
+  },
+  commentTime: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
 });

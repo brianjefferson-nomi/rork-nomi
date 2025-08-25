@@ -52,6 +52,7 @@ interface RestaurantStore {
   getCollectionDiscussions: (collectionId: string, restaurantId?: string) => Promise<any[]>;
   inviteToCollection: (collectionId: string, email: string, message?: string) => Promise<void>;
   updateCollectionSettings: (collectionId: string, settings: any) => Promise<void>;
+  getRestaurantVotingDetails: (restaurantId: string, planId: string) => any;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -726,6 +727,66 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     });
   }, [discussions]);
 
+  // Get detailed voting information for a restaurant in a collection
+  const getRestaurantVotingDetails = useCallback((restaurantId: string, planId: string) => {
+    const planVotes = userVotes.filter((v: any) => 
+      v.restaurantId === restaurantId && v.collectionId === planId
+    );
+    
+    const planDiscussions = discussions.filter((d: any) => 
+      d.restaurantId === restaurantId && d.collectionId === planId
+    );
+    
+    const likes = planVotes.filter((v: any) => v.vote === 'like');
+    const dislikes = planVotes.filter((v: any) => v.vote === 'dislike');
+    
+    // Group votes by user for detailed breakdown
+    const voteBreakdown = planVotes.reduce((acc: any, vote: any) => {
+      const userId = vote.userId;
+      if (!acc[userId]) {
+        acc[userId] = {
+          userId,
+          userName: vote.userName || 'Unknown User',
+          votes: []
+        };
+      }
+      acc[userId].votes.push({
+        vote: vote.vote,
+        reason: vote.reason,
+        timestamp: vote.timestamp
+      });
+      return acc;
+    }, {});
+    
+    // Group discussions by user
+    const discussionBreakdown = planDiscussions.reduce((acc: any, discussion: any) => {
+      const userId = discussion.userId;
+      if (!acc[userId]) {
+        acc[userId] = {
+          userId,
+          userName: discussion.userName || 'Unknown User',
+          comments: []
+        };
+      }
+      acc[userId].comments.push({
+        message: discussion.message,
+        timestamp: discussion.timestamp,
+        likes: discussion.likes || 0
+      });
+      return acc;
+    }, {});
+    
+    return {
+      totalVotes: planVotes.length,
+      likes: likes.length,
+      dislikes: dislikes.length,
+      totalComments: planDiscussions.length,
+      voteBreakdown: Object.values(voteBreakdown),
+      discussionBreakdown: Object.values(discussionBreakdown),
+      approvalRate: planVotes.length > 0 ? (likes.length / planVotes.length) * 100 : 0
+    };
+  }, [userVotes, discussions]);
+
   // Search restaurants with location-based results
   const searchRestaurants = useCallback(async (query: string, userLat?: number, userLng?: number): Promise<Restaurant[]> => {
     try {
@@ -851,6 +912,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
+    getRestaurantVotingDetails,
   }), [
     restaurants,
     plansQuery.data,
@@ -892,6 +954,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
+    getRestaurantVotingDetails,
   ]);
 
   return storeValue;
