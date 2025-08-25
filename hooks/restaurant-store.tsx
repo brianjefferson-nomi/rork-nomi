@@ -201,6 +201,46 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
+  // Load all votes for collections (to see other users' activity)
+  const allVotesQuery = useQuery({
+    queryKey: ['allVotes'],
+    queryFn: async () => {
+      try {
+        console.log('[RestaurantStore] Loading all votes from database');
+        // Get all collections the user has access to
+        const plans = await dbHelpers.getUserPlans(user?.id || '');
+        const allVotes: any[] = [];
+        
+        // Fetch votes for each collection
+        for (const plan of plans) {
+          const collectionVotes = await dbHelpers.getCollectionVotes(plan.id);
+          allVotes.push(...collectionVotes.map((vote: any) => ({
+            restaurantId: vote.restaurant_id,
+            userId: vote.user_id,
+            collectionId: vote.collection_id,
+            vote: vote.vote,
+            reason: vote.reason,
+            timestamp: vote.created_at,
+            authority: 'regular',
+            weight: 1,
+            userName: vote.users?.name || 'Unknown User'
+          })));
+        }
+        
+        console.log('[RestaurantStore] Loaded all votes from database:', allVotes.length);
+        return allVotes;
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading all votes from database:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+
   // Load discussions from database
   const discussionsQuery = useQuery({
     queryKey: ['discussions'],
@@ -873,9 +913,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       ? restaurants.filter((r: any) => (plan?.restaurant_ids ?? []).includes(r.id))
       : restaurants;
     
+    // Use all votes for the collection, not just user votes
     const planVotes = planId 
-      ? userVotes.filter((v: any) => v.collectionId === planId)
-      : userVotes;
+      ? (allVotesQuery.data?.filter((v: any) => v.collectionId === planId) || [])
+      : (allVotesQuery.data || []);
     
     const discussionCounts = discussions
       .filter((d: any) => !planId || d.collectionId === planId)
@@ -894,12 +935,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       planKeys: plan ? Object.keys(plan) : []
     });
     
+    console.log('[RestaurantStore] Using votes for ranking:', {
+      totalVotes: planVotes.length,
+      userVotes: userVotes.filter((v: any) => v.collectionId === planId).length,
+      allVotes: planVotes.length
+    });
+    
     return computeRankings(pool, planVotes, { 
       memberCount, 
       collection: plan, // ✅ Pass the collection data
       discussions: discussionCounts 
     });
-  }, [plansQuery.data, restaurants, userVotes, discussions]);
+  }, [plansQuery.data, restaurants, userVotes, allVotesQuery.data, discussions]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
     const plan = plansQuery.data?.find((p: any) => p.id === planId);
@@ -1132,6 +1179,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     plans: plansQuery.data || [],
     collections: plansQuery.data || [], // Alias for backward compatibility
     userVotes,
+    allVotes: allVotesQuery.data || [], // All votes for collections (to see other users' activity)
     discussions,
     favoriteRestaurants,
     isLoading: (dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading) && !dataQuery.data && restaurants.length === 0,
@@ -1173,6 +1221,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     restaurants,
     plansQuery.data,
     userVotes,
+    allVotesQuery.data,
     discussions,
     favoriteRestaurants,
     dataQuery.isLoading,

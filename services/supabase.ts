@@ -1265,6 +1265,16 @@ export const dbHelpers = {
     return data || [];
   },
 
+  async getCollectionVotes(collectionId: string) {
+    const { data, error } = await supabase
+      .from('restaurant_votes')
+      .select('*, users(name, avatar_url)')
+      .eq('collection_id', collectionId);
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async deleteRestaurantVote(restaurantId: string, userId: string, collectionId?: string) {
     let query = supabase
       .from('restaurant_votes')
