@@ -38,8 +38,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
                 const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
                   const uniqueVoters = new Set([
-                    ...meta.voteDetails.likeVoters.map((v, index) => v.userId),
-                    ...meta.voteDetails.dislikeVoters.map((v, index) => v.userId)
+                    ...meta.voteDetails.likeVoters.map((v, index) => `${v.userId}-${index}`),
+                    ...meta.voteDetails.dislikeVoters.map((v, index) => `${v.userId}-${index}`)
                   ]);
                   return total + uniqueVoters.size;
                 }, 0);
@@ -717,7 +717,7 @@ export default function CollectionDetailScreen() {
                 <View style={styles.votingSection}>
                   <View style={styles.voteStats}>
                     <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                    <Text style={styles.voteBreakdown}>{meta.likes} likes • {meta.dislikes} dislikes</Text>
+                    <Text style={styles.voteBreakdown}>{meta.likes} likes · {meta.dislikes} dislikes</Text>
                     {meta.consensus && (
                       <View style={[styles.consensusMeter, getConsensusStyle(meta.consensus)]}>
                         <Text style={styles.consensusText}>{meta.consensus} consensus</Text>
