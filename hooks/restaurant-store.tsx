@@ -371,15 +371,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
   }, [user?.id, plansQuery.data, queryClient]);
 
-  const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => {
+    const createPlan = useCallback(async (planData: { name: string; description?: string; plannedDate?: string; isPublic?: boolean; occasion?: string }) => {
     if (!user?.id) {
       console.error('[RestaurantStore] No user ID available for plan creation');
       throw new Error('User not authenticated');
     }
-
+    
     console.log('[RestaurantStore] Creating plan:', planData);
     
     try {
+      // Get cover image first
+      const coverImage = await getUnsplashCollectionCoverImage(planData.occasion || 'General');
+      
       const planInsertData = {
         name: planData.name,
         description: planData.description,
@@ -387,7 +390,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         creator_id: user.id,
         occasion: planData.occasion,
         is_public: planData.isPublic || false,
-        cover_image: await getUnsplashCollectionCoverImage(planData.occasion || 'General'),
+        cover_image: coverImage,
         likes: 0,
         equal_voting: true,
         admin_weighted: false,
