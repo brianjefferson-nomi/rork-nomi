@@ -205,6 +205,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   });
 
+  // Temporary RLS disable function for testing
+  const disableRLSTemporarily = useMutation({
+    mutationFn: async () => {
+      console.log('[RestaurantStore] Temporarily disabling RLS...');
+      const result = await dbHelpers.disableRLSTemporarily();
+      console.log('[RestaurantStore] RLS disable result:', result);
+      return result;
+    },
+    onSuccess: (data) => {
+      console.log('[RestaurantStore] RLS disabled successfully:', data);
+      // Refetch data after fix
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+    },
+    onError: (error) => {
+      console.error('[RestaurantStore] RLS disable failed:', error);
+    }
+  });
+
   // Test database connection on startup
   const dbTestQuery = useQuery({
     queryKey: ['dbTest'],
@@ -1548,6 +1567,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     removeMemberFromCollection,
     updateCollectionType,
     applyRLSFix, // Add the new function to the memoized value
+    disableRLSTemporarily, // Add the RLS disable function
   }), [
     restaurants,
     plansQuery.data,

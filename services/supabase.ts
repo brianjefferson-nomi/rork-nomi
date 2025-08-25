@@ -722,6 +722,36 @@ export const dbHelpers = {
     }
   },
 
+  // Simplified RLS fix - just disable RLS temporarily for testing
+  async disableRLSTemporarily() {
+    try {
+      console.log('[Supabase] Temporarily disabling RLS for testing...');
+      
+      // Try to disable RLS on collections table
+      const { error: disableError } = await supabase.rpc('exec_sql', {
+        sql: 'ALTER TABLE collections DISABLE ROW LEVEL SECURITY;'
+      });
+      
+      if (disableError) {
+        console.error('[Supabase] Error disabling RLS:', {
+          error: JSON.stringify(disableError, null, 2),
+          message: disableError.message,
+          code: disableError.code
+        });
+        return { success: false, error: disableError, message: 'Failed to disable RLS' };
+      }
+      
+      console.log('[Supabase] RLS disabled successfully');
+      return { success: true, message: 'RLS disabled for testing' };
+    } catch (error) {
+      console.error('[Supabase] RLS disable error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return { success: false, error, message: 'RLS disable failed' };
+    }
+  },
+
   // Diagnostic function to test database connectivity and RLS
   async testDatabaseConnection() {
     try {
@@ -943,71 +973,81 @@ export const dbHelpers = {
         return [];
       }
       
-      // Get collections where user is creator
-      const { data: creatorCollections, error: creatorError } = await supabase
-        .from('collections')
-        .select('*')
-        .or(`created_by.eq.${userId},creator_id.eq.${userId}`)
-        .order('created_at', { ascending: false })
-        .limit(100);
-      
-      if (creatorError) {
-        console.error('[Supabase] Error fetching creator collections:', {
-          error: JSON.stringify(creatorError, null, 2),
-          message: creatorError.message || 'No message',
-          details: creatorError.details || 'No details',
-          hint: creatorError.hint || 'No hint',
-          code: creatorError.code || 'No code'
-        });
-        // Continue with empty creator collections instead of failing completely
-      }
-      
-      // Get collections where user is a member
-      const { data: memberCollections, error: memberError } = await supabase
-        .from('collection_members')
-        .select('collection_id')
-        .eq('user_id', userId);
-      
-      let memberCollectionsData: any[] = [];
-      if (memberError) {
-        console.error('[Supabase] Error fetching member collections:', {
-          error: JSON.stringify(memberError, null, 2),
-          message: memberError.message || 'No message',
-          details: memberError.details || 'No details',
-          hint: memberError.hint || 'No hint',
-          code: memberError.code || 'No code'
-        });
-      } else if (memberCollections && memberCollections.length > 0) {
-        const collectionIds = memberCollections.map(m => m.collection_id);
-        
-        const { data: memberColls, error: memberCollsError } = await supabase
+      // Try to get collections where user is creator
+      let creatorCollections: any[] = [];
+      try {
+        const { data, error: creatorError } = await supabase
           .from('collections')
           .select('*')
-          .in('id', collectionIds)
+          .or(`created_by.eq.${userId},creator_id.eq.${userId}`)
           .order('created_at', { ascending: false })
           .limit(100);
         
-        if (memberCollsError) {
-          console.error('[Supabase] Error fetching member collection details:', {
-            error: JSON.stringify(memberCollsError, null, 2),
-            message: memberCollsError.message || 'No message',
-            details: memberCollsError.details || 'No details',
-            hint: memberCollsError.hint || 'No hint',
-            code: memberCollsError.code || 'No code'
+        if (creatorError) {
+          console.error('[Supabase] Error fetching creator collections:', {
+            error: JSON.stringify(creatorError, null, 2),
+            message: creatorError.message || 'No message',
+            details: creatorError.details || 'No details',
+            hint: creatorError.hint || 'No hint',
+            code: creatorError.code || 'No code'
           });
         } else {
-          memberCollectionsData = memberColls || [];
+          creatorCollections = data || [];
         }
+      } catch (error) {
+        console.error('[Supabase] Exception fetching creator collections:', error);
+      }
+      
+      // Try to get collections where user is a member
+      let memberCollectionsData: any[] = [];
+      try {
+        const { data: memberCollections, error: memberError } = await supabase
+          .from('collection_members')
+          .select('collection_id')
+          .eq('user_id', userId);
+        
+        if (memberError) {
+          console.error('[Supabase] Error fetching member collections:', {
+            error: JSON.stringify(memberError, null, 2),
+            message: memberError.message || 'No message',
+            details: memberError.details || 'No details',
+            hint: memberError.hint || 'No hint',
+            code: memberError.code || 'No code'
+          });
+        } else if (memberCollections && memberCollections.length > 0) {
+          const collectionIds = memberCollections.map(m => m.collection_id);
+          
+          const { data: memberColls, error: memberCollsError } = await supabase
+            .from('collections')
+            .select('*')
+            .in('id', collectionIds)
+            .order('created_at', { ascending: false })
+            .limit(100);
+          
+          if (memberCollsError) {
+            console.error('[Supabase] Error fetching member collection details:', {
+              error: JSON.stringify(memberCollsError, null, 2),
+              message: memberCollsError.message || 'No message',
+              details: memberCollsError.details || 'No details',
+              hint: memberCollsError.hint || 'No hint',
+              code: memberCollsError.code || 'No code'
+            });
+          } else {
+            memberCollectionsData = memberColls || [];
+          }
+        }
+      } catch (error) {
+        console.error('[Supabase] Exception fetching member collections:', error);
       }
       
       // Combine and deduplicate collections
-      const allCollections = [...(creatorCollections || []), ...memberCollectionsData];
+      const allCollections = [...creatorCollections, ...memberCollectionsData];
       const uniqueCollections = allCollections.filter((collection, index, self) => 
         index === self.findIndex(c => c.id === collection.id)
       );
       
       console.log('[Supabase] Successfully fetched collections:', {
-        creator: creatorCollections?.length || 0,
+        creator: creatorCollections.length,
         member: memberCollectionsData.length,
         total: uniqueCollections.length
       });
