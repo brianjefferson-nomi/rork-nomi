@@ -67,6 +67,102 @@ interface CachedContent {
 const CACHE_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days in milliseconds
 const CACHE_KEY_PREFIX = 'genai_cache_';
 
+// Restaurant-related validation keywords
+const RESTAURANT_VIBE_KEYWORDS = [
+  'romantic', 'upscale', 'trendy', 'cozy', 'casual', 'elegant', 'rustic', 'modern', 'traditional',
+  'intimate', 'lively', 'quiet', 'bustling', 'charming', 'sophisticated', 'laid-back', 'energetic',
+  'relaxed', 'formal', 'informal', 'family-friendly', 'date-night', 'business', 'outdoor', 'rooftop',
+  'authentic', 'fusion', 'gourmet', 'comfort', 'luxury', 'budget-friendly', 'quick', 'slow', 'artisan',
+  'farm-to-table', 'organic', 'sustainable', 'local', 'international', 'street-food', 'fine-dining',
+  'fast-casual', 'diner', 'bistro', 'cafe', 'pub', 'bar', 'grill', 'steakhouse', 'seafood', 'pizza',
+  'sushi', 'thai', 'italian', 'mexican', 'chinese', 'indian', 'french', 'japanese', 'korean', 'mediterranean'
+];
+
+const RESTAURANT_DESCRIPTION_KEYWORDS = [
+  'restaurant', 'dining', 'food', 'cuisine', 'meal', 'dish', 'menu', 'chef', 'kitchen', 'service',
+  'atmosphere', 'ambiance', 'experience', 'taste', 'flavor', 'delicious', 'fresh', 'quality', 'ingredients',
+  'cooking', 'prepared', 'served', 'recommended', 'popular', 'favorite', 'specialty', 'signature',
+  'authentic', 'traditional', 'modern', 'fusion', 'gourmet', 'casual', 'elegant', 'cozy', 'romantic',
+  'family', 'business', 'date', 'occasion', 'celebration', 'dinner', 'lunch', 'breakfast', 'brunch'
+];
+
+const RESTAURANT_MENU_KEYWORDS = [
+  'pizza', 'pasta', 'burger', 'steak', 'salmon', 'chicken', 'beef', 'pork', 'fish', 'shrimp',
+  'sushi', 'sashimi', 'rice', 'noodles', 'soup', 'salad', 'sandwich', 'taco', 'burrito', 'curry',
+  'kebab', 'falafel', 'hummus', 'dumpling', 'spring roll', 'pad thai', 'pho', 'ramen', 'udon',
+  'teriyaki', 'tempura', 'gyoza', 'miso', 'kimchi', 'bibimbap', 'bulgogi', 'paella', 'risotto',
+  'gnocchi', 'ravioli', 'lasagna', 'calzone', 'stromboli', 'quesadilla', 'enchilada', 'fajita',
+  'tamale', 'empanada', 'arepa', 'ceviche', 'guacamole', 'salsa', 'mole', 'adobo', 'sofrito',
+  'bruschetta', 'antipasto', 'prosciutto', 'mozzarella', 'parmesan', 'gorgonzola', 'brie', 'camembert',
+  'wine', 'beer', 'cocktail', 'margarita', 'martini', 'moscow mule', 'old fashioned', 'negroni',
+  'dessert', 'cake', 'pie', 'ice cream', 'gelato', 'tiramisu', 'cannoli', 'churro', 'flan',
+  'bread', 'roll', 'bun', 'croissant', 'muffin', 'scone', 'biscuit', 'cookie', 'brownie'
+];
+
+// Validation functions
+const isValidRestaurantVibeTag = (tag: string): boolean => {
+  if (!tag || typeof tag !== 'string') return false;
+  const normalizedTag = tag.toLowerCase().trim();
+  if (normalizedTag.length < 2 || normalizedTag.length > 20) return false;
+  
+  // Check if tag contains restaurant-related keywords
+  return RESTAURANT_VIBE_KEYWORDS.some(keyword => 
+    normalizedTag.includes(keyword) || keyword.includes(normalizedTag)
+  );
+};
+
+const isValidRestaurantDescription = (description: string): boolean => {
+  if (!description || typeof description !== 'string') return false;
+  const normalizedDesc = description.toLowerCase();
+  if (normalizedDesc.length < 10 || normalizedDesc.length > 500) return false;
+  
+  // Check if description contains restaurant-related keywords
+  const keywordCount = RESTAURANT_DESCRIPTION_KEYWORDS.filter(keyword => 
+    normalizedDesc.includes(keyword)
+  ).length;
+  
+  // Must contain at least 2 restaurant-related keywords
+  return keywordCount >= 2;
+};
+
+const filterValidVibeTags = (tags: string[]): string[] => {
+  return tags.filter(tag => isValidRestaurantVibeTag(tag));
+};
+
+const validateAndCleanDescription = (description: string): string | null => {
+  if (!isValidRestaurantDescription(description)) {
+    return null;
+  }
+  
+  // Clean up common issues
+  let cleaned = description.trim();
+  
+  // Remove excessive punctuation
+  cleaned = cleaned.replace(/[.!?]{2,}/g, '.');
+  
+  // Ensure proper sentence structure
+  if (!cleaned.endsWith('.') && !cleaned.endsWith('!') && !cleaned.endsWith('?')) {
+    cleaned += '.';
+  }
+  
+  return cleaned;
+};
+
+const isValidRestaurantMenuItem = (item: string): boolean => {
+  if (!item || typeof item !== 'string') return false;
+  const normalizedItem = item.toLowerCase().trim();
+  if (normalizedItem.length < 2 || normalizedItem.length > 50) return false;
+  
+  // Check if item contains restaurant-related keywords
+  return RESTAURANT_MENU_KEYWORDS.some(keyword => 
+    normalizedItem.includes(keyword) || keyword.includes(normalizedItem)
+  );
+};
+
+const filterValidMenuItems = (items: string[]): string[] => {
+  return items.filter(item => isValidRestaurantMenuItem(item));
+};
+
 // Cache management functions
 const getCacheKey = (restaurantId: string, contentType: string): string => {
   return `${CACHE_KEY_PREFIX}${restaurantId}_${contentType}`;
@@ -228,17 +324,23 @@ export const generateRestaurantDescription = async (reviews: string[], name: str
     }
     
     const data = await response.json();
-    const description = data.completion || 'A great dining experience awaits.';
+    const rawDescription = data.completion || 'A great dining experience awaits.';
+    
+    // Validate and clean the description
+    const validatedDescription = validateAndCleanDescription(rawDescription);
+    const finalDescription = validatedDescription || 'A popular local dining spot with great food and service.';
+    
+    console.log(`[Description] Generated description: ${rawDescription.length} chars, validated: ${validatedDescription ? 'YES' : 'NO'}`);
     
     // Cache the result
     if (restaurantId) {
-      await setCachedContent(restaurantId, 'description', description);
+      await setCachedContent(restaurantId, 'description', finalDescription);
     }
     
-    return description;
+    return finalDescription;
   } catch (error) {
     console.error('Error generating description:', error);
-    return 'A popular local dining spot.';
+    return 'A popular local dining spot with great food and service.';
   }
 };
 
@@ -293,7 +395,11 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
       return singleWord.charAt(0)?.toUpperCase() + singleWord.slice(1)?.toLowerCase() || singleWord;
     }).filter(Boolean) || [];
     
-    const finalTags = tags.slice(0, 5);
+    // Filter and validate tags to ensure they're restaurant-related
+    const validTags = filterValidVibeTags(tags);
+    const finalTags = validTags.slice(0, 5);
+    
+    console.log(`[VibeTags] Generated ${tags.length} tags, ${validTags.length} valid restaurant-related tags`);
     
     // Cache the result
     if (restaurantId) {
@@ -303,7 +409,8 @@ export const generateVibeTags = async (reviews: string[], cuisine: string, resta
     return finalTags;
   } catch (error) {
     console.error('Error generating vibe tags:', error);
-    return ['Popular', 'Local'];
+    // Return validated fallback tags
+    return filterValidVibeTags(['Popular', 'Local', 'Casual', 'Authentic']);
   }
 };
 
@@ -345,7 +452,12 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
       if (!item || typeof item !== 'string') return null;
       return item.trim();
     }).filter(Boolean) || [];
-    const finalPicks = picks.slice(0, 8);
+    
+    // Filter and validate menu items to ensure they're restaurant-related
+    const validPicks = filterValidMenuItems(picks);
+    const finalPicks = validPicks.slice(0, 8);
+    
+    console.log(`[TopPicks] Generated ${picks.length} items, ${validPicks.length} valid restaurant-related items`);
     
     // Cache the result
     if (restaurantId) {
@@ -355,7 +467,8 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
     return finalPicks;
   } catch (error) {
     console.error('Error generating top picks:', error);
-    return [];
+    // Return validated fallback menu items
+    return filterValidMenuItems(['House Special', 'Chef\'s Choice', 'Signature Dish', 'Popular Item']);
   }
 };
 
