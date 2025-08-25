@@ -770,14 +770,19 @@ export const dbHelpers = {
       // Then, get collections where user is a member using a different approach
       let memberCollections: any[] = [];
       try {
+        console.log('[Supabase] Fetching member collections for user:', userId);
+        
         // Get member collection IDs first
         const { data: memberIds, error: memberIdsError } = await supabase
           .from('collection_members')
           .select('collection_id')
           .eq('user_id', userId);
         
+        console.log('[Supabase] Member IDs query result:', { memberIds, memberIdsError });
+        
         if (!memberIdsError && memberIds && memberIds.length > 0) {
           const collectionIds = memberIds.map(m => m.collection_id);
+          console.log('[Supabase] Collection IDs to fetch:', collectionIds);
           
           // Get the actual collections
           const { data: memberColls, error: memberCollsError } = await supabase
@@ -786,9 +791,14 @@ export const dbHelpers = {
             .in('id', collectionIds)
             .limit(100);
           
+          console.log('[Supabase] Member collections query result:', { memberColls, memberCollsError });
+          
           if (!memberCollsError) {
             memberCollections = memberColls || [];
+            console.log('[Supabase] Successfully fetched member collections:', memberCollections.length);
           }
+        } else {
+          console.log('[Supabase] No member IDs found or error occurred');
         }
       } catch (memberError) {
         console.error('[Supabase] Error fetching member collections:', memberError);
