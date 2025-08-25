@@ -734,7 +734,7 @@ export const dbHelpers = {
       
       if (!userId) {
         console.error('[Supabase] No user ID provided');
-        throw new Error('User ID is required');
+        return [];
       }
       
       // Get collections where user is creator
@@ -746,8 +746,13 @@ export const dbHelpers = {
         .limit(100);
       
       if (creatorError) {
-        console.error('[Supabase] Error fetching creator collections:', creatorError);
-        return [];
+        console.error('[Supabase] Error fetching creator collections:', {
+          error: creatorError,
+          message: creatorError.message,
+          details: creatorError.details,
+          hint: creatorError.hint
+        });
+        // Continue with empty creator collections instead of failing completely
       }
       
       // Get collections where user is a member
@@ -757,7 +762,14 @@ export const dbHelpers = {
         .eq('user_id', userId);
       
       let memberCollectionsData: any[] = [];
-      if (!memberError && memberCollections && memberCollections.length > 0) {
+      if (memberError) {
+        console.error('[Supabase] Error fetching member collections:', {
+          error: memberError,
+          message: memberError.message,
+          details: memberError.details,
+          hint: memberError.hint
+        });
+      } else if (memberCollections && memberCollections.length > 0) {
         const collectionIds = memberCollections.map(m => m.collection_id);
         
         const { data: memberColls, error: memberCollsError } = await supabase
@@ -767,7 +779,14 @@ export const dbHelpers = {
           .order('created_at', { ascending: false })
           .limit(100);
         
-        if (!memberCollsError) {
+        if (memberCollsError) {
+          console.error('[Supabase] Error fetching member collection details:', {
+            error: memberCollsError,
+            message: memberCollsError.message,
+            details: memberCollsError.details,
+            hint: memberCollsError.hint
+          });
+        } else {
           memberCollectionsData = memberColls || [];
         }
       }
@@ -787,7 +806,11 @@ export const dbHelpers = {
       return uniqueCollections;
       
     } catch (error) {
-      console.error('[Supabase] getUserPlans error:', error);
+      console.error('[Supabase] getUserPlans error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return [];
     }
   },
@@ -1154,19 +1177,44 @@ export const dbHelpers = {
   },
 
   async getUserVotes(userId: string, collectionId?: string) {
-    let query = supabase
-      .from('restaurant_votes')
-      .select('*, restaurants(*)')
-      .eq('user_id', userId);
-    
-    if (collectionId) {
-      query = query.eq('collection_id', collectionId);
+    try {
+      console.log('[Supabase] Getting user votes for:', userId, 'collection:', collectionId);
+      
+      let query = supabase
+        .from('restaurant_votes')
+        .select('*, restaurants(*)')
+        .eq('user_id', userId);
+      
+      if (collectionId) {
+        query = query.eq('collection_id', collectionId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('[Supabase] Error fetching user votes:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId,
+          collectionId
+        });
+        return [];
+      }
+      
+      console.log('[Supabase] Successfully fetched user votes:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('[Supabase] getUserVotes error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        collectionId
+      });
+      return [];
     }
-    
-    const { data, error } = await query;
-    
-    if (error) throw error;
-    return data || [];
   },
 
   async getRestaurantVotes(restaurantId: string, collectionId?: string) {
@@ -1186,13 +1234,36 @@ export const dbHelpers = {
   },
 
   async getCollectionVotes(collectionId: string) {
-    const { data, error } = await supabase
-      .from('restaurant_votes')
-      .select('*, users(name, avatar_url)')
-      .eq('collection_id', collectionId);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      console.log('[Supabase] Getting collection votes for:', collectionId);
+      
+      const { data, error } = await supabase
+        .from('restaurant_votes')
+        .select('*, users(name, avatar_url)')
+        .eq('collection_id', collectionId);
+      
+      if (error) {
+        console.error('[Supabase] Error fetching collection votes:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          collectionId
+        });
+        return [];
+      }
+      
+      console.log('[Supabase] Successfully fetched collection votes:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('[Supabase] getCollectionVotes error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        collectionId
+      });
+      return [];
+    }
   },
 
   async deleteRestaurantVote(restaurantId: string, userId: string, collectionId?: string) {

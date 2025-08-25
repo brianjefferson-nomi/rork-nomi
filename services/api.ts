@@ -2721,13 +2721,16 @@ export const searchRestaurantsWithYelp = async (
   }
 };
 
-// Yelp API3 Search Suggestions
+// Yelp API3 Search Suggestions with rate limiting
 export const getYelpSearchSuggestions = async (
   location: string = 'US',
   query?: string
 ): Promise<any[]> => {
   try {
     console.log('[Yelp API3] Getting search suggestions for:', location);
+    
+    // Add rate limiting delay
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
     
     const params = new URLSearchParams({
       location: encodeURIComponent(location)
@@ -2748,8 +2751,14 @@ export const getYelpSearchSuggestions = async (
       }
     });
     
+    if (response.status === 429) {
+      console.warn('[Yelp API3] Rate limit exceeded, returning empty results');
+      return [];
+    }
+    
     if (!response.ok) {
-      throw new Error(`Yelp API3 error: ${response.status} ${response.statusText}`);
+      console.error(`[Yelp API3] Error: ${response.status} ${response.statusText}`);
+      return [];
     }
     
     const data = await response.json();

@@ -206,7 +206,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           weight: 1
         }));
       } catch (error) {
-        console.error('[RestaurantStore] Error loading votes from database:', error);
+        console.error('[RestaurantStore] Error loading votes from database:', {
+          error,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          userId: user?.id
+        });
         return [];
       }
     },
