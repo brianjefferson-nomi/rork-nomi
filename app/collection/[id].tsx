@@ -230,7 +230,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <View style={styles.memberStatInfo}>
                         <Text style={styles.memberStatName}>{firstName}</Text>
                         <Text style={styles.memberStatSummary}>
-                          {totalActivity} actions • {positiveRate}% positive
+                          {totalActivity} actions · {positiveRate}% positive
                         </Text>
                       </View>
                     </View>
@@ -736,7 +736,7 @@ export default function CollectionDetailScreen() {
                 <View style={styles.votingSection}>
                   <View style={styles.voteStats}>
                     <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                    <Text style={styles.voteBreakdown}>{meta.likes} likes • {meta.dislikes} dislikes</Text>
+                    <Text style={styles.voteBreakdown}>{meta.likes} likes · {meta.dislikes} dislikes</Text>
                     {meta.consensus && (
                       <View style={[styles.consensusMeter, getConsensusStyle(meta.consensus)]}>
                         <Text style={styles.consensusText}>{meta.consensus} consensus</Text>
@@ -926,7 +926,7 @@ export default function CollectionDetailScreen() {
                                 {discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown'}
                               </Text>
                               <Text style={styles.memberCommentDetail}>
-                                {discussion.restaurantName || 'Collection'} • {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                                {discussion.restaurantName || 'Collection'} · {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
                               </Text>
                             </View>
                           </View>
