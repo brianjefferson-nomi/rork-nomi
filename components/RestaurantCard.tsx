@@ -108,14 +108,14 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
     // Add full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Star key={`full-${i}`} size={14} color="#FFD700" fill="#FFD700" />
+        <Star key={`full-${i}`} size={12} color="#FFD700" fill="#FFD700" />
       );
     }
     
     // Add half star if needed
     if (hasHalfStar) {
       stars.push(
-        <Star key="half" size={14} color="#FFD700" fill="#FFD700" />
+        <Star key="half" size={12} color="#FFD700" fill="#FFD700" />
       );
     }
     
@@ -123,7 +123,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Star key={`empty-${i}`} size={14} color="#E5E5E5" fill="transparent" />
+        <Star key={`empty-${i}`} size={12} color="#E5E5E5" fill="transparent" />
       );
     }
     
@@ -235,25 +235,10 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
-        {/* Location and distance */}
-        <View style={styles.locationRow}>
-          <MapPin size={14} color="#666" />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {restaurant.neighborhood}
-            {restaurant.distance && ` • ${restaurant.distance}`}
-          </Text>
-        </View>
-        
-        {/* Hours */}
-        <View style={styles.hoursRow}>
-          <Clock size={14} color="#666" />
-          <Text style={styles.hoursText}>{formatHours(restaurant.hours)}</Text>
-        </View>
-        
-        {/* Vibe tags */}
+        {/* Vibe tags - prominently displayed */}
         {(restaurant.aiVibes || restaurant.vibe || []).length > 0 && (
           <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 3).map((v, i) => {
+            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 4).map((v, i) => {
               if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
               const firstWord = v.split(' ')[0];
               if (!firstWord || firstWord.length === 0) return null;
@@ -269,6 +254,21 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             })}
           </View>
         )}
+        
+        {/* Location and distance */}
+        <View style={styles.locationRow}>
+          <MapPin size={14} color="#666" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {restaurant.neighborhood}
+            {restaurant.distance && ` • ${restaurant.distance}`}
+          </Text>
+        </View>
+        
+        {/* Hours */}
+        <View style={styles.hoursRow}>
+          <Clock size={14} color="#666" />
+          <Text style={styles.hoursText}>{formatHours(restaurant.hours)}</Text>
+        </View>
         
         {/* Description */}
         {(restaurant.aiDescription || restaurant.description) && (
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#222222',
     fontWeight: '500',
     marginLeft: 4,
@@ -453,15 +453,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   vibeTag: {
-    backgroundColor: '#F7F7F7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: '#F0F8FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E6F3FF',
   },
   vibeText: {
     fontSize: 12,
-    color: '#222222',
-    fontWeight: '500',
+    color: '#0066CC',
+    fontWeight: '600',
   },
   description: {
     fontSize: 14,
