@@ -305,6 +305,11 @@ export default function CollectionDetailScreen() {
     }
   }, [id, getCollectionDiscussions]);
 
+  // Calculate collection members for privacy filtering
+  const collectionMembers = collection?.collaborators && Array.isArray(collection.collaborators) 
+    ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+    : [];
+
   if (!collection) {
     return (
       <View style={styles.errorContainer}>
@@ -1126,7 +1131,36 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   restaurantsList: {
-    padding: 20,
+    padding: 16,
+  },
+  recommendationsSection: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    marginTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  recommendationCard: {
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  recommendationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  recommendationDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  recommendationReasoning: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: 20,
@@ -1143,23 +1177,23 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 32,
-    borderWidth: 3,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
   removeButton: {
     marginTop: -8,
