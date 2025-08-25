@@ -145,18 +145,7 @@ export default function CollectionDetailScreen() {
     );
   };
 
-  // Add test votes for debugging
-  const addTestVotes = () => {
-    if (rankedRestaurants.length > 0) {
-      const testRestaurant = rankedRestaurants[0].restaurant;
-      voteRestaurant(testRestaurant.id, 'like', id, 'Great food and atmosphere!');
-      if (rankedRestaurants.length > 1) {
-        const testRestaurant2 = rankedRestaurants[1].restaurant;
-        voteRestaurant(testRestaurant2.id, 'dislike', id, 'Too expensive for the quality');
-      }
-      Alert.alert('Test Votes Added', 'Added test votes to first two restaurants');
-    }
-  };
+
 
   // Check if user is the owner of the collection
   const isCollectionOwner = () => {
@@ -347,12 +336,7 @@ export default function CollectionDetailScreen() {
                   <Copy size={14} color="#6B7280" />
                   <Text style={styles.shareButtonText}>Copy Link</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.shareButton}
-                  onPress={addTestVotes}
-                >
-                  <Text style={styles.shareButtonText}>Add Test Votes</Text>
-                </TouchableOpacity>
+
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collaboratorsList}>
@@ -389,82 +373,7 @@ export default function CollectionDetailScreen() {
           </View>
         </View>
 
-        {/* Contributor Statistics */}
-        <View style={styles.contributorStatsSection}>
-          <Text style={styles.sectionTitle}>Member Contributions</Text>
-          <View style={styles.contributorStatsList}>
-            {collection.collaborators && Array.isArray(collection.collaborators) ? (
-              collection.collaborators.map((member: any, index: number) => {
-                const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
-                const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
-                
-                // Calculate member's contribution statistics
-                const memberVotes = rankedRestaurants.flatMap(({ meta }) => [
-                  ...meta.voteDetails.likeVoters.filter(v => v.userId === memberId),
-                  ...meta.voteDetails.dislikeVoters.filter(v => v.userId === memberId)
-                ]);
-                
-                const memberDiscussions = discussions.filter(d => d.userId === memberId);
-                const totalVotes = memberVotes.length;
-                const totalDiscussions = memberDiscussions.length;
-                const likes = memberVotes.filter(v => v.reason?.includes('like')).length;
-                const dislikes = memberVotes.filter(v => v.reason?.includes('dislike')).length;
-                
-                // Calculate contribution rate
-                const totalPossibleVotes = rankedRestaurants.length;
-                const contributionRate = totalPossibleVotes > 0 ? (totalVotes / totalPossibleVotes) * 100 : 0;
-                
-                return (
-                  <View key={memberId} style={styles.contributorCard}>
-                    <View style={styles.contributorHeader}>
-                      <View style={styles.contributorAvatar}>
-                        <Text style={styles.contributorInitial}>
-                          {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
-                        </Text>
-                      </View>
-                      <View style={styles.contributorInfo}>
-                        <Text style={styles.contributorName}>{memberName}</Text>
-                        <Text style={styles.contributorStats}>
-                          {contributionRate.toFixed(0)}% participation • {totalVotes} votes • {totalDiscussions} discussions
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.contributorDetails}>
-                      <View style={styles.voteBreakdownRow}>
-                        <View style={styles.voteStat}>
-                          <ThumbsUp size={14} color="#22C55E" />
-                          <Text style={styles.voteStatText}>{likes} likes</Text>
-                        </View>
-                        <View style={styles.voteStat}>
-                          <ThumbsDown size={14} color="#EF4444" />
-                          <Text style={styles.voteStatText}>{dislikes} dislikes</Text>
-                        </View>
-                        <View style={styles.voteStat}>
-                          <MessageCircle size={14} color="#6B7280" />
-                          <Text style={styles.voteStatText}>{totalDiscussions} comments</Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.contributionBar}>
-                        <View 
-                          style={[
-                            styles.contributionFill, 
-                            { width: `${Math.min(contributionRate, 100)}%` }
-                          ]} 
-                        />
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyContributors}>
-                <Text style={styles.emptyContributorsText}>No member contributions yet</Text>
-              </View>
-            )}
-          </View>
-        </View>
+
 
         {/* Group Analytics */}
         {collection?.analytics && collection.analytics.participationRate !== undefined && (
@@ -829,6 +738,83 @@ export default function CollectionDetailScreen() {
           </View>
         </Modal>
 
+        {/* Contributor Statistics - Moved to bottom */}
+        <View style={styles.contributorStatsSection}>
+          <Text style={styles.sectionTitle}>Member Contributions</Text>
+          <View style={styles.contributorStatsList}>
+            {collection.collaborators && Array.isArray(collection.collaborators) ? (
+              collection.collaborators.map((member: any, index: number) => {
+                const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
+                const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
+                
+                // Calculate member's contribution statistics
+                const memberVotes = rankedRestaurants.flatMap(({ meta }) => [
+                  ...meta.voteDetails.likeVoters.filter(v => v.userId === memberId),
+                  ...meta.voteDetails.dislikeVoters.filter(v => v.userId === memberId)
+                ]);
+                
+                const memberDiscussions = discussions.filter(d => d.userId === memberId);
+                const totalVotes = memberVotes.length;
+                const totalDiscussions = memberDiscussions.length;
+                const likes = memberVotes.filter(v => v.reason?.includes('like')).length;
+                const dislikes = memberVotes.filter(v => v.reason?.includes('dislike')).length;
+                
+                // Calculate contribution rate
+                const totalPossibleVotes = rankedRestaurants.length;
+                const contributionRate = totalPossibleVotes > 0 ? (totalVotes / totalPossibleVotes) * 100 : 0;
+                
+                return (
+                  <View key={memberId} style={styles.contributorCard}>
+                    <View style={styles.contributorHeader}>
+                      <View style={styles.contributorAvatar}>
+                        <Text style={styles.contributorInitial}>
+                          {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
+                        </Text>
+                      </View>
+                      <View style={styles.contributorInfo}>
+                        <Text style={styles.contributorName}>{memberName}</Text>
+                        <Text style={styles.contributorStats}>
+                          {contributionRate.toFixed(0)}% participation • {totalVotes} votes • {totalDiscussions} discussions
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.contributorDetails}>
+                      <View style={styles.voteBreakdownRow}>
+                        <View style={styles.voteStat}>
+                          <ThumbsUp size={14} color="#22C55E" />
+                          <Text style={styles.voteStatText}>{likes} likes</Text>
+                        </View>
+                        <View style={styles.voteStat}>
+                          <ThumbsDown size={14} color="#EF4444" />
+                          <Text style={styles.voteStatText}>{dislikes} dislikes</Text>
+                        </View>
+                        <View style={styles.voteStat}>
+                          <MessageCircle size={14} color="#6B7280" />
+                          <Text style={styles.voteStatText}>{totalDiscussions} comments</Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.contributionBar}>
+                        <View 
+                          style={[
+                            styles.contributionFill, 
+                            { width: `${Math.min(contributionRate, 100)}%` }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.emptyContributors}>
+                <Text style={styles.emptyContributorsText}>No member contributions yet</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         <View style={{ height: 32 }} />
       </ScrollView>
     </>
@@ -847,24 +833,27 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFF',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1A1A1A',
     marginBottom: 8,
   },
+  name: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
   description: {
-    fontSize: 15,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 16,
+    marginBottom: 20,
+    lineHeight: 22,
   },
   stats: {
     flexDirection: 'row',
     gap: 20,
+    marginBottom: 20,
   },
   stat: {
     flexDirection: 'row',
@@ -876,13 +865,13 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   restaurantsList: {
-    padding: 16,
+    padding: 20,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   emptyState: {
     paddingVertical: 40,
@@ -893,23 +882,23 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 12,
+    marginBottom: 24,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 2,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 3,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   removeButton: {
     marginTop: -8,
@@ -924,13 +913,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   collaboratorsSection: {
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 24,
   },
   collaboratorsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   collaboratorsTitle: {
     fontSize: 16,
@@ -1295,19 +1285,19 @@ const styles = StyleSheet.create({
   },
   contributorStatsSection: {
     backgroundColor: '#FFF',
-    padding: 16,
-    marginTop: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    padding: 20,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   contributorStatsList: {
-    marginTop: 12,
+    marginTop: 16,
   },
   contributorCard: {
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -1379,6 +1369,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
+
   // Detailed voting styles
   detailedVotingSection: {
     marginTop: 12,
