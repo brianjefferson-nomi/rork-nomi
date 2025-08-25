@@ -307,22 +307,26 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           
           return (
             <View style={styles.vibeContainer}>
-              {displayTags.slice(0, 4)
-                .filter(v => v && typeof v === 'string' && v.trim().length > 0)
-                .map((v, i) => {
-                  const firstWord = v.split(' ')[0];
-                  if (!firstWord || firstWord.length === 0) return null;
-                  const firstChar = firstWord.charAt(0);
-                  const restOfWord = firstWord.slice(1);
-                  const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-                  if (!cleanTag || cleanTag.length === 0) return null;
-                  return (
-                    <View key={i} style={styles.vibeTag}>
-                      <Text style={styles.vibeText}>{cleanTag}</Text>
-                    </View>
-                  );
-                })
-                .filter(Boolean)}
+              {(() => {
+                const validTags = displayTags.slice(0, 4)
+                  .filter(v => v && typeof v === 'string' && v.trim().length > 0)
+                  .map(v => {
+                    const firstWord = v.split(' ')[0];
+                    if (!firstWord || firstWord.length === 0) return null;
+                    const firstChar = firstWord.charAt(0);
+                    const restOfWord = firstWord.slice(1);
+                    const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+                    if (!cleanTag || cleanTag.length === 0) return null;
+                    return cleanTag;
+                  })
+                  .filter(Boolean);
+                
+                return validTags.map((cleanTag, i) => (
+                  <View key={i} style={styles.vibeTag}>
+                    <Text style={styles.vibeText}>{cleanTag}</Text>
+                  </View>
+                ));
+              })()}
             </View>
           );
         })()}

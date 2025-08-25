@@ -438,6 +438,7 @@ export default function CollectionDetailScreen() {
                   vote: 'like',
                   restaurantName: restaurant.name,
                   userName: voter.name,
+                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
                   userId: voter.userId,
                   reason: voter.reason,
                   timestamp: voter.timestamp
@@ -454,6 +455,7 @@ export default function CollectionDetailScreen() {
                   vote: 'dislike',
                   restaurantName: restaurant.name,
                   userName: voter.name,
+                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
                   userId: voter.userId,
                   reason: voter.reason,
                   timestamp: voter.timestamp
@@ -471,6 +473,7 @@ export default function CollectionDetailScreen() {
                 type: 'comment',
                 restaurantName: discussion.restaurantName || 'Collection',
                 userName: discussion.userName,
+                firstName: discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown',
                 userId: discussion.userId,
                 message: discussion.message,
                 timestamp: discussion.timestamp
@@ -487,11 +490,11 @@ export default function CollectionDetailScreen() {
                     <View style={styles.memberActivityHeader}>
                       <View style={styles.memberActivityAvatar}>
                         <Text style={styles.memberActivityInitial}>
-                          {activity.userName ? activity.userName.charAt(0).toUpperCase() : '?'}
+                          {activity.firstName ? activity.firstName.charAt(0).toUpperCase() : '?'}
                         </Text>
                       </View>
                       <View style={styles.memberActivityInfo}>
-                        <Text style={styles.memberActivityName}>{activity.userName}</Text>
+                        <Text style={styles.memberActivityName}>{activity.firstName}</Text>
                         <Text style={styles.memberActivityAction}>
                           {activity.type === 'vote' ? (
                             <>
@@ -657,89 +660,107 @@ export default function CollectionDetailScreen() {
                   </View>
                 )}
 
-                {/* Member Voting Details - Always visible */}
+                {/* Member Voting Details */}
                 <View style={styles.memberVotingSection}>
-                  <Text style={styles.memberVotingTitle}>Member Votes for {restaurant.name}</Text>
+                  <Text style={styles.memberVotingTitle}>Member Voting Details</Text>
                   {(() => {
-                    const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
-                    console.log('[CollectionDetail] Meta vote details:', meta.voteDetails);
-                    console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
-                    console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
+                    const allVotes: any[] = [];
                     
-                    const allVoters = [
-                      ...meta.voteDetails.likeVoters.map(v => ({ ...v, vote: 'like', userName: v.name })),
-                      ...meta.voteDetails.dislikeVoters.map(v => ({ ...v, vote: 'dislike', userName: v.name }))
-                    ];
+                    rankedRestaurants.forEach(({ restaurant, meta }) => {
+                      meta.voteDetails.likeVoters.forEach(voter => {
+                        allVotes.push({
+                          type: 'like',
+                          restaurantName: restaurant.name,
+                          userName: voter.name,
+                          firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                          reason: voter.reason,
+                          timestamp: voter.timestamp
+                        });
+                      });
+                      
+                      meta.voteDetails.dislikeVoters.forEach(voter => {
+                        allVotes.push({
+                          type: 'dislike',
+                          restaurantName: restaurant.name,
+                          userName: voter.name,
+                          firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                          reason: voter.reason,
+                          timestamp: voter.timestamp
+                        });
+                      });
+                    });
                     
-                    console.log('[CollectionDetail] Voting details:', votingDetails);
-                    console.log('[CollectionDetail] All voters:', allVoters);
-                    
-                    return allVoters.length > 0 ? (
+                    return allVotes.length > 0 ? (
                       <View style={styles.memberVotesList}>
-                        {allVoters.map((voter: any, idx: number) => (
-                          <View key={idx} style={styles.memberVoteItem}>
+                        {allVotes.slice(0, 8).map((vote, index) => (
+                          <View key={index} style={styles.memberVoteItem}>
                             <View style={styles.memberVoteHeader}>
                               <View style={styles.memberVoteAvatar}>
                                 <Text style={styles.memberVoteInitial}>
-                                  {voter.userName ? voter.userName.charAt(0).toUpperCase() : '?'}
+                                  {vote.firstName ? vote.firstName.charAt(0).toUpperCase() : '?'}
                                 </Text>
                               </View>
-                              <Text style={styles.memberVoteName}>{voter.userName || 'Unknown Member'}</Text>
+                              <View style={styles.memberVoteInfo}>
+                                <Text style={styles.memberVoteName}>{vote.firstName}</Text>
+                                <Text style={styles.memberVoteRestaurant}>{vote.restaurantName}</Text>
+                              </View>
                               <View style={[
                                 styles.memberVoteBadge,
-                                voter.vote === 'like' ? styles.likeVoteBadge : styles.dislikeVoteBadge
+                                vote.type === 'like' ? styles.likeVoteBadge : styles.dislikeVoteBadge
                               ]}>
                                 <Text style={styles.memberVoteBadgeText}>
-                                  {voter.vote === 'like' ? '👍' : '👎'}
+                                  {vote.type === 'like' ? '👍' : '👎'}
                                 </Text>
                               </View>
                             </View>
-                            {voter.reason && (
-                              <Text style={styles.memberVoteReason}>"{voter.reason}"</Text>
+                            {vote.reason && (
+                              <Text style={styles.memberVoteReason}>"{vote.reason}"</Text>
                             )}
                           </View>
                         ))}
                       </View>
                     ) : (
                       <View style={styles.emptyVotesContainer}>
-                        <Text style={styles.noVotesText}>No votes yet for this restaurant</Text>
-                        <Text style={styles.noVotesSubtext}>Be the first to vote!</Text>
+                        <Text style={styles.noVotesText}>No votes yet</Text>
+                        <Text style={styles.noVotesSubtext}>Members can vote on restaurants to see activity here</Text>
                       </View>
                     );
                   })()}
                 </View>
 
                 {/* Member Comments */}
-                {(() => {
-                  const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
-                  return votingDetails.discussionBreakdown.length > 0 ? (
-                    <View style={styles.memberCommentsSection}>
-                      <Text style={styles.memberCommentsTitle}>Member Comments</Text>
-                      <View style={styles.memberCommentsList}>
-                        {votingDetails.discussionBreakdown.map((userComment: any, idx: number) => (
-                          <View key={idx} style={styles.memberCommentItem}>
-                            <View style={styles.memberCommentHeader}>
-                              <View style={styles.memberCommentAvatar}>
-                                <Text style={styles.memberCommentInitial}>
-                                  {userComment.userName ? userComment.userName.charAt(0).toUpperCase() : '?'}
-                                </Text>
-                              </View>
-                              <Text style={styles.memberCommentName}>{userComment.userName}</Text>
+                <View style={styles.memberCommentsSection}>
+                  <Text style={styles.memberCommentsTitle}>Member Comments</Text>
+                  {discussions.length > 0 ? (
+                    <View style={styles.memberCommentsList}>
+                      {discussions.slice(0, 6).map((discussion, index) => (
+                        <View key={index} style={styles.memberCommentItem}>
+                          <View style={styles.memberCommentHeader}>
+                            <View style={styles.memberCommentAvatar}>
+                              <Text style={styles.memberCommentInitial}>
+                                {discussion.userName ? discussion.userName.split(' ')[0].charAt(0).toUpperCase() : '?'}
+                              </Text>
                             </View>
-                            {userComment.comments.map((comment: any, commentIdx: number) => (
-                              <View key={commentIdx} style={styles.memberCommentDetail}>
-                                <Text style={styles.memberCommentText}>"{comment.message}"</Text>
-                                <Text style={styles.memberCommentTime}>
-                                  {comment.timestamp ? new Date(comment.timestamp).toLocaleDateString() : 'Unknown date'}
-                                </Text>
-                              </View>
-                            ))}
+                            <View style={styles.memberCommentInfo}>
+                              <Text style={styles.memberCommentName}>
+                                {discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown'}
+                              </Text>
+                              <Text style={styles.memberCommentDetail}>
+                                {discussion.restaurantName || 'Collection'} • {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                              </Text>
+                            </View>
                           </View>
-                        ))}
-                      </View>
+                          <Text style={styles.memberCommentText}>{discussion.message}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ) : null;
-                })()}
+                  ) : (
+                    <View style={styles.emptyVotesContainer}>
+                      <Text style={styles.noVotesText}>No comments yet</Text>
+                      <Text style={styles.noVotesSubtext}>Members can comment to see activity here</Text>
+                    </View>
+                  )}
+                </View>
                 
                 <TouchableOpacity 
                   style={styles.removeButton}
@@ -1508,7 +1529,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#1A1A1A',
+  },
+  memberVoteInfo: {
     flex: 1,
+  },
+  memberVoteRestaurant: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
   },
   memberVoteBadge: {
     paddingHorizontal: 8,
@@ -1587,9 +1615,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
   },
+  memberCommentInfo: {
+    flex: 1,
+  },
   memberCommentDetail: {
-    marginLeft: 32,
-    marginTop: 4,
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
   },
   memberCommentText: {
     fontSize: 12,
