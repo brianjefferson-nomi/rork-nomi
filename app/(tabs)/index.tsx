@@ -29,7 +29,7 @@ export default function HomeScreen() {
   
   // Filter restaurants by location with better matching
   const cityRestaurants = restaurants.filter(r => {
-    const address = (r.address || r.neighborhood || '').toLowerCase();
+    const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
     if (city === 'Los Angeles') {
       return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
     } else {

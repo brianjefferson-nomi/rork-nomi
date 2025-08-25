@@ -650,7 +650,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         priceRange: '$'.repeat(Math.min(result.priceLevel || 2, 4)) as '$' | '$$' | '$$$' | '$$$$',
         imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
         images: result.photos,
-        address: result.address || '',
+                          address: result.address || 'Address not available',
         neighborhood: result.address?.split(',')[1]?.trim() || location.city || 'Unknown',
         hours: result.hours || 'Hours vary',
         vibe: result.vibeTags || [],

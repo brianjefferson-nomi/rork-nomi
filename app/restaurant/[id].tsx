@@ -31,7 +31,7 @@ export default function RestaurantDetailScreen() {
   const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection } = useRestaurants();
   const votes = useRestaurantVotes(id);
   const [editingNote, setEditingNote] = useState(false);
-  const [noteText, setNoteText] = useState(restaurant?.userNotes || '');
+  const [noteText, setNoteText] = useState(restaurant?.userNotes || null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [enhancedImages, setEnhancedImages] = useState<string[]>([]);
   const [foodRecommendations, setFoodRecommendations] = useState<string[]>([]);
@@ -402,7 +402,7 @@ export default function RestaurantDetailScreen() {
               <View>
                 <TextInput
                   style={styles.noteInput}
-                  value={noteText}
+                  value={noteText || ''}
                   onChangeText={setNoteText}
                   placeholder="Add your personal notes..."
                   multiline
@@ -413,7 +413,7 @@ export default function RestaurantDetailScreen() {
                     <Text style={styles.saveButtonText}>Save</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.cancelButton} onPress={() => {
-                    setNoteText(restaurant.userNotes || '');
+                    setNoteText(restaurant.userNotes || null);
                     setEditingNote(false);
                   }}>
                     <Text style={styles.cancelButtonText}>Cancel</Text>
