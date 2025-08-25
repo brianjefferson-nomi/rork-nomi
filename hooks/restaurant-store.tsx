@@ -767,9 +767,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Other operations
   const toggleFavorite = useCallback((restaurantId: string) => {
+    console.log('[RestaurantStore] toggleFavorite called for:', restaurantId);
+    console.log('[RestaurantStore] Current favoriteRestaurants:', favoriteRestaurants);
+    
     const updated = favoriteRestaurants.includes(restaurantId)
       ? favoriteRestaurants.filter((id: string) => id !== restaurantId)
       : [...favoriteRestaurants, restaurantId];
+    
+    console.log('[RestaurantStore] Updated favoriteRestaurants:', updated);
+    setFavoriteRestaurants(updated);
     mutateFavorites(updated);
   }, [favoriteRestaurants, mutateFavorites]);
 
@@ -783,6 +789,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       console.log('[RestaurantStore] Voting on restaurant:', restaurantId, 'vote:', vote, 'collection:', planId, 'reason:', reason);
       console.log('[RestaurantStore] Current user:', user.id);
       console.log('[RestaurantStore] Current userVotes count:', userVotes.length);
+      console.log('[RestaurantStore] Current userVotes:', userVotes);
       
       // Save vote to database
       const voteData = {
@@ -809,12 +816,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         throw dbError;
       }
       
-      // Update local state
+      // Update local state immediately for better UX
       const existingVoteIndex = userVotes.findIndex((v: any) => 
         v.restaurantId === restaurantId && 
         v.userId === user.id && 
         v.collectionId === planId
       );
+      
+      console.log('[RestaurantStore] Existing vote index:', existingVoteIndex);
+      console.log('[RestaurantStore] Existing vote:', existingVoteIndex >= 0 ? userVotes[existingVoteIndex] : 'None');
       
       let updated: RestaurantVote[];
       const now = new Date().toISOString();
@@ -832,21 +842,29 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         if (userVotes[existingVoteIndex].vote === vote) {
           // Remove vote if same vote is clicked again
           updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
+          console.log('[RestaurantStore] Removing existing vote');
         } else {
           // Update existing vote
           updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
+          console.log('[RestaurantStore] Updating existing vote');
         }
       } else {
         // Add new vote
         updated = [...userVotes, { ...base, vote }];
+        console.log('[RestaurantStore] Adding new vote');
       }
 
+      console.log('[RestaurantStore] Updated votes:', updated);
       console.log('[RestaurantStore] Updating local state with votes:', updated.length);
+      
+      // Update local state immediately
+      setUserVotes(updated);
       persistVotes.mutate(updated);
       
       // Refresh data from database
       console.log('[RestaurantStore] Invalidating queries to refresh data');
       queryClient.invalidateQueries({ queryKey: ['userVotes', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['allVotes'] });
       
     } catch (error) {
       console.error('[RestaurantStore] Error saving vote to database:', error);
@@ -878,10 +896,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       } else {
         updated = [...userVotes, { ...base, vote }];
       }
-
+      
+      // Update local state even if database fails
+      setUserVotes(updated);
       persistVotes.mutate(updated);
     }
-  }, [userVotes, persistVotes.mutate, user?.id, queryClient]);
+  }, [user, userVotes, persistVotes.mutate, queryClient]);
 
   const addUserNote = useCallback((restaurantId: string, note: string) => {
     mutateNotes({ restaurantId, note });

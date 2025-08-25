@@ -733,6 +733,16 @@ export default function CollectionDetailScreen() {
               const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
               const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
               
+              console.log(`[CollectionDetail] Restaurant ${restaurant.name}:`, {
+                id: restaurant.id,
+                isFavorite,
+                userLiked,
+                userDisliked,
+                likes: meta.likes,
+                dislikes: meta.dislikes,
+                favoriteRestaurants: favoriteRestaurants.length
+              });
+              
               return (
                 <View key={restaurant?.id || index} style={[
                   styles.restaurantItem,
@@ -778,7 +788,10 @@ export default function CollectionDetailScreen() {
                     
                     <TouchableOpacity 
                       style={styles.heartButton}
-                      onPress={() => toggleFavorite(restaurant.id)}
+                      onPress={() => {
+                        console.log('[CollectionDetail] Heart button pressed for:', restaurant.name, restaurant.id);
+                        toggleFavorite(restaurant.id);
+                      }}
                     >
                       <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
                         {isFavorite ? '♥' : '♡'}
@@ -810,21 +823,15 @@ export default function CollectionDetailScreen() {
                       onPress={() => {
                         console.log('[CollectionDetail] Like button pressed:', {
                           restaurantId: restaurant.id,
+                          restaurantName: restaurant.name,
                           collectionId: id,
                           userLiked,
-                          userDisliked
+                          userDisliked,
+                          currentUser: user?.id
                         });
                         
-                        if (userLiked) {
-                          // Remove like
-                          voteRestaurant(restaurant.id, 'like', id, '');
-                        } else {
-                          // Add like, remove dislike if exists
-                          if (userDisliked) {
-                            voteRestaurant(restaurant.id, 'dislike', id, '');
-                          }
-                          setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
-                        }
+                        // Simple vote logic - just call voteRestaurant
+                        voteRestaurant(restaurant.id, 'like', id, '');
                       }}
                     >
                       <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
@@ -840,21 +847,15 @@ export default function CollectionDetailScreen() {
                       onPress={() => {
                         console.log('[CollectionDetail] Dislike button pressed:', {
                           restaurantId: restaurant.id,
+                          restaurantName: restaurant.name,
                           collectionId: id,
                           userLiked,
-                          userDisliked
+                          userDisliked,
+                          currentUser: user?.id
                         });
                         
-                        if (userDisliked) {
-                          // Remove dislike
-                          voteRestaurant(restaurant.id, 'dislike', id, '');
-                        } else {
-                          // Add dislike, remove like if exists
-                          if (userLiked) {
-                            voteRestaurant(restaurant.id, 'like', id, '');
-                          }
-                          setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
-                        }
+                        // Simple vote logic - just call voteRestaurant
+                        voteRestaurant(restaurant.id, 'dislike', id, '');
                       }}
                     >
                       <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
@@ -863,7 +864,10 @@ export default function CollectionDetailScreen() {
                     
                     <TouchableOpacity 
                       style={[styles.voteButton, styles.commentButton]}
-                      onPress={() => setShowDiscussionModal(restaurant.id)}
+                      onPress={() => {
+                        console.log('[CollectionDetail] Comment button pressed for:', restaurant.name);
+                        setShowDiscussionModal(restaurant.id);
+                      }}
                     >
                       <MessageCircle size={16} color="#6B7280" />
                       <Text style={styles.voteCount}>{meta.discussionCount}</Text>
@@ -947,7 +951,7 @@ export default function CollectionDetailScreen() {
         </View>
       </Modal>
 
-      {/* Discussion Modal */}
+      {/* Discussion Modal - FIXED */}
       <Modal visible={!!showDiscussionModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -964,6 +968,12 @@ export default function CollectionDetailScreen() {
               <TouchableOpacity 
                 style={styles.modalButton}
                 onPress={() => {
+                  console.log('[CollectionDetail] Discussion modal submit:', {
+                    showDiscussionModal,
+                    discussionMessage,
+                    collectionId: id
+                  });
+                  
                   if (showDiscussionModal && discussionMessage.trim()) {
                     // FIXED: Correct parameter order (restaurantId, planId, message)
                     addDiscussion(showDiscussionModal, id, discussionMessage);
