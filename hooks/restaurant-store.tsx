@@ -143,11 +143,16 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['restaurants'],
     queryFn: async () => {
       try {
+        console.log('[RestaurantStore] Starting restaurant loading...');
         // Try to load from database first
         const dbRestaurants = await dbHelpers.getAllRestaurants();
+        console.log('[RestaurantStore] Database restaurants result:', dbRestaurants?.length || 0, dbRestaurants);
+        
         if (dbRestaurants && dbRestaurants.length > 0) {
           console.log('[RestaurantStore] Loaded', dbRestaurants.length, 'restaurants from database');
-          return dbRestaurants.map(mapDatabaseRestaurant);
+          const mappedRestaurants = dbRestaurants.map(mapDatabaseRestaurant);
+          console.log('[RestaurantStore] Mapped restaurants:', mappedRestaurants.length, mappedRestaurants.map(r => ({ id: r.id, name: r.name })));
+          return mappedRestaurants;
         }
         
         // If no restaurants in database, try to populate with real data
@@ -163,6 +168,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       
       // Fallback to mock data
       console.log('[RestaurantStore] Using mock data as fallback');
+      console.log('[RestaurantStore] Mock restaurants:', mockRestaurants.length, mockRestaurants.map(r => ({ id: r.id, name: r.name })));
       return mockRestaurants;
     },
     retry: 1,
@@ -991,15 +997,30 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user, queryClient]);
 
   const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
+    console.log('[RestaurantStore] getRankedRestaurants called with:', { planId, memberCount });
+    console.log('[RestaurantStore] Current data state:', {
+      plansQueryData: plansQuery.data?.length || 0,
+      restaurants: restaurants.length,
+      userVotes: userVotes.length,
+      allVotesQueryData: allVotesQuery.data?.length || 0,
+      discussions: discussions.length
+    });
+
     const plan = planId ? plansQuery.data?.find((p: any) => p.id === planId) : undefined;
+    console.log('[RestaurantStore] Found plan:', plan ? { id: plan.id, name: plan.name } : 'No plan found');
+    
     const pool = planId
       ? restaurants.filter((r: any) => (plan?.restaurant_ids ?? []).includes(r.id))
       : restaurants;
+    
+    console.log('[RestaurantStore] Restaurant pool:', pool.length, pool.map(r => ({ id: r.id, name: r.name })));
     
     // Use all votes for the collection, not just user votes
     const planVotes = planId 
       ? (allVotesQuery.data?.filter((v: any) => v.collectionId === planId) || [])
       : (allVotesQuery.data || []);
+    
+    console.log('[RestaurantStore] Plan votes:', planVotes.length, planVotes.map(v => ({ restaurantId: v.restaurantId, vote: v.vote })));
     
     const discussionCounts = discussions
       .filter((d: any) => !planId || d.collectionId === planId)
@@ -1007,6 +1028,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
         return acc;
       }, {});
+    
+    console.log('[RestaurantStore] Discussion counts:', discussionCounts);
     
     // Pass the collection data so voter names can be properly displayed
     console.log('[RestaurantStore] Plan data being passed to ranking:', {
@@ -1024,11 +1047,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       allVotes: planVotes.length
     });
     
-    return computeRankings(pool, planVotes, { 
+    const result = computeRankings(pool, planVotes, { 
       memberCount, 
       collection: plan, // ✅ Pass the collection data
       discussions: discussionCounts 
     });
+    
+    console.log('[RestaurantStore] Ranking result:', result.length, result.map(r => ({ 
+      restaurantId: r.restaurant.id, 
+      name: r.restaurant.name, 
+      rank: r.meta.rank,
+      likes: r.meta.likes,
+      dislikes: r.meta.dislikes
+    })));
+    
+    return result;
   }, [plansQuery.data, restaurants, userVotes, allVotesQuery.data, discussions]);
 
   const getGroupRecommendations = useCallback((planId: string) => {

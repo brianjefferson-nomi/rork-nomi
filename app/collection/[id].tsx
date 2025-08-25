@@ -1182,13 +1182,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   rankBadge: {
+    width: 36,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   rankNumber: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#000000',
+    color: '#FFFFFF',
   },
   winnerRankNumber: {
     fontSize: 18,
