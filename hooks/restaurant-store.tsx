@@ -124,6 +124,52 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   });
 
+  // Load votes from database
+  const votesQuery = useQuery({
+    queryKey: ['userVotes', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        console.log('[RestaurantStore] Loading votes from database for user:', user.id);
+        const votes = await dbHelpers.getUserVotes(user.id);
+        console.log('[RestaurantStore] Loaded votes from database:', votes.length);
+        return votes.map((vote: any) => ({
+          restaurantId: vote.restaurant_id,
+          userId: vote.user_id,
+          collectionId: vote.collection_id,
+          vote: vote.vote,
+          reason: vote.reason,
+          timestamp: vote.created_at,
+          authority: 'regular',
+          weight: 1
+        }));
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading votes from database:', error);
+        return [];
+      }
+    },
+    enabled: !!user?.id
+  });
+
+  // Load discussions from database
+  const discussionsQuery = useQuery({
+    queryKey: ['discussions'],
+    queryFn: async () => {
+      try {
+        console.log('[RestaurantStore] Loading discussions from database');
+        // For now, we'll use the existing discussions from AsyncStorage
+        // In the future, we can implement a function to get all discussions across collections
+        const storedDiscussions = await AsyncStorage.getItem('discussions');
+        const discussions = storedDiscussions ? JSON.parse(storedDiscussions) : [];
+        console.log('[RestaurantStore] Loaded discussions from storage:', discussions.length);
+        return discussions;
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading discussions from storage:', error);
+        return [];
+      }
+    }
+  });
+
   // Load initial data and user location
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
@@ -145,14 +191,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
       return {
         restaurants: restaurantsWithNotes,
-        userVotes: storedVotes ? JSON.parse(storedVotes) : mockVotes,
-        discussions: storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions,
+        userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : mockVotes),
+        discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions),
         favoriteRestaurants: storedFavorites ? JSON.parse(storedFavorites) : [],
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
       };
     },
-    enabled: !!restaurantsQuery.data
+    enabled: !!restaurantsQuery.data && !!votesQuery.data && !!discussionsQuery.data
   });
 
   // Helper function to map database restaurant format to component format
@@ -586,37 +632,99 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     mutateFavorites(updated);
   }, [favoriteRestaurants, mutateFavorites]);
 
-  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
-    const existingVoteIndex = userVotes.findIndex((v: any) => 
-      v.restaurantId === restaurantId && 
-      v.userId === 'currentUser' && 
-      v.collectionId === planId
-    );
-    let updated: RestaurantVote[];
-
-    const now = new Date().toISOString();
-    const base: Omit<RestaurantVote, 'vote'> = { 
-      restaurantId, 
-      userId: 'currentUser', 
-      collectionId: planId,
-      timestamp: now, 
-      authority: 'regular', 
-      weight: 1,
-      reason
-    };
-
-    if (existingVoteIndex >= 0) {
-      if (userVotes[existingVoteIndex].vote === vote) {
-        updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
-      } else {
-        updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
-      }
-    } else {
-      updated = [...userVotes, { ...base, vote }];
+  const voteRestaurant = useCallback(async (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for voting');
+      return;
     }
+    
+    try {
+      console.log('[RestaurantStore] Voting on restaurant:', restaurantId, 'vote:', vote, 'collection:', planId);
+      
+      // Save vote to database
+      const voteData = {
+        restaurant_id: restaurantId,
+        user_id: user.id,
+        collection_id: planId,
+        vote,
+        reason,
+        created_at: new Date().toISOString()
+      };
+      
+      await dbHelpers.createRestaurantVote(voteData);
+      console.log('[RestaurantStore] Vote saved to database successfully');
+      
+      // Update local state
+      const existingVoteIndex = userVotes.findIndex((v: any) => 
+        v.restaurantId === restaurantId && 
+        v.userId === user.id && 
+        v.collectionId === planId
+      );
+      
+      let updated: RestaurantVote[];
+      const now = new Date().toISOString();
+      const base: Omit<RestaurantVote, 'vote'> = { 
+        restaurantId, 
+        userId: user.id, 
+        collectionId: planId,
+        timestamp: now, 
+        authority: 'regular', 
+        weight: 1,
+        reason
+      };
 
-    persistVotes.mutate(updated);
-  }, [userVotes, persistVotes.mutate]);
+      if (existingVoteIndex >= 0) {
+        if (userVotes[existingVoteIndex].vote === vote) {
+          // Remove vote if same vote is clicked again
+          updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
+        } else {
+          // Update existing vote
+          updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
+        }
+      } else {
+        // Add new vote
+        updated = [...userVotes, { ...base, vote }];
+      }
+
+      persistVotes.mutate(updated);
+      
+      // Refresh data from database
+      queryClient.invalidateQueries({ queryKey: ['userVotes', user.id] });
+      
+    } catch (error) {
+      console.error('[RestaurantStore] Error saving vote to database:', error);
+      // Still update local state for immediate feedback
+      const existingVoteIndex = userVotes.findIndex((v: any) => 
+        v.restaurantId === restaurantId && 
+        v.userId === user.id && 
+        v.collectionId === planId
+      );
+      
+      let updated: RestaurantVote[];
+      const now = new Date().toISOString();
+      const base: Omit<RestaurantVote, 'vote'> = { 
+        restaurantId, 
+        userId: user.id, 
+        collectionId: planId,
+        timestamp: now, 
+        authority: 'regular', 
+        weight: 1,
+        reason
+      };
+
+      if (existingVoteIndex >= 0) {
+        if (userVotes[existingVoteIndex].vote === vote) {
+          updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
+        } else {
+          updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
+        }
+      } else {
+        updated = [...userVotes, { ...base, vote }];
+      }
+
+      persistVotes.mutate(updated);
+    }
+  }, [userVotes, persistVotes.mutate, user?.id, queryClient]);
 
   const addUserNote = useCallback((restaurantId: string, note: string) => {
     mutateNotes({ restaurantId, note });
@@ -654,20 +762,61 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     return [...searchHistory, ...locationSuggestions, ...sorted].slice(0, 8);
   }, [restaurants, searchHistory, userLocation]);
 
-  const addDiscussion = useCallback((restaurantId: string, planId: string, message: string) => {
-    const newDiscussion: RestaurantDiscussion = {
-      id: `d${Date.now()}`,
-      restaurantId,
-      collectionId: planId,
-      userId: 'currentUser',
-      userName: 'You',
-      userAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
-      message,
-      timestamp: new Date(),
-      likes: 0
-    };
-    persistDiscussions.mutate([...discussions, newDiscussion]);
-  }, [discussions, persistDiscussions.mutate]);
+  const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for adding discussion');
+      return;
+    }
+    
+    try {
+      console.log('[RestaurantStore] Adding discussion for restaurant:', restaurantId, 'collection:', planId);
+      
+      // Save discussion to database
+      const discussionData = {
+        restaurant_id: restaurantId,
+        user_id: user.id,
+        collection_id: planId,
+        message,
+        created_at: new Date().toISOString()
+      };
+      
+      await dbHelpers.createDiscussion(discussionData);
+      console.log('[RestaurantStore] Discussion saved to database successfully');
+      
+      // Update local state
+      const newDiscussion: RestaurantDiscussion = {
+        id: `d${Date.now()}`,
+        restaurantId,
+        collectionId: planId,
+        userId: user.id,
+        userName: user.name || 'You',
+        userAvatar: user.avatar_url || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        message,
+        timestamp: new Date(),
+        likes: 0
+      };
+      persistDiscussions.mutate([...discussions, newDiscussion]);
+      
+      // Refresh data from database
+      queryClient.invalidateQueries({ queryKey: ['discussions', planId] });
+      
+    } catch (error) {
+      console.error('[RestaurantStore] Error saving discussion to database:', error);
+      // Still update local state for immediate feedback
+      const newDiscussion: RestaurantDiscussion = {
+        id: `d${Date.now()}`,
+        restaurantId,
+        collectionId: planId,
+        userId: user.id,
+        userName: user.name || 'You',
+        userAvatar: user.avatar_url || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+        message,
+        timestamp: new Date(),
+        likes: 0
+      };
+      persistDiscussions.mutate([...discussions, newDiscussion]);
+    }
+  }, [discussions, persistDiscussions.mutate, user, queryClient]);
 
   const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
     const plan = planId ? plansQuery.data?.find((p: any) => p.id === planId) : undefined;
