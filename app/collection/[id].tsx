@@ -188,7 +188,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 );
               })()}
 
-              {/* Member Comments */}
+              {/* User Discussions */}
               {(() => {
                 const filteredDiscussions = discussions.filter((discussion: any) => {
                   if (discussion.restaurantId !== restaurant.id) return false;
@@ -198,8 +198,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                 });
 
-                // Debug logging for comments
-                console.log(`[InsightsTab] Restaurant ${restaurant.name} comments:`, {
+                // Debug logging for discussions
+                console.log(`[InsightsTab] Restaurant ${restaurant.name} discussions:`, {
                   restaurantId: restaurant.id,
                   allDiscussions: discussions.length,
                   filteredDiscussions: filteredDiscussions.length,
@@ -211,20 +211,30 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 });
 
                 return (
-                  <View style={styles.commentsSection}>
-                    <View style={styles.commentsHeader}>
+                  <View style={styles.discussionsSection}>
+                    <View style={styles.discussionsHeader}>
                       <MessageCircle size={14} color="#6B7280" />
-                      <Text style={styles.commentsLabel}>Comments ({filteredDiscussions.length})</Text>
+                      <Text style={styles.discussionsLabel}>Discussions ({filteredDiscussions.length})</Text>
                     </View>
                     {filteredDiscussions.length > 0 ? (
                       filteredDiscussions.slice(0, 3).map((discussion: any) => (
-                        <View key={discussion.id} style={styles.commentItem}>
-                          <Text style={styles.commentAuthor}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
-                          <Text style={styles.commentText} numberOfLines={3}>{discussion.message}</Text>
+                        <View key={discussion.id} style={styles.discussionItem}>
+                          <View style={styles.discussionHeader}>
+                            <View style={styles.discussionAvatar}>
+                              <Text style={styles.discussionInitial}>
+                                {discussion.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                              </Text>
+                            </View>
+                            <Text style={styles.discussionAuthor}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
+                            <Text style={styles.discussionTime}>
+                              {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                            </Text>
+                          </View>
+                          <Text style={styles.discussionText} numberOfLines={3}>{discussion.message}</Text>
                         </View>
                       ))
                     ) : (
-                      <Text style={styles.noComments}>No comments yet</Text>
+                      <Text style={styles.noDiscussions}>No discussions yet</Text>
                     )}
                   </View>
                 );
@@ -645,7 +655,7 @@ export default function CollectionDetailScreen() {
                 styles.restaurantItem,
                 meta?.rank === 1 && styles.winningRestaurantItem
               ]}>
-                {/* Enhanced Header with Sophisticated Badges */}
+                {/* Clean Header with Rank Badge */}
                 <View style={styles.restaurantHeader}>
                   <View style={[
                     styles.rankBadge,
@@ -653,61 +663,25 @@ export default function CollectionDetailScreen() {
                     meta?.rank === 2 && styles.silverRankBadge,
                     meta?.rank === 3 && styles.bronzeRankBadge
                   ]}>
-                    {meta?.rank === 1 && <Crown size={20} color="#FFFFFF" />}
-                    {meta?.rank === 2 && <Award size={18} color="#FFFFFF" />}
-                    {meta?.rank === 3 && <Award size={18} color="#FFFFFF" />}
-                    <Text style={[
-                      styles.rankNumber,
-                      meta?.rank === 1 && styles.winnerRankNumber
-                    ]}>#{meta?.rank || index + 1}</Text>
+                    {meta?.rank === 1 && <Crown size={16} color="#FFFFFF" />}
+                    <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
                   </View>
                   
                   <View style={styles.restaurantInfo}>
-                    <Text style={[
-                      styles.restaurantName,
-                      meta?.rank === 1 && styles.winnerRestaurantName
-                    ]}>{restaurant.name}</Text>
+                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
                     <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
-                    
-                    {/* Sophisticated Status Badges */}
-                    <View style={styles.statusBadgesContainer}>
-                      {meta?.rank === 1 && (
-                        <View style={styles.winnerBadge}>
-                          <Crown size={12} color="#F59E0B" />
-                          <Text style={styles.winnerBadgeText}>Winner</Text>
-                        </View>
-                      )}
-                      {meta.approvalPercent >= 80 && (
-                        <View style={styles.favoritesBadge}>
-                          <TrendingUp size={12} color="#10B981" />
-                          <Text style={styles.favoritesBadgeText}>Popular</Text>
-                        </View>
-                      )}
-                      {meta.approvalPercent >= 90 && (
-                        <View style={styles.unanimousBadge}>
-                          <ThumbsUp size={12} color="#3B82F6" />
-                          <Text style={styles.unanimousBadgeText}>Unanimous</Text>
-                        </View>
-                      )}
-                      {meta.approvalPercent < 50 && meta.approvalPercent > 30 && (
-                        <View style={styles.debatedBadge}>
-                          <MessageCircle size={12} color="#F59E0B" />
-                          <Text style={styles.debatedBadgeText}>Debated</Text>
-                        </View>
-                      )}
-                    </View>
+                    <Text style={styles.restaurantDetails}>
+                      {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
+                    </Text>
                   </View>
                   
-                  <View style={[
-                    styles.approvalBadge,
-                    meta?.rank === 1 && styles.winnerApprovalBadge
-                  ]}>
-                    <Text style={[
-                      styles.approvalPercent,
-                      meta?.rank === 1 && styles.winnerApprovalPercent
-                    ]}>{meta.approvalPercent}%</Text>
-                    <Text style={styles.approvalLabel}>Approval</Text>
-                  </View>
+                  {/* Top Choice Badge for Winner */}
+                  {meta?.rank === 1 && (
+                    <View style={styles.topChoiceBadge}>
+                      <Crown size={12} color="#FFFFFF" />
+                      <Text style={styles.topChoiceText}>TOP CHOICE</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Restaurant Card */}
@@ -717,7 +691,20 @@ export default function CollectionDetailScreen() {
                   compact
                 />
 
-                {/* Simple Vote Actions */}
+                {/* Approval Section */}
+                <View style={styles.approvalSection}>
+                  <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
+                  <Text style={styles.voteBreakdown}>
+                    {meta.likes} likes • {meta.dislikes} dislikes
+                  </Text>
+                  <View style={styles.consensusBadge}>
+                    <Text style={styles.consensusBadgeText}>
+                      {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Vote Actions */}
                 <View style={styles.voteActions}>
                   <TouchableOpacity 
                     style={[styles.voteButton, styles.likeButton]}
@@ -742,6 +729,38 @@ export default function CollectionDetailScreen() {
                     <MessageCircle size={16} color="#6B7280" />
                     <Text style={styles.voteCount}>{meta.discussionCount}</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Member Votes Section */}
+                <View style={styles.memberVotesSection}>
+                  <Text style={styles.memberVotesTitle}>Member Votes for {restaurant.name}</Text>
+                  <View style={styles.memberVotesList}>
+                    {meta.voteDetails?.likeVoters?.slice(0, 3).map((voter: any, voterIndex: number) => (
+                      <View key={`${restaurant.id}-like-${voter.userId}-${voterIndex}`} style={styles.memberVoteItem}>
+                        <View style={styles.memberVoteAvatar}>
+                          <Text style={styles.memberVoteInitial}>
+                            {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                          </Text>
+                        </View>
+                        <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                        <ThumbsUp size={16} color="#10B981" />
+                      </View>
+                    ))}
+                    {meta.voteDetails?.dislikeVoters?.slice(0, 3).map((voter: any, voterIndex: number) => (
+                      <View key={`${restaurant.id}-dislike-${voter.userId}-${voterIndex}`} style={styles.memberVoteItem}>
+                        <View style={styles.memberVoteAvatar}>
+                          <Text style={styles.memberVoteInitial}>
+                            {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                          </Text>
+                        </View>
+                        <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                        <ThumbsDown size={16} color="#EF4444" />
+                      </View>
+                    ))}
+                    {(!meta.voteDetails?.likeVoters?.length && !meta.voteDetails?.dislikeVoters?.length) && (
+                      <Text style={styles.noVotes}>No votes yet</Text>
+                    )}
+                  </View>
                 </View>
 
                 {/* Remove Button */}
@@ -1136,6 +1155,92 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 2,
+  },
+  restaurantDetails: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  topChoiceBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  topChoiceText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  discussionsSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  discussionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  discussionsLabel: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  discussionItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 10,
+    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  discussionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  discussionAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discussionInitial: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  discussionAuthor: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+  },
+  discussionTime: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+  discussionText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#374151',
+  },
+  noDiscussions: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
   removeButton: {
     marginTop: -8,
