@@ -355,7 +355,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
         </View>
       )}
 
-      {(query.length > 0 || filtered.length > 0) && (
+      {(query.length > 0 && filtered.length > 0) && (
         <View style={styles.liveResults}>
           <View style={styles.liveHeader}>
             <Text style={styles.liveTitle}>

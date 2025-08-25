@@ -547,10 +547,17 @@ export default function CollectionDetailScreen() {
                   <Text style={styles.memberVotingTitle}>Member Votes</Text>
                   {(() => {
                     const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
+                    console.log('[CollectionDetail] Meta vote details:', meta.voteDetails);
+                    console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
+                    console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
+                    
                     const allVoters = [
-                      ...meta.voteDetails.likeVoters.map(v => ({ ...v, vote: 'like' })),
-                      ...meta.voteDetails.dislikeVoters.map(v => ({ ...v, vote: 'dislike' }))
+                      ...meta.voteDetails.likeVoters.map(v => ({ ...v, vote: 'like', userName: v.name })),
+                      ...meta.voteDetails.dislikeVoters.map(v => ({ ...v, vote: 'dislike', userName: v.name }))
                     ];
+                    
+                    console.log('[CollectionDetail] Voting details:', votingDetails);
+                    console.log('[CollectionDetail] All voters:', allVoters);
                     
                     return allVoters.length > 0 ? (
                       <View style={styles.memberVotesList}>
