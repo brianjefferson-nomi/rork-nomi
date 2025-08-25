@@ -412,7 +412,7 @@ export default function CollectionDetailScreen() {
             )}
 
             {/* Ranked Restaurants */}
-        <View style={styles.restaurantsList}>
+            <View style={styles.restaurantsList}>
           <Text style={styles.sectionTitle}>Ranked Restaurants ({rankedRestaurants.length})</Text>
           {rankedRestaurants.length === 0 ? (
             <View style={styles.emptyState}>
