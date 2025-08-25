@@ -952,19 +952,141 @@ export default function CollectionDetailScreen() {
             collectionMembers={collectionMembers}
             styles={styles}
           />
-              <View style={styles.analyticsSection}>
-                <Text style={styles.sectionTitle}>Group Insights</Text>
-                <View style={styles.analyticsGrid}>
-                  <View style={styles.analyticCard}>
-                    <Text style={styles.analyticValue}>
-                      {(() => {
-                        const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
-                        const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
-                          const uniqueVoters = new Set([
-                            ...meta.voteDetails.likeVoters.map(v => v.userId),
-                            ...meta.voteDetails.dislikeVoters.map(v => v.userId)
-                          ]);
-                          return total + uniqueVoters.size;
+        )}
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
+
+      {/* Vote Modal */}
+      <Modal visible={!!showVoteModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {showVoteModal?.vote === 'like' ? 'Why do you like this?' : 'Why don\'t you like this?'}
+            </Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Share your thoughts (optional)"
+              multiline
+              value={voteReason}
+              onChangeText={setVoteReason}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalButton}
+                onPress={() => {
+                  if (showVoteModal) {
+                    voteRestaurant(showVoteModal.vote, showVoteModal.restaurantId, id, voteReason);
+                  }
+                  setShowVoteModal(null);
+                  setVoteReason('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Submit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowVoteModal(null);
+                  setVoteReason('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Discussion Modal */}
+      <Modal visible={!!showDiscussionModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Comment</Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Share your thoughts..."
+              multiline
+              value={discussionMessage}
+              onChangeText={setDiscussionMessage}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalButton}
+                onPress={() => {
+                  if (showDiscussionModal && discussionMessage.trim()) {
+                    addDiscussion(showDiscussionModal.id, discussionMessage);
+                  }
+                  setShowDiscussionModal(null);
+                  setDiscussionMessage('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Submit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowDiscussionModal(null);
+                  setDiscussionMessage('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invite Modal */}
+      <Modal visible={showInviteModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Invite to Collection</Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Email address"
+              value={inviteEmail}
+              onChangeText={setInviteEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Personal message (optional)"
+              multiline
+              value={inviteMessage}
+              onChangeText={setInviteMessage}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleInviteUser}>
+                <Text style={styles.modalButtonText}>Send Invite</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowInviteModal(false);
+                  setInviteEmail('');
+                  setInviteMessage('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
                         }, 0);
                         return totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
                       })()}%
