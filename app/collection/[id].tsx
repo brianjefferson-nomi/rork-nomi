@@ -375,32 +375,44 @@ export default function CollectionDetailScreen() {
 
 
 
-        {/* Group Analytics */}
-        {collection?.analytics && collection.analytics.participationRate !== undefined && (
-          <View style={styles.analyticsSection}>
-            <Text style={styles.sectionTitle}>Group Insights</Text>
-            <View style={styles.analyticsGrid}>
-              <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>
-                  {collection.analytics.participationRate ? Math.round(collection.analytics.participationRate * 100) : 0}%
-                </Text>
-                <Text style={styles.analyticLabel}>Participation</Text>
-              </View>
-              <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>
-                  {collection.analytics.consensusScore ? Math.round(collection.analytics.consensusScore * 100) : 0}%
-                </Text>
-                <Text style={styles.analyticLabel}>Consensus</Text>
-              </View>
-              <View style={styles.analyticCard}>
-                <Text style={styles.analyticValue}>
-                  {collection.analytics.totalVotes || 0}
-                </Text>
-                <Text style={styles.analyticLabel}>Total Votes</Text>
-              </View>
+        {/* Group Insights */}
+        <View style={styles.analyticsSection}>
+          <Text style={styles.sectionTitle}>Group Insights</Text>
+          <View style={styles.analyticsGrid}>
+            <View style={styles.analyticCard}>
+              <Text style={styles.analyticValue}>
+                {(() => {
+                  const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
+                  const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
+                    const uniqueVoters = new Set([
+                      ...meta.voteDetails.likeVoters.map(v => v.userId),
+                      ...meta.voteDetails.dislikeVoters.map(v => v.userId)
+                    ]);
+                    return total + uniqueVoters.size;
+                  }, 0);
+                  return totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
+                })()}%
+              </Text>
+              <Text style={styles.analyticLabel}>Participation</Text>
+            </View>
+            <View style={styles.analyticCard}>
+              <Text style={styles.analyticValue}>
+                {(() => {
+                  const totalVotes = rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0);
+                  const unanimousVotes = rankedRestaurants.filter(({ meta }) => meta.dislikes === 0).length;
+                  return totalVotes > 0 ? Math.round((unanimousVotes / rankedRestaurants.length) * 100) : 0;
+                })()}%
+              </Text>
+              <Text style={styles.analyticLabel}>Consensus</Text>
+            </View>
+            <View style={styles.analyticCard}>
+              <Text style={styles.analyticValue}>
+                {rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0)}
+              </Text>
+              <Text style={styles.analyticLabel}>Total Votes</Text>
             </View>
           </View>
-        )}
+        </View>
 
         {/* Group Recommendations */}
         {recommendations.length > 0 && (
@@ -530,61 +542,79 @@ export default function CollectionDetailScreen() {
                   </View>
                 )}
 
-                {/* Detailed Voting Information */}
-                <View style={styles.detailedVotingSection}>
-                  <Text style={styles.detailedVotingTitle}>Voting Details</Text>
-                  
-                  {/* Vote Breakdown by User */}
-                  <View style={styles.voteBreakdownSection}>
-                    <Text style={styles.breakdownTitle}>Votes by Member:</Text>
-                    {(() => {
-                      const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
-                      return votingDetails.voteBreakdown.map((userVote: any, idx: number) => (
-                        <View key={idx} style={styles.userVoteItem}>
-                          <Text style={styles.userVoteName}>{userVote.userName}</Text>
-                          <View style={styles.userVoteDetails}>
-                            {userVote.votes.map((vote: any, voteIdx: number) => (
-                              <View key={voteIdx} style={styles.voteDetail}>
-                                <Text style={[
-                                  styles.voteType, 
-                                  vote.vote === 'like' ? styles.likeVote : styles.dislikeVote
-                                ]}>
-                                  {vote.vote === 'like' ? '👍' : '👎'} {vote.vote}
+                {/* Member Voting Details */}
+                <View style={styles.memberVotingSection}>
+                  <Text style={styles.memberVotingTitle}>Member Votes</Text>
+                  {(() => {
+                    const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
+                    const allVoters = [
+                      ...meta.voteDetails.likeVoters.map(v => ({ ...v, vote: 'like' })),
+                      ...meta.voteDetails.dislikeVoters.map(v => ({ ...v, vote: 'dislike' }))
+                    ];
+                    
+                    return allVoters.length > 0 ? (
+                      <View style={styles.memberVotesList}>
+                        {allVoters.map((voter: any, idx: number) => (
+                          <View key={idx} style={styles.memberVoteItem}>
+                            <View style={styles.memberVoteHeader}>
+                              <View style={styles.memberVoteAvatar}>
+                                <Text style={styles.memberVoteInitial}>
+                                  {voter.userName ? voter.userName.charAt(0).toUpperCase() : '?'}
                                 </Text>
-                                {vote.reason && (
-                                  <Text style={styles.voteReason}>"{vote.reason}"</Text>
-                                )}
                               </View>
-                            ))}
+                              <Text style={styles.memberVoteName}>{voter.userName || 'Unknown Member'}</Text>
+                              <View style={[
+                                styles.memberVoteBadge,
+                                voter.vote === 'like' ? styles.likeVoteBadge : styles.dislikeVoteBadge
+                              ]}>
+                                <Text style={styles.memberVoteBadgeText}>
+                                  {voter.vote === 'like' ? '👍' : '👎'}
+                                </Text>
+                              </View>
+                            </View>
+                            {voter.reason && (
+                              <Text style={styles.memberVoteReason}>"{voter.reason}"</Text>
+                            )}
                           </View>
-                        </View>
-                      ));
-                    })()}
-                  </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.noVotesText}>No votes yet</Text>
+                    );
+                  })()}
+                </View>
 
-                  {/* Comments by User */}
-                  <View style={styles.commentsSection}>
-                    <Text style={styles.breakdownTitle}>Comments by Member:</Text>
-                    {(() => {
-                      const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
-                      return votingDetails.discussionBreakdown.map((userComment: any, idx: number) => (
-                        <View key={idx} style={styles.userCommentItem}>
-                          <Text style={styles.userCommentName}>{userComment.userName}</Text>
-                          <View style={styles.userCommentDetails}>
+                {/* Member Comments */}
+                {(() => {
+                  const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
+                  return votingDetails.discussionBreakdown.length > 0 ? (
+                    <View style={styles.memberCommentsSection}>
+                      <Text style={styles.memberCommentsTitle}>Member Comments</Text>
+                      <View style={styles.memberCommentsList}>
+                        {votingDetails.discussionBreakdown.map((userComment: any, idx: number) => (
+                          <View key={idx} style={styles.memberCommentItem}>
+                            <View style={styles.memberCommentHeader}>
+                              <View style={styles.memberCommentAvatar}>
+                                <Text style={styles.memberCommentInitial}>
+                                  {userComment.userName ? userComment.userName.charAt(0).toUpperCase() : '?'}
+                                </Text>
+                              </View>
+                              <Text style={styles.memberCommentName}>{userComment.userName}</Text>
+                            </View>
                             {userComment.comments.map((comment: any, commentIdx: number) => (
-                              <View key={commentIdx} style={styles.commentDetail}>
-                                <Text style={styles.commentText}>"{comment.message}"</Text>
-                                <Text style={styles.commentTime}>
+                              <View key={commentIdx} style={styles.memberCommentDetail}>
+                                <Text style={styles.memberCommentText}>"{comment.message}"</Text>
+                                <Text style={styles.memberCommentTime}>
                                   {comment.timestamp ? new Date(comment.timestamp).toLocaleDateString() : 'Unknown date'}
                                 </Text>
                               </View>
                             ))}
                           </View>
-                        </View>
-                      ));
-                    })()}
-                  </View>
-                </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null;
+                })()}
                 
                 <TouchableOpacity 
                   style={styles.removeButton}
@@ -738,82 +768,7 @@ export default function CollectionDetailScreen() {
           </View>
         </Modal>
 
-        {/* Contributor Statistics - Moved to bottom */}
-        <View style={styles.contributorStatsSection}>
-          <Text style={styles.sectionTitle}>Member Contributions</Text>
-          <View style={styles.contributorStatsList}>
-            {collection.collaborators && Array.isArray(collection.collaborators) ? (
-              collection.collaborators.map((member: any, index: number) => {
-                const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
-                const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
-                
-                // Calculate member's contribution statistics
-                const memberVotes = rankedRestaurants.flatMap(({ meta }) => [
-                  ...meta.voteDetails.likeVoters.filter(v => v.userId === memberId),
-                  ...meta.voteDetails.dislikeVoters.filter(v => v.userId === memberId)
-                ]);
-                
-                const memberDiscussions = discussions.filter(d => d.userId === memberId);
-                const totalVotes = memberVotes.length;
-                const totalDiscussions = memberDiscussions.length;
-                const likes = memberVotes.filter(v => v.reason?.includes('like')).length;
-                const dislikes = memberVotes.filter(v => v.reason?.includes('dislike')).length;
-                
-                // Calculate contribution rate
-                const totalPossibleVotes = rankedRestaurants.length;
-                const contributionRate = totalPossibleVotes > 0 ? (totalVotes / totalPossibleVotes) * 100 : 0;
-                
-                return (
-                  <View key={memberId} style={styles.contributorCard}>
-                    <View style={styles.contributorHeader}>
-                      <View style={styles.contributorAvatar}>
-                        <Text style={styles.contributorInitial}>
-                          {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
-                        </Text>
-                      </View>
-                      <View style={styles.contributorInfo}>
-                        <Text style={styles.contributorName}>{memberName}</Text>
-                        <Text style={styles.contributorStats}>
-                          {contributionRate.toFixed(0)}% participation • {totalVotes} votes • {totalDiscussions} discussions
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.contributorDetails}>
-                      <View style={styles.voteBreakdownRow}>
-                        <View style={styles.voteStat}>
-                          <ThumbsUp size={14} color="#22C55E" />
-                          <Text style={styles.voteStatText}>{likes} likes</Text>
-                        </View>
-                        <View style={styles.voteStat}>
-                          <ThumbsDown size={14} color="#EF4444" />
-                          <Text style={styles.voteStatText}>{dislikes} dislikes</Text>
-                        </View>
-                        <View style={styles.voteStat}>
-                          <MessageCircle size={14} color="#6B7280" />
-                          <Text style={styles.voteStatText}>{totalDiscussions} comments</Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.contributionBar}>
-                        <View 
-                          style={[
-                            styles.contributionFill, 
-                            { width: `${Math.min(contributionRate, 100)}%` }
-                          ]} 
-                        />
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptyContributors}>
-                <Text style={styles.emptyContributorsText}>No member contributions yet</Text>
-              </View>
-            )}
-          </View>
-        </View>
+
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -1283,92 +1238,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  contributorStatsSection: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  contributorStatsList: {
-    marginTop: 16,
-  },
-  contributorCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  contributorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  contributorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  contributorInitial: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  contributorInfo: {
-    flex: 1,
-  },
-  contributorName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 2,
-  },
-  contributorStats: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  contributorDetails: {
-    marginTop: 8,
-  },
-  voteBreakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 8,
-  },
-  voteStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  voteStatText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  contributionBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  contributionFill: {
-    height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: 4,
-  },
-  emptyContributors: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  emptyContributorsText: {
-    fontSize: 14,
-    color: '#999',
-  },
 
   // Detailed voting styles
   detailedVotingSection: {
@@ -1453,6 +1322,146 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   commentTime: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+
+  // Member voting styles
+  memberVotingSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  memberVotingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  memberVotesList: {
+    gap: 8,
+  },
+  memberVoteItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  memberVoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  memberVoteAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  memberVoteInitial: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberVoteName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    flex: 1,
+  },
+  memberVoteBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  likeVoteBadge: {
+    backgroundColor: '#D1FAE5',
+  },
+  dislikeVoteBadge: {
+    backgroundColor: '#FEE2E2',
+  },
+  memberVoteBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  memberVoteReason: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginLeft: 32,
+  },
+  noVotesText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+
+  // Member comments styles
+  memberCommentsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  memberCommentsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  memberCommentsList: {
+    gap: 8,
+  },
+  memberCommentItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  memberCommentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  memberCommentAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  memberCommentInitial: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberCommentName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  memberCommentDetail: {
+    marginLeft: 32,
+    marginTop: 4,
+  },
+  memberCommentText: {
+    fontSize: 12,
+    color: '#374151',
+    fontStyle: 'italic',
+  },
+  memberCommentTime: {
     fontSize: 10,
     color: '#9CA3AF',
     marginTop: 2,
