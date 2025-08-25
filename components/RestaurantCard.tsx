@@ -51,6 +51,54 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
   const images = getValidImages();
   const hasMultipleImages = images.length > 1;
 
+  // Format price range to show proper dollar signs
+  const formatPriceRange = (priceRange: string) => {
+    if (!priceRange) return '$$';
+    // Remove any non-dollar sign characters and ensure it's only $ symbols
+    const cleanPrice = priceRange.replace(/[^$]/g, '');
+    return cleanPrice.length > 0 ? cleanPrice : '$$';
+  };
+
+  // Format hours to show days open
+  const formatHours = (hours: string) => {
+    if (!hours) return 'Hours vary';
+    
+    // Common patterns for days
+    const dayPatterns = {
+      'daily': 'Daily',
+      'mon-fri': 'Mon-Fri',
+      'monday-friday': 'Mon-Fri',
+      'tuesday-saturday': 'Tue-Sat',
+      'wednesday-sunday': 'Wed-Sun',
+      'thursday-monday': 'Thu-Mon',
+      'friday-tuesday': 'Fri-Tue',
+      'saturday-wednesday': 'Sat-Wed',
+      'sunday-thursday': 'Sun-Thu'
+    };
+    
+    const lowerHours = hours.toLowerCase();
+    
+    // Check for specific day patterns
+    for (const [pattern, display] of Object.entries(dayPatterns)) {
+      if (lowerHours.includes(pattern)) {
+        return display;
+      }
+    }
+    
+    // Check for individual days
+    if (lowerHours.includes('monday') || lowerHours.includes('mon')) return 'Mon';
+    if (lowerHours.includes('tuesday') || lowerHours.includes('tue')) return 'Tue';
+    if (lowerHours.includes('wednesday') || lowerHours.includes('wed')) return 'Wed';
+    if (lowerHours.includes('thursday') || lowerHours.includes('thu')) return 'Thu';
+    if (lowerHours.includes('friday') || lowerHours.includes('fri')) return 'Fri';
+    if (lowerHours.includes('saturday') || lowerHours.includes('sat')) return 'Sat';
+    if (lowerHours.includes('sunday') || lowerHours.includes('sun')) return 'Sun';
+    
+    // If no specific pattern found, return first word or default
+    const firstWord = hours.split(' ')[0];
+    return firstWord && firstWord.length > 0 ? firstWord : 'Hours vary';
+  };
+
   if (compact) {
     return (
       <TouchableOpacity style={styles.compactCard} onPress={onPress} activeOpacity={0.9}>
@@ -65,7 +113,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           <Text style={styles.compactName} numberOfLines={1}>{restaurant.name}</Text>
           <Text style={styles.compactCuisine}>{restaurant.cuisine}</Text>
           <View style={styles.compactInfo}>
-            <Text style={styles.compactPrice}>{restaurant.priceRange}</Text>
+            <Text style={styles.compactPrice}>{formatPriceRange(restaurant.priceRange)}</Text>
             <Text style={styles.compactDot}>•</Text>
             <Text style={styles.compactNeighborhood}>{restaurant.neighborhood}</Text>
           </View>
@@ -143,22 +191,26 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
-        <View style={styles.locationInfo}>
-          <MapPin size={14} color="#666" />
-          <Text style={styles.neighborhood} numberOfLines={1}>{restaurant.neighborhood}</Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoItem}>
+            <MapPin size={16} color="#666" />
+            <Text style={styles.infoText} numberOfLines={1}>{restaurant.neighborhood}</Text>
+          </View>
           {restaurant.distance && (
-            <>
-              <Text style={styles.dot}>•</Text>
-              <Text style={styles.distance}>{restaurant.distance}</Text>
-            </>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoText}>{restaurant.distance}</Text>
+            </View>
           )}
         </View>
         
-        <View style={styles.details}>
-          <Text style={styles.price}>{restaurant.priceRange}</Text>
-          <Text style={styles.dot}>•</Text>
-          <Clock size={14} color="#666" />
-          <Text style={styles.infoText} numberOfLines={1}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoItem}>
+            <Text style={styles.price}>{formatPriceRange(restaurant.priceRange)}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Clock size={16} color="#666" />
+            <Text style={styles.infoText}>{formatHours(restaurant.hours)}</Text>
+          </View>
         </View>
         
         <View style={styles.vibeContainer}>
@@ -321,9 +373,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 16,
   },
-  info: {
+  infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   infoItem: {
     flexDirection: 'row',
@@ -331,8 +385,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   infoText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E7D32',
   },
   noteContainer: {
     marginTop: 16,
@@ -405,8 +464,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   compactPrice: {
-    fontSize: 13,
-    color: '#999',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E7D32',
   },
   compactDot: {
     fontSize: 13,
@@ -421,26 +481,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 16,
   },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  neighborhood: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  details: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  price: {
-    fontSize: 14,
-    color: '#999',
-    marginRight: 6,
-  },
+
   dot: {
     fontSize: 14,
     color: '#999',
