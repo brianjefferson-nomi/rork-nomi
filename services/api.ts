@@ -21,6 +21,8 @@ const GOOGLE_MAPS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863'
 const GOOGLE_MAPS_HOST = 'google-map-places-new-v2.p.rapidapi.com';
 const UNSPLASH_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const UNSPLASH_HOST = 'unsplash-image-search-api.p.rapidapi.com';
+const YELP_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const YELP_HOST = 'yelp-business-api.p.rapidapi.com';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -31,7 +33,7 @@ const API_CONFIG = {
       googleMapsExtractor: 'google-maps-extractor.p.rapidapi.com',
       localBusinessData: 'local-business-data.p.rapidapi.com',
       mapData: 'map-data.p.rapidapi.com',
-      yelp: 'yelp-scraper.p.rapidapi.com',
+      yelp: 'yelp-business-api.p.rapidapi.com',
       tripadvisor: 'tripadvisor16.p.rapidapi.com',
       unsplash: 'unsplash-image-search.p.rapidapi.com',
       stockPhotos: 'stock-photos-and-videos.p.rapidapi.com',
@@ -1093,10 +1095,13 @@ export const aggregateRestaurantData = async (query: string, location: string, u
           searchFoursquareRestaurants(query, userLocation.lat, userLocation.lng, 5000),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Foursquare timeout')), 8000))
         ]),
-        Promise.resolve([]) // Skip Yelp and Reddit APIs due to issues
+        Promise.race([
+          searchRestaurantsWithYelp(query, userLocation.city, 20),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 8000))
+        ])
       ];
 
-      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults, foursquareResults] = await Promise.allSettled(apiPromises);
+      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults, foursquareResults, yelpResults] = await Promise.allSettled(apiPromises);
 
       const mapsExtractorData = mapsExtractorResults.status === 'fulfilled' ? mapsExtractorResults.value : [];
       const localBusinessData = localBusinessResults.status === 'fulfilled' ? localBusinessResults.value : [];
@@ -1104,8 +1109,9 @@ export const aggregateRestaurantData = async (query: string, location: string, u
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
       const foursquareData = foursquareResults.status === 'fulfilled' ? foursquareResults.value : [];
+      const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}, Yelp: ${yelpData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1114,6 +1120,7 @@ export const aggregateRestaurantData = async (query: string, location: string, u
         googleData, 
         tripAdvisorData, 
         foursquareData,
+        yelpData,
         userLocation
       );
     } catch (error) {
@@ -1330,6 +1337,7 @@ const combineLocationBasedResults = async (
   googleResults: any[], 
   tripAdvisorResults: any[], 
   foursquareResults: any[],
+  yelpResults: any[],
   userLocation: { lat: number; lng: number; city: string }
 ) => {
   const combined: any[] = [];
@@ -1556,6 +1564,60 @@ const combineLocationBasedResults = async (
       totalPhotos: transformedPlace.totalPhotos,
       totalTips: transformedPlace.totalTips,
       totalVisits: transformedPlace.totalVisits
+    });
+  }
+
+  // Yelp
+  for (const restaurant of yelpResults) {
+    if (!restaurant.name || seenNames.has(restaurant.name.toLowerCase())) continue;
+    seenNames.add(restaurant.name.toLowerCase());
+
+    // Transform Yelp data to our format
+    const transformedRestaurant = transformYelpData(restaurant);
+    if (!transformedRestaurant) continue;
+
+    // Get additional details and reviews for top results
+    let enhancedPhotos: string[] = transformedRestaurant.photos || [];
+    let enhancedReviews: string[] = [];
+    
+    if (combined.length < 10 && restaurant.id) {
+      try {
+        const [details, reviews] = await Promise.all([
+          getYelpRestaurantDetails(restaurant.id),
+          getYelpRestaurantReviews(restaurant.id, 5)
+        ]);
+        
+        if (details) {
+          transformedRestaurant.description = details.snippet_text || transformedRestaurant.description;
+          transformedRestaurant.hours = details.hours?.[0]?.open?.map((day: any) => `${day.day}: ${day.start}-${day.end}`).join(', ') || transformedRestaurant.hours;
+        }
+        
+        enhancedReviews = reviews.map((review: any) => review.text || review.comment).filter(Boolean);
+      } catch (error) {
+        console.error('[Yelp] Error getting additional data:', error);
+      }
+    }
+
+    combined.push({
+      id: transformedRestaurant.id,
+      name: transformedRestaurant.name,
+      cuisine: transformedRestaurant.cuisine,
+      rating: transformedRestaurant.rating,
+      priceLevel: transformedRestaurant.priceLevel,
+      address: formatAddress(transformedRestaurant.address, userLocation.city),
+      phone: transformedRestaurant.phone,
+      website: transformedRestaurant.website,
+      photos: enhancedPhotos,
+      reviews: enhancedReviews.length > 0 ? enhancedReviews : [],
+      hours: transformedRestaurant.hours,
+      source: 'yelp',
+      location: { 
+        lat: restaurant.coordinates?.latitude || userLocation.lat, 
+        lng: restaurant.coordinates?.longitude || userLocation.lng 
+      },
+      totalReviews: transformedRestaurant.totalReviews,
+      vibeTags: transformedRestaurant.vibeTags,
+      topPicks: transformedRestaurant.topPicks
     });
   }
 
@@ -2230,6 +2292,191 @@ export const searchRestaurantsWithAPI = async (
     return enhancedResults;
   } catch (error) {
     console.error('[API] Error in Restaurants API search:', error);
+    return [];
+  }
+};
+
+// Yelp Business API Integration
+export const searchYelpRestaurants = async (
+  location: string = 'New York, NY',
+  searchCategory: string = 'Restaurants',
+  limit: number = 10,
+  offset: number = 0,
+  businessDetailsType: string = 'basic'
+): Promise<any[]> => {
+  try {
+    console.log('[Yelp API] Searching restaurants in:', location);
+    
+    const params = new URLSearchParams({
+      location: encodeURIComponent(location),
+      search_category: searchCategory,
+      limit: limit.toString(),
+      offset: offset.toString(),
+      business_details_type: businessDetailsType
+    });
+    
+    const url = `https://yelp-business-api.p.rapidapi.com/search/category?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': YELP_HOST,
+        'x-rapidapi-key': YELP_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Yelp API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Yelp API] Found ${data.businesses?.length || 0} restaurants`);
+    return data.businesses || [];
+  } catch (error) {
+    console.error('[Yelp API] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+export const getYelpRestaurantDetails = async (
+  businessId: string
+): Promise<any | null> => {
+  try {
+    console.log('[Yelp API] Getting restaurant details for:', businessId);
+    
+    const url = `https://yelp-business-api.p.rapidapi.com/business/${businessId}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': YELP_HOST,
+        'x-rapidapi-key': YELP_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Yelp API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log('[Yelp API] Retrieved restaurant details');
+    return data;
+  } catch (error) {
+    console.error('[Yelp API] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+export const getYelpRestaurantReviews = async (
+  businessId: string,
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[Yelp API] Getting reviews for:', businessId);
+    
+    const params = new URLSearchParams({
+      limit: limit.toString()
+    });
+    
+    const url = `https://yelp-business-api.p.rapidapi.com/business/${businessId}/reviews?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': YELP_HOST,
+        'x-rapidapi-key': YELP_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Yelp API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log(`[Yelp API] Retrieved ${data.reviews?.length || 0} reviews`);
+    return data.reviews || [];
+  } catch (error) {
+    console.error('[Yelp API] Error getting reviews:', error);
+    return [];
+  }
+};
+
+export const transformYelpData = (yelpData: any): any => {
+  try {
+    return {
+      id: yelpData.id || `yelp_${yelpData.alias || Date.now()}`,
+      name: yelpData.name || 'Unknown Restaurant',
+      cuisine: yelpData.categories?.map((cat: any) => cat.title).join(', ') || 'Restaurant',
+      priceLevel: yelpData.price ? yelpData.price.length : 2,
+      photos: yelpData.image_url ? [yelpData.image_url] : [],
+      address: yelpData.location?.address1 || '',
+      neighborhood: yelpData.location?.city || '',
+      hours: yelpData.hours?.[0]?.open?.map((day: any) => `${day.day}: ${day.start}-${day.end}`).join(', ') || 'Hours vary',
+      vibeTags: yelpData.categories?.map((cat: any) => cat.title) || [],
+      description: yelpData.snippet_text || 'A great dining experience awaits.',
+      topPicks: yelpData.transactions || [],
+      rating: yelpData.rating || 0,
+      reviews: [],
+      phone: yelpData.phone || '',
+      website: yelpData.url || '',
+      distance: yelpData.distance ? `${(yelpData.distance / 1609.34).toFixed(1)} mi` : '',
+      proximity: yelpData.distance || 0,
+      totalReviews: yelpData.review_count || 0,
+      source: 'yelp_api'
+    };
+  } catch (error) {
+    console.error('[Yelp API] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+export const searchRestaurantsWithYelp = async (
+  query: string,
+  location: string = 'New York, NY',
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Yelp API');
+    
+    // Search using Yelp API
+    const yelpResults = await searchYelpRestaurants(location, 'Restaurants', limit);
+    
+    // Transform results
+    const transformedResults = yelpResults
+      .map(transformYelpData)
+      .filter(Boolean);
+    
+    // Enhance with additional data for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get detailed information
+          const details = await getYelpRestaurantDetails(restaurant.id);
+          if (details) {
+            restaurant.description = details.snippet_text || restaurant.description;
+            restaurant.hours = details.hours?.[0]?.open?.map((day: any) => `${day.day}: ${day.start}-${day.end}`).join(', ') || restaurant.hours;
+          }
+          
+          // Get reviews
+          const reviews = await getYelpRestaurantReviews(restaurant.id, 5);
+          const reviewTexts = reviews.map((review: any) => review.text || review.comment).filter(Boolean);
+          restaurant.reviews = reviewTexts;
+          
+          return restaurant;
+        } catch (error) {
+          console.error('[Yelp API] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Yelp API data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Yelp API search:', error);
     return [];
   }
 };
