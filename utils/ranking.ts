@@ -25,6 +25,18 @@ export function computeRankings(
   options?: ComputeOptions
 ): { restaurant: Restaurant; meta: RankedRestaurantMeta }[] {
   try {
+    console.log('[ranking] Starting computeRankings with:', {
+      restaurantCount: restaurants.length,
+      voteCount: votes.length,
+      options: options ? {
+        memberCount: options.memberCount,
+        hasCollection: !!options.collection,
+        collectionId: options.collection?.id,
+        collectionSettings: options.collection?.settings,
+        collectionConsensusThreshold: options.collection?.consensus_threshold
+      } : 'no options'
+    });
+    
     const now = Date.now();
 
     const results = restaurants.map((restaurant, index) => {
@@ -118,7 +130,9 @@ export function computeRankings(
       const consensus = computeConsensus(likeRatio);
 
       let badge: RankedRestaurantMeta['badge'] | undefined = undefined;
-      const consensusThreshold = options?.collection?.consensus_threshold ?? 0.7;
+      // Handle both database format (consensus_threshold) and interface format (settings.consensusThreshold)
+      const consensusThreshold = options?.collection?.settings?.consensusThreshold ?? 
+                                (options?.collection?.consensus_threshold ? options.collection.consensus_threshold / 100 : 0.7);
       
       if (totalVotes >= 3 && likeRatio >= consensusThreshold) badge = 'group_favorite';
       if (totalVotes >= 3 && likes === totalVotes) badge = 'unanimous';

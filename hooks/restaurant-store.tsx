@@ -684,7 +684,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
     
     try {
-      console.log('[RestaurantStore] Voting on restaurant:', restaurantId, 'vote:', vote, 'collection:', planId);
+      console.log('[RestaurantStore] Voting on restaurant:', restaurantId, 'vote:', vote, 'collection:', planId, 'reason:', reason);
+      console.log('[RestaurantStore] Current user:', user.id);
+      console.log('[RestaurantStore] Current userVotes count:', userVotes.length);
       
       // Save vote to database
       const voteData = {
@@ -696,8 +698,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         created_at: new Date().toISOString()
       };
       
-      await dbHelpers.createRestaurantVote(voteData);
-      console.log('[RestaurantStore] Vote saved to database successfully');
+      const savedVote = await dbHelpers.createRestaurantVote(voteData);
+      console.log('[RestaurantStore] Vote saved to database successfully:', savedVote);
       
       // Update local state
       const existingVoteIndex = userVotes.findIndex((v: any) => 
@@ -731,9 +733,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         updated = [...userVotes, { ...base, vote }];
       }
 
+      console.log('[RestaurantStore] Updating local state with votes:', updated.length);
       persistVotes.mutate(updated);
       
       // Refresh data from database
+      console.log('[RestaurantStore] Invalidating queries to refresh data');
       queryClient.invalidateQueries({ queryKey: ['userVotes', user.id] });
       
     } catch (error) {

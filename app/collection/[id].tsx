@@ -414,244 +414,6 @@ export default function CollectionDetailScreen() {
           </View>
         </View>
 
-        {/* Enhanced Member Activity - Comprehensive voting insights */}
-        <View style={styles.memberActivitySection}>
-          <Text style={styles.sectionTitle}>Member Activity & Insights</Text>
-          {(() => {
-            // Get collection members for privacy filtering
-            const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
-              ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
-              : [];
-            
-            console.log('[CollectionDetail] Collection members:', collectionMembers);
-            console.log('[CollectionDetail] Collection is public:', collection.is_public);
-            console.log('[CollectionDetail] Current user:', user?.id);
-            console.log('[CollectionDetail] Collection data:', collection);
-            console.log('[CollectionDetail] Collection collaborators:', collection.collaborators);
-            
-            // Collect all member activity across all restaurants
-            const allMemberActivity: any[] = [];
-            const memberVotingStats: Record<string, { likes: number; dislikes: number; total: number }> = {};
-            
-            rankedRestaurants.forEach(({ restaurant, meta }) => {
-              console.log('[CollectionDetail] Restaurant:', restaurant.name);
-              console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
-              console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
-              console.log('[CollectionDetail] Meta vote details structure:', {
-                likeVoters: meta.voteDetails.likeVoters.map(v => ({ userId: v.userId, name: v.name })),
-                dislikeVoters: meta.voteDetails.dislikeVoters.map(v => ({ userId: v.userId, name: v.name }))
-              });
-              
-              // Add votes - show all activity for public collections, only members for private
-              meta.voteDetails.likeVoters.forEach(voter => {
-                // For private collections, only show activity from actual members
-                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                  console.log('[CollectionDetail] Filtering out non-member like voter:', voter.userId);
-                  return;
-                }
-                
-                // Track member voting stats
-                if (!memberVotingStats[voter.userId]) {
-                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                }
-                memberVotingStats[voter.userId].likes++;
-                memberVotingStats[voter.userId].total++;
-                
-                allMemberActivity.push({
-                  type: 'vote',
-                  vote: 'like',
-                  restaurantName: restaurant.name,
-                  userName: voter.name,
-                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                  userId: voter.userId,
-                  reason: voter.reason,
-                  timestamp: voter.timestamp,
-                  restaurantId: restaurant.id
-                });
-              });
-              
-              meta.voteDetails.dislikeVoters.forEach(voter => {
-                // For private collections, only show activity from actual members
-                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                  console.log('[CollectionDetail] Filtering out non-member dislike voter:', voter.userId);
-                  return;
-                }
-                
-                // Track member voting stats
-                if (!memberVotingStats[voter.userId]) {
-                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                }
-                memberVotingStats[voter.userId].dislikes++;
-                memberVotingStats[voter.userId].total++;
-                
-                allMemberActivity.push({
-                  type: 'vote',
-                  vote: 'dislike',
-                  restaurantName: restaurant.name,
-                  userName: voter.name,
-                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                  userId: voter.userId,
-                  reason: voter.reason,
-                  timestamp: voter.timestamp,
-                  restaurantId: restaurant.id
-                });
-              });
-            });
-            
-            console.log('[CollectionDetail] Discussions:', discussions);
-            
-            // Add discussions - show all activity for public collections, only members for private
-            discussions.forEach(discussion => {
-              console.log('[CollectionDetail] Processing discussion:', discussion);
-              // For private collections, only show activity from actual members
-              if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
-                console.log('[CollectionDetail] Filtering out non-member discussion:', discussion.userId);
-                return;
-              }
-              allMemberActivity.push({
-                type: 'comment',
-                restaurantName: discussion.restaurantName || 'Collection',
-                userName: discussion.userName,
-                firstName: discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown',
-                userId: discussion.userId,
-                message: discussion.message,
-                timestamp: discussion.timestamp
-              });
-            });
-            
-            console.log('[CollectionDetail] All member activity:', allMemberActivity);
-            console.log('[CollectionDetail] Member voting stats:', memberVotingStats);
-            
-            // Sort by timestamp (most recent first)
-            allMemberActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-            
-            return allMemberActivity.length > 0 ? (
-              <View style={styles.memberActivityList}>
-                {/* Member Voting Insights */}
-                <View style={styles.insightsSection}>
-                  <Text style={styles.insightsTitle}>📊 Member Voting Insights</Text>
-                  <View style={styles.insightsGrid}>
-                    {Object.entries(memberVotingStats)
-                      .filter(([userId, stats]) => stats.total > 0)
-                      .sort(([,a], [,b]) => b.total - a.total)
-                      .slice(0, 6)
-                      .map(([userId, stats]) => {
-                        const member = collection.collaborators?.find((m: any) => {
-                          if (typeof m === 'string') return m === userId;
-                          return m.userId === userId;
-                        });
-                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                        const firstName = memberName.split(' ')[0];
-                        const likePercentage = stats.total > 0 ? Math.round((stats.likes / stats.total) * 100) : 0;
-                        
-                        return (
-                          <View key={userId} style={styles.memberInsight}>
-                            <View style={styles.memberInsightHeader}>
-                              <View style={styles.memberInsightAvatar}>
-                                <Text style={styles.memberInsightInitial}>
-                                  {firstName.charAt(0).toUpperCase()}
-                                </Text>
-                              </View>
-                              <Text style={styles.memberInsightName}>{firstName}</Text>
-                            </View>
-                            <View style={styles.memberInsightStats}>
-                              <Text style={styles.memberInsightVotes}>{stats.total} votes</Text>
-                              <Text style={styles.memberInsightPercentage}>{likePercentage}% likes</Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                  </View>
-                </View>
-                
-                {/* Recent Activity Feed */}
-                <View style={styles.recentActivitySection}>
-                  <Text style={styles.recentActivityTitle}>🕒 Recent Activity</Text>
-                  {allMemberActivity.slice(0, 8).map((activity, index) => (
-                    <View key={index} style={styles.memberActivityItem}>
-                      <View style={styles.memberActivityHeader}>
-                        <View style={styles.memberActivityAvatar}>
-                          <Text style={styles.memberActivityInitial}>
-                            {activity.firstName ? activity.firstName.charAt(0).toUpperCase() : '?'}
-                          </Text>
-                        </View>
-                        <View style={styles.memberActivityInfo}>
-                          <Text style={styles.memberActivityName}>{activity.firstName}</Text>
-                          <Text style={styles.memberActivityAction}>
-                            {activity.type === 'vote' ? (
-                              <>
-                                {activity.vote === 'like' ? '👍 Liked' : '👎 Disliked'} {activity.restaurantName}
-                              </>
-                            ) : (
-                              <>💬 Commented on {activity.restaurantName}</>
-                            )}
-                          </Text>
-                        </View>
-                        <Text style={styles.memberActivityTime}>
-                          {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString() : 'Unknown date'}
-                        </Text>
-                      </View>
-                      {(activity.reason || activity.message) && (
-                        <Text style={styles.memberActivityContent}>
-                          "{activity.reason || activity.message}"
-                        </Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-                
-                {/* Restaurant Voting Summary */}
-                <View style={styles.restaurantVotingSection}>
-                  <Text style={styles.restaurantVotingTitle}>🏆 Restaurant Voting Summary</Text>
-                  {rankedRestaurants
-                    .filter(({ meta }) => meta.likes > 0 || meta.dislikes > 0)
-                    .slice(0, 5)
-                    .map(({ restaurant, meta }, index) => (
-                      <View key={restaurant.id} style={styles.restaurantVotingItem}>
-                        <View style={styles.restaurantVotingHeader}>
-                          <Text style={styles.restaurantVotingName}>{restaurant.name}</Text>
-                          <View style={styles.restaurantVotingBadge}>
-                            <Text style={styles.restaurantVotingRank}>#{meta.rank}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.restaurantVotingStats}>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>👍 Likes</Text>
-                            <Text style={styles.voteStatValue}>{meta.likes}</Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>👎 Dislikes</Text>
-                            <Text style={styles.voteStatValue}>{meta.dislikes}</Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <Text style={styles.voteStatLabel}>📊 Approval</Text>
-                            <Text style={styles.voteStatValue}>{meta.approvalPercent}%</Text>
-                          </View>
-                        </View>
-                        {meta.voteDetails.likeVoters.length > 0 && (
-                          <Text style={styles.restaurantVotingVoters}>
-                            Liked by: {meta.voteDetails.likeVoters.map(v => v.name).join(', ')}
-                          </Text>
-                        )}
-                      </View>
-                    ))}
-                </View>
-              </View>
-            ) : (
-              <View style={styles.emptyActivityContainer}>
-                <Text style={styles.emptyActivityText}>
-                  {collection.is_public ? 'No member activity yet' : 'No collection member activity yet'}
-                </Text>
-                <Text style={styles.emptyActivitySubtext}>
-                  {collection.is_public 
-                    ? 'Start voting and commenting to see activity here!' 
-                    : 'Collection members can vote and comment to see activity here!'}
-                </Text>
-              </View>
-            );
-          })()}
-        </View>
-
         {/* Group Recommendations */}
         {recommendations.length > 0 && (
           <View style={styles.recommendationsSection}>
@@ -908,6 +670,244 @@ export default function CollectionDetailScreen() {
             ))}
           </View>
         )}
+
+        {/* Enhanced Member Activity - Comprehensive voting insights */}
+        <View style={styles.memberActivitySection}>
+          <Text style={styles.sectionTitle}>Member Activity & Insights</Text>
+          {(() => {
+            // Get collection members for privacy filtering
+            const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
+              ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+              : [];
+            
+            console.log('[CollectionDetail] Collection members:', collectionMembers);
+            console.log('[CollectionDetail] Collection is public:', collection.is_public);
+            console.log('[CollectionDetail] Current user:', user?.id);
+            console.log('[CollectionDetail] Collection data:', collection);
+            console.log('[CollectionDetail] Collection collaborators:', collection.collaborators);
+            
+            // Collect all member activity across all restaurants
+            const allMemberActivity: any[] = [];
+            const memberVotingStats: Record<string, { likes: number; dislikes: number; total: number }> = {};
+            
+            rankedRestaurants.forEach(({ restaurant, meta }) => {
+              console.log('[CollectionDetail] Restaurant:', restaurant.name);
+              console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
+              console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
+              console.log('[CollectionDetail] Meta vote details structure:', {
+                likeVoters: meta.voteDetails.likeVoters.map(v => ({ userId: v.userId, name: v.name })),
+                dislikeVoters: meta.voteDetails.dislikeVoters.map(v => ({ userId: v.userId, name: v.name }))
+              });
+              
+              // Add votes - show all activity for public collections, only members for private
+              meta.voteDetails.likeVoters.forEach(voter => {
+                // For private collections, only show activity from actual members
+                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  console.log('[CollectionDetail] Filtering out non-member like voter:', voter.userId);
+                  return;
+                }
+                
+                // Track member voting stats
+                if (!memberVotingStats[voter.userId]) {
+                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
+                }
+                memberVotingStats[voter.userId].likes++;
+                memberVotingStats[voter.userId].total++;
+                
+                allMemberActivity.push({
+                  type: 'vote',
+                  vote: 'like',
+                  restaurantName: restaurant.name,
+                  userName: voter.name,
+                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                  userId: voter.userId,
+                  reason: voter.reason,
+                  timestamp: voter.timestamp,
+                  restaurantId: restaurant.id
+                });
+              });
+              
+              meta.voteDetails.dislikeVoters.forEach(voter => {
+                // For private collections, only show activity from actual members
+                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  console.log('[CollectionDetail] Filtering out non-member dislike voter:', voter.userId);
+                  return;
+                }
+                
+                // Track member voting stats
+                if (!memberVotingStats[voter.userId]) {
+                  memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
+                }
+                memberVotingStats[voter.userId].dislikes++;
+                memberVotingStats[voter.userId].total++;
+                
+                allMemberActivity.push({
+                  type: 'vote',
+                  vote: 'dislike',
+                  restaurantName: restaurant.name,
+                  userName: voter.name,
+                  firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                  userId: voter.userId,
+                  reason: voter.reason,
+                  timestamp: voter.timestamp,
+                  restaurantId: restaurant.id
+                });
+              });
+            });
+            
+            console.log('[CollectionDetail] Discussions:', discussions);
+            
+            // Add discussions - show all activity for public collections, only members for private
+            discussions.forEach(discussion => {
+              console.log('[CollectionDetail] Processing discussion:', discussion);
+              // For private collections, only show activity from actual members
+              if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                console.log('[CollectionDetail] Filtering out non-member discussion:', discussion.userId);
+                return;
+              }
+              allMemberActivity.push({
+                type: 'comment',
+                restaurantName: discussion.restaurantName || 'Collection',
+                userName: discussion.userName,
+                firstName: discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown',
+                userId: discussion.userId,
+                message: discussion.message,
+                timestamp: discussion.timestamp
+              });
+            });
+            
+            console.log('[CollectionDetail] All member activity:', allMemberActivity);
+            console.log('[CollectionDetail] Member voting stats:', memberVotingStats);
+            
+            // Sort by timestamp (most recent first)
+            allMemberActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+            return allMemberActivity.length > 0 ? (
+              <View style={styles.memberActivityList}>
+                {/* Member Voting Insights */}
+                <View style={styles.insightsSection}>
+                  <Text style={styles.insightsTitle}>📊 Member Voting Insights</Text>
+                  <View style={styles.insightsGrid}>
+                    {Object.entries(memberVotingStats)
+                      .filter(([userId, stats]) => stats.total > 0)
+                      .sort(([,a], [,b]) => b.total - a.total)
+                      .slice(0, 6)
+                      .map(([userId, stats]) => {
+                        const member = collection.collaborators?.find((m: any) => {
+                          if (typeof m === 'string') return m === userId;
+                          return m.userId === userId;
+                        });
+                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
+                        const firstName = memberName.split(' ')[0];
+                        const likePercentage = stats.total > 0 ? Math.round((stats.likes / stats.total) * 100) : 0;
+                        
+                        return (
+                          <View key={userId} style={styles.memberInsight}>
+                            <View style={styles.memberInsightHeader}>
+                              <View style={styles.memberInsightAvatar}>
+                                <Text style={styles.memberInsightInitial}>
+                                  {firstName.charAt(0).toUpperCase()}
+                                </Text>
+                              </View>
+                              <Text style={styles.memberInsightName}>{firstName}</Text>
+                            </View>
+                            <View style={styles.memberInsightStats}>
+                              <Text style={styles.memberInsightVotes}>{stats.total} votes</Text>
+                              <Text style={styles.memberInsightPercentage}>{likePercentage}% likes</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                  </View>
+                </View>
+                
+                {/* Recent Activity Feed */}
+                <View style={styles.recentActivitySection}>
+                  <Text style={styles.recentActivityTitle}>🕒 Recent Activity</Text>
+                  {allMemberActivity.slice(0, 8).map((activity, index) => (
+                    <View key={index} style={styles.memberActivityItem}>
+                      <View style={styles.memberActivityHeader}>
+                        <View style={styles.memberActivityAvatar}>
+                          <Text style={styles.memberActivityInitial}>
+                            {activity.firstName ? activity.firstName.charAt(0).toUpperCase() : '?'}
+                          </Text>
+                        </View>
+                        <View style={styles.memberActivityInfo}>
+                          <Text style={styles.memberActivityName}>{activity.firstName}</Text>
+                          <Text style={styles.memberActivityAction}>
+                            {activity.type === 'vote' ? (
+                              <>
+                                {activity.vote === 'like' ? '👍 Liked' : '👎 Disliked'} {activity.restaurantName}
+                              </>
+                            ) : (
+                              <>💬 Commented on {activity.restaurantName}</>
+                            )}
+                          </Text>
+                        </View>
+                        <Text style={styles.memberActivityTime}>
+                          {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString() : 'Unknown date'}
+                        </Text>
+                      </View>
+                      {(activity.reason || activity.message) && (
+                        <Text style={styles.memberActivityContent}>
+                          "{activity.reason || activity.message}"
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+                
+                {/* Restaurant Voting Summary */}
+                <View style={styles.restaurantVotingSection}>
+                  <Text style={styles.restaurantVotingTitle}>🏆 Restaurant Voting Summary</Text>
+                  {rankedRestaurants
+                    .filter(({ meta }) => meta.likes > 0 || meta.dislikes > 0)
+                    .slice(0, 5)
+                    .map(({ restaurant, meta }, index) => (
+                      <View key={restaurant.id} style={styles.restaurantVotingItem}>
+                        <View style={styles.restaurantVotingHeader}>
+                          <Text style={styles.restaurantVotingName}>{restaurant.name}</Text>
+                          <View style={styles.restaurantVotingBadge}>
+                            <Text style={styles.restaurantVotingRank}>#{meta.rank}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.restaurantVotingStats}>
+                          <View style={styles.voteStat}>
+                            <Text style={styles.voteStatLabel}>👍 Likes</Text>
+                            <Text style={styles.voteStatValue}>{meta.likes}</Text>
+                          </View>
+                          <View style={styles.voteStat}>
+                            <Text style={styles.voteStatLabel}>👎 Dislikes</Text>
+                            <Text style={styles.voteStatValue}>{meta.dislikes}</Text>
+                          </View>
+                          <View style={styles.voteStat}>
+                            <Text style={styles.voteStatLabel}>📊 Approval</Text>
+                            <Text style={styles.voteStatValue}>{meta.approvalPercent}%</Text>
+                          </View>
+                        </View>
+                        {meta.voteDetails.likeVoters.length > 0 && (
+                          <Text style={styles.restaurantVotingVoters}>
+                            Liked by: {meta.voteDetails.likeVoters.map(v => v.name).join(', ')}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyActivityContainer}>
+                <Text style={styles.emptyActivityText}>
+                  {collection.is_public ? 'No member activity yet' : 'No collection member activity yet'}
+                </Text>
+                <Text style={styles.emptyActivitySubtext}>
+                  {collection.is_public 
+                    ? 'Start voting and commenting to see activity here!' 
+                    : 'Collection members can vote and comment to see activity here!'}
+                </Text>
+              </View>
+            );
+          })()}
+        </View>
 
         {/* Vote Modal */}
         <Modal visible={!!showVoteModal} transparent animationType="slide">

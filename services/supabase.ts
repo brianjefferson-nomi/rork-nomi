@@ -862,6 +862,13 @@ export const dbHelpers = {
       
       // Enhance collections with user details for collaborators
       if (data && data.length > 0) {
+        console.log('[Supabase] Enhancing collections with user details. Sample collection:', {
+          id: data[0]?.id,
+          name: data[0]?.name,
+          consensus_threshold: data[0]?.consensus_threshold,
+          settings: data[0]?.settings,
+          collaborators: data[0]?.collaborators?.length || 0
+        });
         data = await this.enhanceCollectionsWithUserDetails(data);
       }
       
@@ -928,6 +935,16 @@ export const dbHelpers = {
       // Enhance collections with user details
       return collections.map(collection => {
         const enhancedCollection = { ...collection };
+        
+        // Add settings object if it doesn't exist
+        if (!enhancedCollection.settings) {
+          enhancedCollection.settings = {
+            voteVisibility: collection.vote_visibility || 'public',
+            discussionEnabled: collection.discussion_enabled !== false,
+            autoRankingEnabled: collection.auto_ranking_enabled !== false,
+            consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
+          };
+        }
         
         // Enhance creator info
         if (collection.created_by && userMap.has(collection.created_by)) {
