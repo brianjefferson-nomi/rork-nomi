@@ -418,12 +418,21 @@ export default function CollectionDetailScreen() {
         <View style={styles.memberActivitySection}>
           <Text style={styles.sectionTitle}>Member Activity</Text>
           {(() => {
+            // Get collection members for privacy filtering
+            const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
+              ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+              : [];
+            
             // Collect all member activity across all restaurants
             const allMemberActivity: any[] = [];
             
             rankedRestaurants.forEach(({ restaurant, meta }) => {
-              // Add votes
+              // Add votes - only from collection members if private
               meta.voteDetails.likeVoters.forEach(voter => {
+                // For private collections, only show activity from actual members
+                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  return;
+                }
                 allMemberActivity.push({
                   type: 'vote',
                   vote: 'like',
@@ -436,6 +445,10 @@ export default function CollectionDetailScreen() {
               });
               
               meta.voteDetails.dislikeVoters.forEach(voter => {
+                // For private collections, only show activity from actual members
+                if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  return;
+                }
                 allMemberActivity.push({
                   type: 'vote',
                   vote: 'dislike',
@@ -448,8 +461,12 @@ export default function CollectionDetailScreen() {
               });
             });
             
-            // Add discussions
+            // Add discussions - only from collection members if private
             discussions.forEach(discussion => {
+              // For private collections, only show activity from actual members
+              if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                return;
+              }
               allMemberActivity.push({
                 type: 'comment',
                 restaurantName: discussion.restaurantName || 'Collection',
@@ -499,8 +516,14 @@ export default function CollectionDetailScreen() {
               </View>
             ) : (
               <View style={styles.emptyActivityContainer}>
-                <Text style={styles.emptyActivityText}>No member activity yet</Text>
-                <Text style={styles.emptyActivitySubtext}>Start voting and commenting to see activity here!</Text>
+                <Text style={styles.emptyActivityText}>
+                  {collection.is_public ? 'No member activity yet' : 'No collection member activity yet'}
+                </Text>
+                <Text style={styles.emptyActivitySubtext}>
+                  {collection.is_public 
+                    ? 'Start voting and commenting to see activity here!' 
+                    : 'Collection members can vote and comment to see activity here!'}
+                </Text>
               </View>
             );
           })()}
@@ -541,7 +564,7 @@ export default function CollectionDetailScreen() {
                     styles.rankBadge,
                     meta?.rank === 1 && styles.winningRankBadge
                   ]}>
-                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={24} color="#B45309" />}
+                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={16} color="#FFFFFF" />}
                     {meta?.rank === 2 && <Text style={styles.silverRank}>🥈</Text>}
                     {meta?.rank === 3 && <Text style={styles.bronzeRank}>🥉</Text>}
                     <Text style={[
@@ -554,7 +577,7 @@ export default function CollectionDetailScreen() {
                     {meta?.rank === 1 && (
                       <View style={[styles.badge, styles.winnerBadge]}>
                         <Crown size={12} color="#FFF" />
-                        <Text style={styles.badgeText}>WINNER</Text>
+                        <Text style={styles.badgeText}>TOP CHOICE</Text>
                       </View>
                     )}
                     {meta?.rank !== 1 && meta.badge === 'group_favorite' && (
@@ -1135,26 +1158,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   winningRankBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 24,
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   winningRankNumber: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#B45309',
-    textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   badges: {
     flexDirection: 'row',
@@ -1179,9 +1197,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
   },
   winnerBadge: {
-    backgroundColor: '#FFD700',
-    borderWidth: 2,
-    borderColor: '#B45309',
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   badgeText: {
     fontSize: 10,
