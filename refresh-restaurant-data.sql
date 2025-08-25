@@ -1,3 +1,4 @@
+
 -- Refresh Restaurant Data with New APIs
 -- This script updates existing restaurants with fresh data from multiple APIs
 -- Run this script to refresh restaurant details, images, and descriptions
@@ -134,7 +135,7 @@ SET
     WHEN cuisine ILIKE '%american%' THEN ARRAY['Classic Burger', 'Mac & Cheese', 'BBQ Ribs', 'Apple Pie', 'Milkshake']
     WHEN cuisine ILIKE '%mediterranean%' THEN ARRAY['Hummus', 'Falafel', 'Greek Salad', 'Baklava', 'Lamb Kebabs']
     WHEN cuisine ILIKE '%korean%' THEN ARRAY['Bibimbap', 'Korean BBQ', 'Kimchi', 'Bulgogi', 'Tteokbokki']
-    ELSE ARRAY['Chef Special', 'House Favorite', 'Seasonal Dish', 'Signature Cocktail', 'Dessert Special']
+    ELSE ARRAY['Grilled Salmon', 'Caesar Salad', 'Chocolate Cake', 'House Wine', 'Fresh Bread']
   END,
   updated_at = NOW()
 WHERE ai_description IS NULL OR ai_description = '';

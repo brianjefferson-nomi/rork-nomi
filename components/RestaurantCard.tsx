@@ -358,6 +358,8 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           const menuHighlights = restaurant.menuHighlights || [];
           const aiTopPicks = restaurant.aiTopPicks || [];
           
+
+          
           // Filter out generic dishes and only show specific menu items
           const filterGenericDishes = (dishes: string[]) => {
             const genericTerms = [
@@ -378,7 +380,9 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           ];
           
           // If no specific menu items, don't show the section
-          if (specificMenuItems.length === 0) return null;
+          if (specificMenuItems.length === 0) {
+            return null;
+          }
           
           return (
             <View style={styles.topPicksContainer}>
