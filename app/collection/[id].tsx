@@ -829,7 +829,7 @@ export default function CollectionDetailScreen() {
                     return restaurantVotes.length > 0 ? (
                       <View style={styles.memberVotesList}>
                         {restaurantVotes.map((vote, index) => (
-                          <View key={index} style={styles.memberVoteItem}>
+                          <View key={`${vote.userName}-${vote.type}-${index}`} style={styles.memberVoteItem}>
                             <View style={styles.memberVoteHeader}>
                               <View style={styles.memberVoteAvatar}>
                                 <Text style={styles.memberVoteInitial}>
@@ -895,7 +895,7 @@ export default function CollectionDetailScreen() {
                     return filteredDiscussions.length > 0 ? (
                       <View style={styles.memberCommentsList}>
                         {filteredDiscussions.slice(0, 6).map((discussion, index) => (
-                        <View key={index} style={styles.memberCommentItem}>
+                        <View key={`${discussion.userId}-${discussion.id}-${index}`} style={styles.memberCommentItem}>
                           <View style={styles.memberCommentHeader}>
                             <View style={styles.memberCommentAvatar}>
                               <Text style={styles.memberCommentInitial}>
@@ -1183,19 +1183,19 @@ const styles = StyleSheet.create({
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 32,
     borderWidth: 3,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   removeButton: {
     marginTop: -8,
@@ -1444,6 +1444,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignSelf: 'flex-start',
     marginBottom: 8,
+    backgroundColor: '#10B981',
   },
   consensusText: {
     fontSize: 12,
@@ -1499,35 +1500,35 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   memberVotingSection: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 20,
+    paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#E5E7EB',
   },
   memberVotingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   memberVotesList: {
     gap: 8,
   },
   memberVoteItem: {
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 8,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   memberVoteHeader: {
     flexDirection: 'row',
@@ -1557,22 +1558,21 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
   },
   memberVoteBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
   likeVoteBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#FCD34D',
   },
   dislikeVoteBadge: {
     backgroundColor: '#EF4444',
   },
   memberVoteBadgeText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   memberVoteReason: {
     fontSize: 11,
