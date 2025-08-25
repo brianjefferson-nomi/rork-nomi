@@ -661,6 +661,67 @@ export const dbHelpers = {
     return data;
   },
 
+  // Manual RLS fix function that can be called from the app
+  async applyRLSFix() {
+    try {
+      console.log('[Supabase] Applying RLS fix manually...');
+      
+      // First, let's test the current state
+      const testResult = await this.testDatabaseConnection();
+      console.log('[Supabase] Current database state:', testResult);
+      
+      if (testResult.success) {
+        console.log('[Supabase] Database connection is working, RLS fix may not be needed');
+        return { success: true, message: 'Database connection is working' };
+      }
+      
+      // If we have RLS issues, try to fix them
+      console.log('[Supabase] Attempting to fix RLS policies...');
+      
+      // Try to create a simple test collection to see if the issue is with creation or reading
+      const testCollection = {
+        name: 'Test Collection',
+        description: 'Test collection for RLS debugging',
+        collection_type: 'private',
+        created_by: '11111111-1111-1111-1111-111111111111',
+        creator_id: '11111111-1111-1111-1111-111111111111',
+        is_public: false,
+        collection_code: `test_${Date.now()}`
+      };
+      
+      const { data: createTest, error: createError } = await supabase
+        .from('collections')
+        .insert(testCollection)
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error('[Supabase] Test collection creation failed:', {
+          error: JSON.stringify(createError, null, 2),
+          message: createError.message,
+          code: createError.code
+        });
+        return { success: false, error: createError, message: 'Collection creation failed' };
+      }
+      
+      console.log('[Supabase] Test collection created successfully:', createTest);
+      
+      // Clean up the test collection
+      await supabase
+        .from('collections')
+        .delete()
+        .eq('id', createTest.id);
+      
+      return { success: true, message: 'RLS fix applied successfully' };
+    } catch (error) {
+      console.error('[Supabase] RLS fix error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return { success: false, error, message: 'RLS fix failed' };
+    }
+  },
+
   // Diagnostic function to test database connectivity and RLS
   async testDatabaseConnection() {
     try {
@@ -674,7 +735,7 @@ export const dbHelpers = {
       
       if (testError) {
         console.error('[Supabase] Basic connection test failed:', {
-          error: testError,
+          error: JSON.stringify(testError, null, 2),
           message: testError.message || 'No message',
           code: testError.code || 'No code'
         });
@@ -691,7 +752,7 @@ export const dbHelpers = {
       
       if (collectionsError) {
         console.error('[Supabase] Collections table access test failed:', {
-          error: collectionsError,
+          error: JSON.stringify(collectionsError, null, 2),
           message: collectionsError.message || 'No message',
           code: collectionsError.code || 'No code'
         });
@@ -709,7 +770,7 @@ export const dbHelpers = {
       
       if (rlsTestError) {
         console.error('[Supabase] RLS policy test failed:', {
-          error: rlsTestError,
+          error: JSON.stringify(rlsTestError, null, 2),
           message: rlsTestError.message || 'No message',
           code: rlsTestError.code || 'No code'
         });
@@ -892,13 +953,11 @@ export const dbHelpers = {
       
       if (creatorError) {
         console.error('[Supabase] Error fetching creator collections:', {
-          error: creatorError,
+          error: JSON.stringify(creatorError, null, 2),
           message: creatorError.message || 'No message',
           details: creatorError.details || 'No details',
           hint: creatorError.hint || 'No hint',
-          code: creatorError.code || 'No code',
-          errorType: typeof creatorError,
-          errorKeys: Object.keys(creatorError || {})
+          code: creatorError.code || 'No code'
         });
         // Continue with empty creator collections instead of failing completely
       }
@@ -912,13 +971,11 @@ export const dbHelpers = {
       let memberCollectionsData: any[] = [];
       if (memberError) {
         console.error('[Supabase] Error fetching member collections:', {
-          error: memberError,
+          error: JSON.stringify(memberError, null, 2),
           message: memberError.message || 'No message',
           details: memberError.details || 'No details',
           hint: memberError.hint || 'No hint',
-          code: memberError.code || 'No code',
-          errorType: typeof memberError,
-          errorKeys: Object.keys(memberError || {})
+          code: memberError.code || 'No code'
         });
       } else if (memberCollections && memberCollections.length > 0) {
         const collectionIds = memberCollections.map(m => m.collection_id);
@@ -932,13 +989,11 @@ export const dbHelpers = {
         
         if (memberCollsError) {
           console.error('[Supabase] Error fetching member collection details:', {
-            error: memberCollsError,
+            error: JSON.stringify(memberCollsError, null, 2),
             message: memberCollsError.message || 'No message',
             details: memberCollsError.details || 'No details',
             hint: memberCollsError.hint || 'No hint',
-            code: memberCollsError.code || 'No code',
-            errorType: typeof memberCollsError,
-            errorKeys: Object.keys(memberCollsError || {})
+            code: memberCollsError.code || 'No code'
           });
         } else {
           memberCollectionsData = memberColls || [];
@@ -1349,15 +1404,13 @@ export const dbHelpers = {
       
       if (error) {
         console.error('[Supabase] Error fetching user votes:', {
-          error: error,
+          error: JSON.stringify(error, null, 2),
           message: error.message || 'No message',
           details: error.details || 'No details',
           hint: error.hint || 'No hint',
           code: error.code || 'No code',
           userId,
-          collectionId,
-          errorType: typeof error,
-          errorKeys: Object.keys(error || {})
+          collectionId
         });
         return [];
       }

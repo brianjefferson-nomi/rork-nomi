@@ -186,6 +186,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
 
+  // Manual RLS fix function
+  const applyRLSFix = useMutation({
+    mutationFn: async () => {
+      console.log('[RestaurantStore] Applying RLS fix...');
+      const result = await dbHelpers.applyRLSFix();
+      console.log('[RestaurantStore] RLS fix result:', result);
+      return result;
+    },
+    onSuccess: (data) => {
+      console.log('[RestaurantStore] RLS fix completed:', data);
+      // Refetch data after fix
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+    },
+    onError: (error) => {
+      console.error('[RestaurantStore] RLS fix failed:', error);
+    }
+  });
+
   // Test database connection on startup
   const dbTestQuery = useQuery({
     queryKey: ['dbTest'],
@@ -197,9 +216,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return result;
       } catch (error) {
         console.error('[RestaurantStore] Database test error:', {
-          error: error,
-          message: error instanceof Error ? error.message : String(error),
-          errorType: typeof error
+          error: JSON.stringify(error, null, 2),
+          message: error instanceof Error ? error.message : String(error)
         });
         return { success: false, error };
       }
@@ -231,12 +249,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         }));
       } catch (error) {
         console.error('[RestaurantStore] Error loading votes from database:', {
-          error: error,
+          error: JSON.stringify(error, null, 2),
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          userId: user?.id,
-          errorType: typeof error,
-          errorKeys: error && typeof error === 'object' ? Object.keys(error) : []
+          userId: user?.id
         });
         return [];
       }
@@ -1531,6 +1547,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addMemberToCollection,
     removeMemberFromCollection,
     updateCollectionType,
+    applyRLSFix, // Add the new function to the memoized value
   }), [
     restaurants,
     plansQuery.data,
@@ -1579,6 +1596,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addMemberToCollection,
     removeMemberFromCollection,
     updateCollectionType,
+    applyRLSFix, // Add the new function to the memoized value
   ]);
 
   return storeValue;
