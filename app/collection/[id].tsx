@@ -805,11 +805,14 @@ export default function CollectionDetailScreen() {
                     <Text style={styles.voteBreakdown}>
                       {meta.likes} likes • {meta.dislikes} dislikes
                     </Text>
-                    <View style={styles.consensusBadge}>
-                      <Text style={styles.consensusBadgeText}>
-                        {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                      </Text>
-                    </View>
+                    {/* Only show consensus badge if there's engagement */}
+                    {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
+                      <View style={styles.consensusBadge}>
+                        <Text style={styles.consensusBadgeText}>
+                          {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Vote Actions */}
