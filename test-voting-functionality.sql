@@ -101,8 +101,8 @@ SELECT
     tm.user_id,
     tc.collection_id,
     CASE 
-        WHEN RANDOM() > 0.5 THEN 'like'
-        ELSE 'dislike'
+        WHEN RANDOM() > 0.5 THEN 'like'::vote_type
+        ELSE 'dislike'::vote_type
     END,
     CASE 
         WHEN RANDOM() > 0.5 THEN 'Great food and atmosphere!'
