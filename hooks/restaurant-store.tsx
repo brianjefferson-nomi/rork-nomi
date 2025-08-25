@@ -490,9 +490,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     return removeRestaurantFromPlan(collectionId, restaurantId);
   }, [removeRestaurantFromPlan]);
   
-  const deleteCollection = useCallback((collectionId: string) => {
-    return deletePlan(collectionId);
-  }, [deletePlan]);
+  const deleteCollection = useCallback(async (collectionId: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for collection deletion');
+      throw new Error('User not authenticated');
+    }
+    
+    try {
+      console.log('[RestaurantStore] Deleting collection:', collectionId);
+      await dbHelpers.deletePlan(collectionId);
+      console.log('[RestaurantStore] Collection deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error deleting collection:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to delete collection: ${error.message}`);
+      } else {
+        throw new Error('Failed to delete collection: Unknown error occurred');
+      }
+    }
+  }, [user?.id, queryClient]);
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
     return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
   }, []);

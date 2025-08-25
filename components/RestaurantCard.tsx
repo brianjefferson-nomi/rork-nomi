@@ -14,16 +14,53 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
   const { favoriteRestaurants, toggleFavorite } = useRestaurants();
   const isFavorite = favoriteRestaurants.includes(restaurant.id);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [imageError, setImageError] = useState<boolean>(false);
+  const [imageLoading, setImageLoading] = useState<boolean>(true);
 
   const handleFavoritePress = (e: any) => {
     e.stopPropagation();
     toggleFavorite(restaurant.id);
   };
 
+  const handleImageLoad = () => {
+    setImageLoading(false);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    setImageLoading(false);
+    setImageError(true);
+    console.log('[RestaurantCard] Image failed to load:', images[currentImageIndex]);
+  };
+
+  // Ensure we have valid images with fallbacks
+  const getValidImages = () => {
+    const images = restaurant.images || [restaurant.imageUrl];
+    console.log('[RestaurantCard] Raw images:', images);
+    const validImages = images.filter(img => {
+      const isValid = img && img.trim().length > 0 && img.startsWith('http');
+      if (!isValid) {
+        console.log('[RestaurantCard] Invalid image URL:', img);
+      }
+      return isValid;
+    });
+    console.log('[RestaurantCard] Valid images:', validImages);
+    return validImages.length > 0 ? validImages : ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'];
+  };
+
+  const images = getValidImages();
+  const hasMultipleImages = images.length > 1;
+
   if (compact) {
     return (
       <TouchableOpacity style={styles.compactCard} onPress={onPress} activeOpacity={0.9}>
-        <Image source={{ uri: restaurant.imageUrl }} style={styles.compactImage} />
+        <Image 
+          source={{ uri: images[0] }} 
+          style={styles.compactImage}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          defaultSource={{ uri: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
+        />
         <View style={styles.compactContent}>
           <Text style={styles.compactName} numberOfLines={1}>{restaurant.name}</Text>
           <Text style={styles.compactCuisine}>{restaurant.cuisine}</Text>
@@ -43,8 +80,6 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
       </TouchableOpacity>
     );
   }
-  const images = restaurant.images || [restaurant.imageUrl];
-  const hasMultipleImages = images.length > 1;
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -57,7 +92,13 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.95}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: images[currentImageIndex] }} style={styles.image} />
+        <Image 
+          source={{ uri: images[currentImageIndex] }} 
+          style={styles.image}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          defaultSource={{ uri: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
+        />
         
         {hasMultipleImages && (
           <>
@@ -94,30 +135,30 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.name}>{restaurant.name}</Text>
+          <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
           <View style={styles.rating}>
             <Text style={styles.ratingText}>★ {restaurant.rating}</Text>
           </View>
         </View>
         
-        <View style={styles.info}>
-          <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
-          <View style={styles.locationInfo}>
-            <MapPin size={14} color="#666" />
-            <Text style={styles.neighborhood}>{restaurant.neighborhood}</Text>
-            {restaurant.distance && (
-              <>
-                <Text style={styles.dot}>•</Text>
-                <Text style={styles.distance}>{restaurant.distance}</Text>
-              </>
-            )}
-          </View>
-          <View style={styles.details}>
-            <Text style={styles.price}>{restaurant.priceRange}</Text>
-            <Text style={styles.dot}>•</Text>
-            <Clock size={14} color="#666" />
-            <Text style={styles.infoText}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
-          </View>
+        <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
+        
+        <View style={styles.locationInfo}>
+          <MapPin size={14} color="#666" />
+          <Text style={styles.neighborhood} numberOfLines={1}>{restaurant.neighborhood}</Text>
+          {restaurant.distance && (
+            <>
+              <Text style={styles.dot}>•</Text>
+              <Text style={styles.distance}>{restaurant.distance}</Text>
+            </>
+          )}
+        </View>
+        
+        <View style={styles.details}>
+          <Text style={styles.price}>{restaurant.priceRange}</Text>
+          <Text style={styles.dot}>•</Text>
+          <Clock size={14} color="#666" />
+          <Text style={styles.infoText} numberOfLines={1}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
         </View>
         
         <View style={styles.vibeContainer}>
@@ -150,21 +191,6 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             </Text>
           </View>
         )}
-        
-        <View style={styles.info}>
-          <View style={styles.infoItem}>
-            <DollarSign size={14} color="#666" />
-            <Text style={styles.infoText}>{restaurant.priceRange}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MapPin size={14} color="#666" />
-            <Text style={styles.infoText}>{restaurant.neighborhood}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Clock size={14} color="#666" />
-            <Text style={styles.infoText}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
-          </View>
-        </View>
 
         {restaurant.userNotes && (
           <View style={styles.noteContainer}>
