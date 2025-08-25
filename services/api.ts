@@ -1100,18 +1100,12 @@ export const aggregateRestaurantData = async (query: string, location: string, u
           searchTripAdvisor(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
-        Promise.race([
-          searchFoursquareRestaurants(query, userLocation.lat, userLocation.lng, 5000),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Foursquare timeout')), 8000))
-        ]),
+        Promise.resolve([]), // Foursquare temporarily disabled due to API issues
         Promise.race([
           searchRestaurantsWithYelp(query, userLocation.city, 20),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 8000))
         ]),
-        Promise.race([
-          searchRestaurantsWithWorldwideAPI(query, userLocation.city, 20),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Worldwide Restaurants timeout')), 8000))
-        ]),
+        Promise.resolve([]), // Worldwide Restaurants temporarily disabled due to 422 errors
         Promise.race([
           searchRestaurantsWithUberEats(query, `${userLocation.city}, ${userLocation.lat}, ${userLocation.lng}`, 'en-US', 15),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Uber Eats timeout')), 8000))
@@ -1130,7 +1124,7 @@ export const aggregateRestaurantData = async (query: string, location: string, u
       const worldwideData = worldwideResults.status === 'fulfilled' ? worldwideResults.value : [];
       const uberEatsData = uberEatsResults.status === 'fulfilled' ? uberEatsResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}, Yelp: ${yelpData.length}, Worldwide: ${worldwideData.length}, Uber Eats: ${uberEatsData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length} (disabled), Yelp: ${yelpData.length}, Worldwide: ${worldwideData.length} (disabled), Uber Eats: ${uberEatsData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1912,6 +1906,7 @@ export const searchFoursquareRestaurants = async (
   try {
     console.log('[Foursquare] Searching for restaurants:', query);
     
+    // Foursquare API v3 requires different parameters
     const params = new URLSearchParams({
       query: query,
       categories: '13065', // Food category ID for restaurants
@@ -1930,12 +1925,15 @@ export const searchFoursquareRestaurants = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
+        'User-Agent': 'Rork-Nomi-App/1.0'
       }
     });
     
     if (!response.ok) {
-      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+      console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
+      // Return empty array instead of throwing to prevent app crashes
+      return [];
     }
     
     const data = await response.json();
@@ -1945,6 +1943,7 @@ export const searchFoursquareRestaurants = async (
     return results;
   } catch (error) {
     console.error('[Foursquare] Error searching restaurants:', error);
+    // Return empty array to prevent app crashes
     return [];
   }
 };
@@ -1960,12 +1959,14 @@ export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
+        'User-Agent': 'Rork-Nomi-App/1.0'
       }
     });
     
     if (!response.ok) {
-      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+      console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
+      return null;
     }
     
     const data = await response.json();
@@ -1993,7 +1994,8 @@ export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
+        'User-Agent': 'Rork-Nomi-App/1.0'
       }
     });
     
@@ -2862,12 +2864,29 @@ export const searchWorldwideRestaurants = async (
   try {
     console.log('[Worldwide Restaurants API] Searching restaurants for:', query);
     
-    const formData = new URLSearchParams();
-    formData.append('query', query);
-    if (location) {
-      formData.append('location', location);
+    // Ensure we have valid parameters
+    if (!query || query.trim().length === 0) {
+      console.log('[Worldwide Restaurants API] Empty query, skipping search');
+      return [];
     }
-    formData.append('limit', limit.toString());
+    
+    const formData = new URLSearchParams();
+    formData.append('query', query.trim());
+    
+    // Only add location if it's valid
+    if (location && location.trim().length > 0) {
+      formData.append('location', location.trim());
+    }
+    
+    // Ensure limit is within reasonable bounds
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    formData.append('limit', safeLimit.toString());
+    
+    console.log('[Worldwide Restaurants API] Request data:', {
+      query: query.trim(),
+      location: location?.trim(),
+      limit: safeLimit
+    });
     
     const response = await fetch('https://worldwide-restaurants.p.rapidapi.com/search', {
       method: 'POST',
@@ -2880,7 +2899,18 @@ export const searchWorldwideRestaurants = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Worldwide Restaurants API error: ${response.status} ${response.statusText}`);
+      console.error(`[Worldwide Restaurants API] HTTP error: ${response.status} ${response.statusText}`);
+      
+      // Try to get error details
+      try {
+        const errorData = await response.text();
+        console.error('[Worldwide Restaurants API] Error response:', errorData);
+      } catch (e) {
+        console.error('[Worldwide Restaurants API] Could not read error response');
+      }
+      
+      // Return empty array instead of throwing to prevent app crashes
+      return [];
     }
     
     const data = await response.json();
@@ -2889,6 +2919,7 @@ export const searchWorldwideRestaurants = async (
     return data.results || [];
   } catch (error) {
     console.error('[Worldwide Restaurants API] Error searching restaurants:', error);
+    // Return empty array to prevent app crashes
     return [];
   }
 };
