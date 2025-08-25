@@ -93,7 +93,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {/* Member Voting Details */}
               {(() => {
                 const restaurantVotes = rankedRestaurants.find(r => r.id === restaurant.id);
-                if (!restaurantVotes?.meta?.voteDetails) return null;
+                if (!restaurantVotes?.meta?.voteDetails) return <></>;
 
                 const filteredLikeVoters = restaurantVotes.meta.voteDetails.likeVoters.filter((voter: any) => {
                   if (collection.is_public && !collectionMembers.includes(voter.userId)) {
@@ -122,7 +122,6 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </Text>
                       </View>
                     )}
-                    
                     {filteredDislikeVoters.length > 0 && (
                       <View style={styles.voteGroup}>
                         <View style={styles.voteHeader}>
@@ -134,7 +133,6 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </Text>
                       </View>
                     )}
-
                     {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
                       <Text style={styles.noVotes}>No votes yet</Text>
                     )}
@@ -152,7 +150,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                 });
 
-                if (filteredDiscussions.length === 0) return null;
+                if (filteredDiscussions.length === 0) return <></>;
 
                 return (
                   <View style={styles.commentsSection}>
@@ -216,39 +214,22 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             <View style={styles.memberStatsGrid}>
               {Object.entries(memberVotingStats).map(([userId, stats]) => {
                 const firstName = stats.name?.split(' ')[0] || 'Unknown';
-                const totalActivity = stats.likes + stats.dislikes + stats.comments;
-                const positiveRate = totalActivity > 0 ? Math.round((stats.likes / totalActivity) * 100) : 0;
                 
                 return (
                   <View key={userId} style={styles.memberStatCard}>
-                    <View style={styles.memberStatHeader}>
-                      <View style={styles.memberStatAvatar}>
-                        <Text style={styles.memberStatInitial}>
-                          {firstName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.memberStatInfo}>
-                        <Text style={styles.memberStatName}>{firstName}</Text>
-                        <Text style={styles.memberStatSummary}>
-                          {totalActivity} actions · {positiveRate}% positive
-                        </Text>
-                      </View>
-                    </View>
+                    <Text style={styles.memberName}>{firstName}</Text>
                     <View style={styles.memberStats}>
-                      <View style={styles.statItemLarge}>
-                        <ThumbsUp size={16} color="#10B981" />
-                        <Text style={styles.statValueLarge}>{stats.likes}</Text>
-                        <Text style={styles.statLabelSmall}>likes</Text>
+                      <View style={styles.statItem}>
+                        <ThumbsUp size={14} color="#10B981" />
+                        <Text style={styles.statValue}>{stats.likes}</Text>
                       </View>
-                      <View style={styles.statItemLarge}>
-                        <ThumbsDown size={16} color="#EF4444" />
-                        <Text style={styles.statValueLarge}>{stats.dislikes}</Text>
-                        <Text style={styles.statLabelSmall}>dislikes</Text>
+                      <View style={styles.statItem}>
+                        <ThumbsDown size={14} color="#EF4444" />
+                        <Text style={styles.statValue}>{stats.dislikes}</Text>
                       </View>
-                      <View style={styles.statItemLarge}>
-                        <MessageCircle size={16} color="#6B7280" />
-                        <Text style={styles.statValueLarge}>{stats.comments}</Text>
-                        <Text style={styles.statLabelSmall}>comments</Text>
+                      <View style={styles.statItem}>
+                        <MessageCircle size={14} color="#6B7280" />
+                        <Text style={styles.statValue}>{stats.comments}</Text>
                       </View>
                     </View>
                   </View>
@@ -1810,54 +1791,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   memberStatsGrid: {
-    gap: 16,
+    gap: 12,
   },
   memberStatCard: {
     backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  memberStatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  memberStatAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  memberStatInitial: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberStatInfo: {
-    flex: 1,
-  },
-  memberStatName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  memberStatSummary: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
+    borderColor: '#F0F0F0',
   },
   memberName: {
     fontSize: 12,
@@ -1867,15 +1808,10 @@ const styles = StyleSheet.create({
   },
   memberStats: {
     flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'space-around',
+    gap: 12,
   },
   statItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statItemLarge: {
     alignItems: 'center',
     gap: 4,
   },
@@ -1883,15 +1819,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: '#6B7280',
-  },
-  statValueLarge: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  statLabelSmall: {
-    fontSize: 10,
-    color: '#9CA3AF',
   },
   noActivity: {
     fontSize: 12,
