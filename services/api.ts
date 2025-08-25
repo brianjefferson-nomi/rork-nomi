@@ -5,6 +5,8 @@ const AI_API_URL = 'https://toolkit.rork.com/text/llm/';
 const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
+const FOURSQUARE_API_KEY = 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
+const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -1002,18 +1004,23 @@ export const aggregateRestaurantData = async (query: string, location: string, u
           searchTripAdvisor(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
+        Promise.race([
+          searchFoursquareRestaurants(query, userLocation.lat, userLocation.lng, 5000),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Foursquare timeout')), 8000))
+        ]),
         Promise.resolve([]) // Skip Yelp and Reddit APIs due to issues
       ];
 
-      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults] = await Promise.allSettled(apiPromises);
+      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults, foursquareResults] = await Promise.allSettled(apiPromises);
 
       const mapsExtractorData = mapsExtractorResults.status === 'fulfilled' ? mapsExtractorResults.value : [];
       const localBusinessData = localBusinessResults.status === 'fulfilled' ? localBusinessResults.value : [];
       const mapDataData = mapDataResults.status === 'fulfilled' ? mapDataResults.value : [];
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
+      const foursquareData = foursquareResults.status === 'fulfilled' ? foursquareResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1021,6 +1028,7 @@ export const aggregateRestaurantData = async (query: string, location: string, u
         mapDataData, 
         googleData, 
         tripAdvisorData, 
+        foursquareData,
         userLocation
       );
     } catch (error) {
@@ -1236,6 +1244,7 @@ const combineLocationBasedResults = async (
   mapDataResults: any[], 
   googleResults: any[], 
   tripAdvisorResults: any[], 
+  foursquareResults: any[],
   userLocation: { lat: number; lng: number; city: string }
 ) => {
   const combined: any[] = [];
@@ -1415,6 +1424,56 @@ const combineLocationBasedResults = async (
     });
   }
 
+  // Foursquare
+  for (const place of foursquareResults) {
+    if (!place.name || seenNames.has(place.name.toLowerCase())) continue;
+    seenNames.add(place.name.toLowerCase());
+
+    // Transform Foursquare data to our format
+    const transformedPlace = transformFoursquareRestaurant(place);
+    if (!transformedPlace) continue;
+
+    // Get additional photos and tips for top results
+    let photos: string[] = [];
+    let reviews: string[] = [];
+    
+    if (combined.length < 10 && place.fsq_id) {
+      try {
+        const [placePhotos, placeTips] = await Promise.all([
+          getFoursquareRestaurantPhotos(place.fsq_id, 5),
+          getFoursquareRestaurantTips(place.fsq_id, 5)
+        ]);
+        photos = placePhotos;
+        reviews = placeTips.map((tip: any) => tip.text).filter(Boolean);
+      } catch (error) {
+        console.error('[Foursquare] Error getting additional data:', error);
+      }
+    }
+
+    combined.push({
+      id: `foursquare_${place.fsq_id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: transformedPlace.name,
+      cuisine: transformedPlace.cuisine,
+      rating: transformedPlace.rating,
+      priceLevel: transformedPlace.price,
+      address: formatAddress(transformedPlace.address, userLocation.city),
+      phone: transformedPlace.phone,
+      website: transformedPlace.website,
+      photos: photos.length > 0 ? photos : [],
+      reviews: reviews.length > 0 ? reviews : [],
+      hours: transformedPlace.hours,
+      source: 'foursquare',
+      location: { 
+        lat: transformedPlace.latitude || userLocation.lat, 
+        lng: transformedPlace.longitude || userLocation.lng 
+      },
+      fsq_id: place.fsq_id,
+      totalPhotos: transformedPlace.totalPhotos,
+      totalTips: transformedPlace.totalTips,
+      totalVisits: transformedPlace.totalVisits
+    });
+  }
+
   return combined;
 };
 
@@ -1519,4 +1578,247 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c; // Distance in km
   return distance;
+};
+
+// ============================================================================
+// FOURSQUARE API INTEGRATION
+// ============================================================================
+
+// Search for restaurants using Foursquare API
+export const searchFoursquareRestaurants = async (
+  query: string, 
+  lat?: number, 
+  lng?: number, 
+  radius: number = 5000
+): Promise<any[]> => {
+  try {
+    console.log('[Foursquare] Searching for restaurants:', query);
+    
+    const params = new URLSearchParams({
+      query: query,
+      categories: '13065', // Food category ID for restaurants
+      limit: '50',
+      radius: radius.toString(),
+      sort: 'RATING'
+    });
+    
+    if (lat && lng) {
+      params.append('ll', `${lat},${lng}`);
+    }
+    
+    const url = `${FOURSQUARE_BASE_URL}/places/search?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const results = data.results || [];
+    
+    console.log(`[Foursquare] Found ${results.length} restaurants`);
+    return results;
+  } catch (error) {
+    console.error('[Foursquare] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Get detailed information about a specific restaurant
+export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any> => {
+  try {
+    console.log('[Foursquare] Getting details for restaurant:', fsqId);
+    
+    const url = `${FOURSQUARE_BASE_URL}/places/${fsqId}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('[Foursquare] Retrieved restaurant details');
+    return data;
+  } catch (error) {
+    console.error('[Foursquare] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Get photos for a restaurant
+export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number = 10): Promise<string[]> => {
+  try {
+    console.log('[Foursquare] Getting photos for restaurant:', fsqId);
+    
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      sort: 'POPULAR'
+    });
+    
+    const url = `${FOURSQUARE_BASE_URL}/places/${fsqId}/photos?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const photos = data.photos || [];
+    
+    // Extract photo URLs
+    const photoUrls = photos.map((photo: any) => {
+      const prefix = photo.prefix;
+      const suffix = photo.suffix;
+      return `${prefix}original${suffix}`;
+    }).filter(Boolean);
+    
+    console.log(`[Foursquare] Retrieved ${photoUrls.length} photos`);
+    return photoUrls;
+  } catch (error) {
+    console.error('[Foursquare] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Get tips/reviews for a restaurant
+export const getFoursquareRestaurantTips = async (fsqId: string, limit: number = 20): Promise<any[]> => {
+  try {
+    console.log('[Foursquare] Getting tips for restaurant:', fsqId);
+    
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      sort: 'POPULAR'
+    });
+    
+    const url = `${FOURSQUARE_BASE_URL}/places/${fsqId}/tips?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const tips = data.tips || [];
+    
+    console.log(`[Foursquare] Retrieved ${tips.length} tips`);
+    return tips;
+  } catch (error) {
+    console.error('[Foursquare] Error getting restaurant tips:', error);
+    return [];
+  }
+};
+
+// Transform Foursquare restaurant data to our format
+export const transformFoursquareRestaurant = (fsqData: any): any => {
+  try {
+    const location = fsqData.geocodes?.main || fsqData.geocodes?.roof || {};
+    const categories = fsqData.categories || [];
+    const stats = fsqData.stats || {};
+    
+    return {
+      id: fsqData.fsq_id,
+      name: fsqData.name,
+      address: fsqData.location?.address || '',
+      city: fsqData.location?.locality || '',
+      state: fsqData.location?.region || '',
+      zipCode: fsqData.location?.postcode || '',
+      country: fsqData.location?.country || '',
+      latitude: location.latitude,
+      longitude: location.longitude,
+      phone: fsqData.tel || '',
+      website: fsqData.website || '',
+      rating: fsqData.rating || 0,
+      price: fsqData.price || 0,
+      cuisine: categories.length > 0 ? categories[0].name : 'International',
+      categories: categories.map((cat: any) => cat.name),
+      hours: fsqData.hours?.display || 'Hours vary',
+      isOpen: fsqData.hours?.open_now || false,
+      totalPhotos: stats.total_photos || 0,
+      totalTips: stats.total_tips || 0,
+      totalVisits: stats.total_visits || 0,
+      fsq_id: fsqData.fsq_id,
+      source: 'foursquare'
+    };
+  } catch (error) {
+    console.error('[Foursquare] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search that includes Foursquare data
+export const searchRestaurantsWithFoursquare = async (
+  query: string, 
+  lat?: number, 
+  lng?: number, 
+  radius: number = 5000
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Foursquare integration');
+    
+    // Search Foursquare
+    const foursquareResults = await searchFoursquareRestaurants(query, lat, lng, radius);
+    
+    // Transform Foursquare results
+    const transformedResults = foursquareResults
+      .map(transformFoursquareRestaurant)
+      .filter(Boolean);
+    
+    // Get additional details for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get photos
+          const photos = await getFoursquareRestaurantPhotos(restaurant.fsq_id, 5);
+          
+          // Get tips for description
+          const tips = await getFoursquareRestaurantTips(restaurant.fsq_id, 5);
+          const tipTexts = tips.map((tip: any) => tip.text).filter(Boolean);
+          
+          return {
+            ...restaurant,
+            photos,
+            reviews: tipTexts,
+            description: tipTexts.length > 0 ? tipTexts[0] : 'A great dining experience awaits.'
+          };
+        } catch (error) {
+          console.error('[Foursquare] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Foursquare data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Foursquare-enhanced search:', error);
+    return [];
+  }
 };
