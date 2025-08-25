@@ -694,24 +694,7 @@ export default function CollectionDetailScreen() {
               </View>
             ))
           )}
-        </View>
-
-            {/* Recent Discussions */}
-            {discussions.length > 0 && (
-              <View style={styles.discussionsSection}>
-                <Text style={styles.sectionTitle}>Recent Discussions</Text>
-                {discussions.slice(0, 5).map((discussion: any) => (
-                  <View key={discussion.id} style={styles.discussionItem}>
-                    <Text style={styles.discussionUser}>{discussion.userName}</Text>
-                    <Text style={styles.discussionMessage}>{discussion.message}</Text>
-                    <Text style={styles.discussionTime}>
-                      {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </>
+                </View>
         ) : (
           <InsightsTab 
             collection={collection}
@@ -1611,6 +1594,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '400',
+  },
+  restaurantInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
   approvalBadge: {
     backgroundColor: '#FEF3C7',
