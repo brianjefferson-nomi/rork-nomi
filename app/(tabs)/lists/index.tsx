@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign } from 'lucide-react-native';
+import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign, Trash2 } from 'lucide-react-native';
 import { CollectionCard } from '@/components/CollectionCard';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
@@ -12,7 +12,7 @@ type SortType = 'recent' | 'rating' | 'price' | 'distance';
 type ViewType = 'grid' | 'list';
 
 export default function ListsScreen() {
-  const { collections, restaurants, favoriteRestaurants } = useRestaurants();
+  const { collections, restaurants, favoriteRestaurants, deleteCollection } = useRestaurants();
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
@@ -61,6 +61,30 @@ export default function ListsScreen() {
       </Text>
     </TouchableOpacity>
   );
+
+  const handleDeleteCollection = (collection: Collection) => {
+    Alert.alert(
+      'Delete Collection',
+      `Are you sure you want to delete "${collection.name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCollection(collection.id);
+              Alert.alert('Success', 'Collection deleted successfully');
+            } catch (error) {
+              console.error('[ListsScreen] Error deleting collection:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              Alert.alert('Error', `Failed to delete collection: ${errorMessage}`);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -170,11 +194,18 @@ export default function ListsScreen() {
                   updated_at: plan.updated_at
                 };
                 return (
-                  <CollectionCard
-                    key={plan.id}
-                    collection={collection}
-                    onPress={() => router.push(`/collection/${plan.id}` as any)}
-                  />
+                  <View key={plan.id} style={styles.collectionCardContainer}>
+                    <CollectionCard
+                      collection={collection}
+                      onPress={() => router.push(`/collection/${plan.id}` as any)}
+                    />
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteCollection(collection)}
+                    >
+                      <Trash2 size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -388,6 +419,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  collectionCardContainer: {
+    position: 'relative',
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   favoritesGrid: {
     gap: 16,

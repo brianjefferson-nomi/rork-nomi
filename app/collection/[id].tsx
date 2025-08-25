@@ -86,15 +86,23 @@ export default function CollectionDetailScreen() {
   const handleDeleteCollection = () => {
     Alert.alert(
       'Delete Collection',
-      'Are you sure you want to delete this collection?',
+      'Are you sure you want to delete this collection? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
-            deleteCollection(collection.id);
-            router.back();
+          onPress: async () => {
+            try {
+              await deleteCollection(collection.id);
+              Alert.alert('Success', 'Collection deleted successfully', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error) {
+              console.error('[CollectionDetail] Error deleting collection:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              Alert.alert('Error', `Failed to delete collection: ${errorMessage}`);
+            }
           }
         }
       ]

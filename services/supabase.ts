@@ -928,12 +928,34 @@ export const dbHelpers = {
   },
 
   async deletePlan(id: string) {
-    const { error } = await supabase
-      .from('collections')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
+    try {
+      console.log('[Supabase] Deleting plan with ID:', id);
+      
+      const { error } = await supabase
+        .from('collections')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[Supabase] Error deleting plan:', error);
+        if (error.code === '23503') {
+          throw new Error('Cannot delete collection: It has associated data (restaurants, votes, etc.)');
+        } else if (error.message.includes('RLS') || error.message.includes('policy')) {
+          throw new Error('Permission denied. You can only delete collections you created.');
+        } else {
+          throw new Error(`Failed to delete collection: ${error.message}`);
+        }
+      }
+      
+      console.log('[Supabase] Plan deleted successfully');
+    } catch (error) {
+      console.error('[Supabase] deletePlan error:', error);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown error occurred while deleting plan');
+      }
+    }
   },
 
   // Collection operations (new names)

@@ -319,10 +319,24 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user?.id, queryClient]);
 
   const deletePlan = useCallback(async (planId: string) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for plan deletion');
+      throw new Error('User not authenticated');
+    }
     
-    await dbHelpers.deletePlan(planId);
-    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    try {
+      console.log('[RestaurantStore] Deleting plan:', planId);
+      await dbHelpers.deletePlan(planId);
+      console.log('[RestaurantStore] Plan deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error deleting plan:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to delete plan: ${error.message}`);
+      } else {
+        throw new Error('Failed to delete plan: Unknown error occurred');
+      }
+    }
   }, [user?.id, queryClient]);
 
   const inviteToPlan = useCallback(async (planId: string, email: string, message?: string) => {
