@@ -154,7 +154,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     id: dbRestaurant.id,
     name: dbRestaurant.name,
     cuisine: dbRestaurant.cuisine,
-    priceRange: dbRestaurant.price_level as '$' | '$$' | '$$$' | '$$$$',
+    priceRange: (dbRestaurant.price_range || dbRestaurant.price_level === 1 ? '$' : dbRestaurant.price_level === 2 ? '$$' : dbRestaurant.price_level === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
     imageUrl: dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
     images: (dbRestaurant.images || [dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter((img: string) => img && img.trim().length > 0),
     address: dbRestaurant.address,
