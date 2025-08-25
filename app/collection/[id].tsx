@@ -198,6 +198,18 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                 });
 
+                // Debug logging for comments
+                console.log(`[InsightsTab] Restaurant ${restaurant.name} comments:`, {
+                  restaurantId: restaurant.id,
+                  allDiscussions: discussions.length,
+                  filteredDiscussions: filteredDiscussions.length,
+                  discussions: filteredDiscussions.map(d => ({
+                    id: d.id,
+                    userName: d.userName,
+                    message: d.message?.substring(0, 50) + '...'
+                  }))
+                });
+
                 return (
                   <View style={styles.commentsSection}>
                     <View style={styles.commentsHeader}>
@@ -633,18 +645,68 @@ export default function CollectionDetailScreen() {
                 styles.restaurantItem,
                 meta?.rank === 1 && styles.winningRestaurantItem
               ]}>
-                {/* Simple Header */}
+                {/* Enhanced Header with Sophisticated Badges */}
                 <View style={styles.restaurantHeader}>
-                  <View style={styles.rankBadge}>
-                    {meta?.rank === 1 && <Crown size={16} color="#FFFFFF" />}
-                    <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
+                  <View style={[
+                    styles.rankBadge,
+                    meta?.rank === 1 && styles.winnerRankBadge,
+                    meta?.rank === 2 && styles.silverRankBadge,
+                    meta?.rank === 3 && styles.bronzeRankBadge
+                  ]}>
+                    {meta?.rank === 1 && <Crown size={20} color="#FFFFFF" />}
+                    {meta?.rank === 2 && <Award size={18} color="#FFFFFF" />}
+                    {meta?.rank === 3 && <Award size={18} color="#FFFFFF" />}
+                    <Text style={[
+                      styles.rankNumber,
+                      meta?.rank === 1 && styles.winnerRankNumber
+                    ]}>#{meta?.rank || index + 1}</Text>
                   </View>
+                  
                   <View style={styles.restaurantInfo}>
-                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                    <Text style={[
+                      styles.restaurantName,
+                      meta?.rank === 1 && styles.winnerRestaurantName
+                    ]}>{restaurant.name}</Text>
                     <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
+                    
+                    {/* Sophisticated Status Badges */}
+                    <View style={styles.statusBadgesContainer}>
+                      {meta?.rank === 1 && (
+                        <View style={styles.winnerBadge}>
+                          <Crown size={12} color="#F59E0B" />
+                          <Text style={styles.winnerBadgeText}>Winner</Text>
+                        </View>
+                      )}
+                      {meta.approvalPercent >= 80 && (
+                        <View style={styles.favoritesBadge}>
+                          <TrendingUp size={12} color="#10B981" />
+                          <Text style={styles.favoritesBadgeText}>Popular</Text>
+                        </View>
+                      )}
+                      {meta.approvalPercent >= 90 && (
+                        <View style={styles.unanimousBadge}>
+                          <ThumbsUp size={12} color="#3B82F6" />
+                          <Text style={styles.unanimousBadgeText}>Unanimous</Text>
+                        </View>
+                      )}
+                      {meta.approvalPercent < 50 && meta.approvalPercent > 30 && (
+                        <View style={styles.debatedBadge}>
+                          <MessageCircle size={12} color="#F59E0B" />
+                          <Text style={styles.debatedBadgeText}>Debated</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.approvalBadge}>
-                    <Text style={styles.approvalPercent}>{meta.approvalPercent}%</Text>
+                  
+                  <View style={[
+                    styles.approvalBadge,
+                    meta?.rank === 1 && styles.winnerApprovalBadge
+                  ]}>
+                    <Text style={[
+                      styles.approvalPercent,
+                      meta?.rank === 1 && styles.winnerApprovalPercent
+                    ]}>{meta.approvalPercent}%</Text>
+                    <Text style={styles.approvalLabel}>Approval</Text>
                   </View>
                 </View>
 
@@ -940,19 +1002,140 @@ const styles = StyleSheet.create({
   },
   winningRestaurantItem: {
     backgroundColor: '#FFFBEB',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 28,
-    borderWidth: 2,
+    borderRadius: 24,
+    padding: 32,
+    marginBottom: 32,
+    borderWidth: 3,
     borderColor: '#F59E0B',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 8,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
+    transform: [{ scale: 1.02 }],
+  },
+  winnerRankBadge: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#D97706',
+    borderWidth: 2,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  silverRankBadge: {
+    backgroundColor: '#6B7280',
+    borderColor: '#4B5563',
+    borderWidth: 2,
+  },
+  bronzeRankBadge: {
+    backgroundColor: '#D97706',
+    borderColor: '#B45309',
+    borderWidth: 2,
+  },
+  winnerRankNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  winnerRestaurantName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  statusBadgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  winnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    gap: 4,
+  },
+  winnerBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  favoritesBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#10B981',
+    gap: 4,
+  },
+  favoritesBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  unanimousBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    gap: 4,
+  },
+  unanimousBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  debatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    gap: 4,
+  },
+  debatedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  winnerApprovalBadge: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  winnerApprovalPercent: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  approvalLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 2,
   },
   removeButton: {
     marginTop: -8,
