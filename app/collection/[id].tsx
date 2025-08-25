@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy } from 'lucide-react-native';
+import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 
 function getConsensusStyle(consensus: string) {
   switch (consensus) {
@@ -18,9 +19,11 @@ function getConsensusStyle(consensus: string) {
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const collection = useCollectionById(id) as any; // Type assertion for now to handle mixed data
+  const { user } = useAuth();
   const { 
     removeRestaurantFromCollection, 
     deleteCollection, 
+    leaveCollection,
     voteRestaurant, 
     addDiscussion, 
     getRankedRestaurants, 
@@ -107,6 +110,38 @@ export default function CollectionDetailScreen() {
         }
       ]
     );
+  };
+
+  const handleLeaveCollection = () => {
+    Alert.alert(
+      'Leave Collection',
+      'Are you sure you want to leave this collection? You can rejoin later if invited.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Leave', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveCollection(collection.id);
+              Alert.alert('Success', 'You have left the collection', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error) {
+              console.error('[CollectionDetail] Error leaving collection:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              Alert.alert('Error', `Failed to leave collection: ${errorMessage}`);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Check if user is the owner of the collection
+  const isCollectionOwner = () => {
+    if (!user || !collection) return false;
+    return collection.created_by === user.id || collection.creator_id === user.id;
   };
 
   const handleInviteUser = () => {
@@ -239,13 +274,18 @@ export default function CollectionDetailScreen() {
           title: collection.name,
           headerRight: () => (
             <View style={{ flexDirection: 'row', gap: 12 }}>
-
               <TouchableOpacity onPress={handleShareCollection}>
                 <Share2 size={20} color="#6B7280" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleDeleteCollection}>
-                <Trash2 size={20} color="#FF6B6B" />
-              </TouchableOpacity>
+              {isCollectionOwner() ? (
+                <TouchableOpacity onPress={handleDeleteCollection}>
+                  <Trash2 size={20} color="#FF6B6B" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={handleLeaveCollection}>
+                  <UserMinus size={20} color="#FF8C00" />
+                </TouchableOpacity>
+              )}
             </View>
           )
         }} 

@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign, Trash2 } from 'lucide-react-native';
+import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign, Trash2, UserMinus } from 'lucide-react-native';
 import { CollectionCard } from '@/components/CollectionCard';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 import { Collection } from '@/types/restaurant';
 
 type TabType = 'collections' | 'favorites';
@@ -12,7 +13,8 @@ type SortType = 'recent' | 'rating' | 'price' | 'distance';
 type ViewType = 'grid' | 'list';
 
 export default function ListsScreen() {
-  const { collections, restaurants, favoriteRestaurants, deleteCollection } = useRestaurants();
+  const { collections, restaurants, favoriteRestaurants, deleteCollection, leaveCollection } = useRestaurants();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
@@ -84,6 +86,36 @@ export default function ListsScreen() {
         }
       ]
     );
+  };
+
+  const handleLeaveCollection = (collection: Collection) => {
+    Alert.alert(
+      'Leave Collection',
+      `Are you sure you want to leave "${collection.name}"? You can rejoin later if invited.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Leave', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveCollection(collection.id);
+              Alert.alert('Success', 'You have left the collection');
+            } catch (error) {
+              console.error('[ListsScreen] Error leaving collection:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              Alert.alert('Error', `Failed to leave collection: ${errorMessage}`);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Check if user is the owner of a collection
+  const isCollectionOwner = (collection: Collection) => {
+    if (!user) return false;
+    return collection.created_by === user.id || collection.creator_id === user.id;
   };
 
   return (
@@ -199,12 +231,23 @@ export default function ListsScreen() {
                       collection={collection}
                       onPress={() => router.push(`/collection/${plan.id}` as any)}
                     />
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDeleteCollection(collection)}
-                    >
-                      <Trash2 size={16} color="#FFF" />
-                    </TouchableOpacity>
+                    {isCollectionOwner(collection) ? (
+                      // Show delete button for owners
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDeleteCollection(collection)}
+                      >
+                        <Trash2 size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    ) : (
+                      // Show leave button for members
+                      <TouchableOpacity
+                        style={styles.leaveButton}
+                        onPress={() => handleLeaveCollection(collection)}
+                      >
+                        <UserMinus size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 );
               })}
@@ -428,6 +471,18 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  leaveButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 165, 0, 0.9)',
     borderRadius: 16,
     width: 32,
     height: 32,
