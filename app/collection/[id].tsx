@@ -394,63 +394,24 @@ export default function CollectionDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Tab Content */}
+                {/* Tab Content */}
         {activeTab === 'restaurants' ? (
           <>
-            {/* Group Insights */}
-        <View style={styles.analyticsSection}>
-          <Text style={styles.sectionTitle}>Group Insights</Text>
-          <View style={styles.analyticsGrid}>
-            <View style={styles.analyticCard}>
-              <Text style={styles.analyticValue}>
-                {(() => {
-                  const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
-                  const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
-                    const uniqueVoters = new Set([
-                      ...meta.voteDetails.likeVoters.map(v => v.userId),
-                      ...meta.voteDetails.dislikeVoters.map(v => v.userId)
-                    ]);
-                    return total + uniqueVoters.size;
-                  }, 0);
-                  return totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
-                })()}%
-              </Text>
-              <Text style={styles.analyticLabel}>Participation</Text>
-            </View>
-            <View style={styles.analyticCard}>
-              <Text style={styles.analyticValue}>
-                {(() => {
-                  const totalVotes = rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0);
-                  const unanimousVotes = rankedRestaurants.filter(({ meta }) => meta.dislikes === 0).length;
-                  return totalVotes > 0 ? Math.round((unanimousVotes / rankedRestaurants.length) * 100) : 0;
-                })()}%
-              </Text>
-              <Text style={styles.analyticLabel}>Consensus</Text>
-            </View>
-            <View style={styles.analyticCard}>
-              <Text style={styles.analyticValue}>
-                {rankedRestaurants.reduce((total, { meta }) => total + meta.likes + meta.dislikes, 0)}
-              </Text>
-              <Text style={styles.analyticLabel}>Total Votes</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Group Recommendations */}
-        {recommendations.length > 0 && (
-          <View style={styles.recommendationsSection}>
-            <Text style={styles.sectionTitle}>AI Recommendations</Text>
-            {recommendations.map(rec => (
-              <View key={rec.id} style={styles.recommendationCard}>
-                <Text style={styles.recommendationTitle}>{rec.title}</Text>
-                <Text style={styles.recommendationDescription}>{rec.description}</Text>
-                <Text style={styles.recommendationReasoning}>Confidence: {Math.round(rec.confidence * 100)}%</Text>
+            {/* Group Recommendations */}
+            {recommendations.length > 0 && (
+              <View style={styles.recommendationsSection}>
+                <Text style={styles.sectionTitle}>AI Recommendations</Text>
+                {recommendations.map(rec => (
+                  <View key={rec.id} style={styles.recommendationCard}>
+                    <Text style={styles.recommendationTitle}>{rec.title}</Text>
+                    <Text style={styles.recommendationDescription}>{rec.description}</Text>
+                    <Text style={styles.recommendationReasoning}>Confidence: {Math.round(rec.confidence * 100)}%</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        )}
+            )}
 
-        {/* Ranked Restaurants */}
+            {/* Ranked Restaurants */}
         <View style={styles.restaurantsList}>
           <Text style={styles.sectionTitle}>Ranked Restaurants ({rankedRestaurants.length})</Text>
           {rankedRestaurants.length === 0 ? (
@@ -689,8 +650,7 @@ export default function CollectionDetailScreen() {
           </View>
         )}
 
-        {/* Enhanced Member Activity - Comprehensive voting insights */}
-        <View style={styles.memberActivitySection}>
+
           <Text style={styles.sectionTitle}>Member Activity & Insights</Text>
           {(() => {
             // Get collection members for privacy filtering
@@ -781,6 +741,12 @@ export default function CollectionDetailScreen() {
               // For private collections, only show activity from actual members
               if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
                 console.log('[CollectionDetail] Filtering out non-member discussion:', discussion.userId);
+                return;
+              }
+              
+              // For shared collections, only show activity from actual collection members
+              if (collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                console.log('[CollectionDetail] Filtering out non-member discussion in shared collection:', discussion.userId);
                 return;
               }
               allMemberActivity.push({
@@ -938,52 +904,50 @@ export default function CollectionDetailScreen() {
 
               {/* Member Voting Insights */}
               <View style={styles.memberActivitySection}>
-                <Text style={styles.sectionTitle}>Member Activity & Insights</Text>
+                <Text style={styles.sectionTitle}>Member Voting Insights</Text>
                 {(() => {
                   // Get collection members for privacy filtering
                   const collectionMembers = collection.collaborators && Array.isArray(collection.collaborators) 
                     ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
                     : [];
                   
-                  // Collect all member activity across all restaurants
-                  const allMemberActivity: any[] = [];
+                  // Collect member voting stats
                   const memberVotingStats: Record<string, { likes: number; dislikes: number; total: number }> = {};
                   
                   rankedRestaurants.forEach(({ restaurant, meta }) => {
-                                      // Add votes - only from collection members if private
-                  meta.voteDetails.likeVoters.forEach(voter => {
-                    // For private collections, only show activity from actual members
-                    if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
-                      return;
-                    }
-                    
-                    // Suppress content for unknown members in shared collections
-                    if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
-                      return;
-                    }
-                    
-                    // Track member voting stats
-                    if (!memberVotingStats[voter.userId]) {
-                      memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
-                    }
-                    memberVotingStats[voter.userId].likes++;
-                    memberVotingStats[voter.userId].total++;
-                    
-                    allMemberActivity.push({
-                      type: 'vote',
-                      vote: 'like',
-                      restaurantName: restaurant.name,
-                      userName: voter.name,
-                      firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                      userId: voter.userId,
-                      reason: voter.reason,
-                      timestamp: voter.timestamp
+                    // Add votes - only from collection members if private
+                    meta.voteDetails.likeVoters.forEach(voter => {
+                      // For private collections, only show activity from actual members
+                      if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // For shared collections, only show activity from actual collection members
+                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // Suppress content for unknown members in shared collections
+                      if (collection.is_public && (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User')) {
+                        return;
+                      }
+                      
+                      // Track member voting stats
+                      if (!memberVotingStats[voter.userId]) {
+                        memberVotingStats[voter.userId] = { likes: 0, dislikes: 0, total: 0 };
+                      }
+                      memberVotingStats[voter.userId].likes++;
+                      memberVotingStats[voter.userId].total++;
                     });
-                  });
                     
                     meta.voteDetails.dislikeVoters.forEach(voter => {
                       // For private collections, only show activity from actual members
                       if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                        return;
+                      }
+                      
+                      // For shared collections, only show activity from actual collection members
+                      if (collection.is_public && !collectionMembers.includes(voter.userId)) {
                         return;
                       }
                       
@@ -998,138 +962,56 @@ export default function CollectionDetailScreen() {
                       }
                       memberVotingStats[voter.userId].dislikes++;
                       memberVotingStats[voter.userId].total++;
-                      
-                      allMemberActivity.push({
-                        type: 'vote',
-                        vote: 'dislike',
-                        restaurantName: restaurant.name,
-                        userName: voter.name,
-                        firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                        userId: voter.userId,
-                        reason: voter.reason,
-                        timestamp: voter.timestamp
-                      });
                     });
                   });
                   
-                  // Add discussions - only from collection members if private
-                  discussions.forEach(discussion => {
-                    // For private collections, only show activity from actual members
-                    if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
-                      return;
-                    }
-                    
-                    // Suppress content for unknown members in shared collections
-                    if (collection.is_public && (!discussion.userName || discussion.userName === 'Unknown' || discussion.userName === 'Unknown User')) {
-                      return;
-                    }
-                    
-                    allMemberActivity.push({
-                      type: 'comment',
-                      restaurantName: discussion.restaurantName || 'Collection',
-                      userName: discussion.userName,
-                      firstName: discussion.userName ? discussion.userName.split(' ')[0] : 'Unknown',
-                      userId: discussion.userId,
-                      message: discussion.message,
-                      timestamp: discussion.timestamp
-                    });
-                  });
+                  const activeMembers = Object.entries(memberVotingStats)
+                    .filter(([userId, stats]) => stats.total > 0)
+                    .filter(([userId, stats]) => {
+                      // Suppress unknown members in shared collections
+                      if (collection.is_public) {
+                        const member = collection.collaborators?.find((m: any) => 
+                          typeof m === 'string' ? m === userId : m.userId === userId
+                        );
+                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
+                        return memberName && memberName !== 'Unknown' && memberName !== 'Unknown User';
+                      }
+                      return true;
+                    })
+                    .sort(([,a], [,b]) => b.total - a.total)
+                    .slice(0, 6);
                   
-                  // Sort by timestamp (most recent first)
-                  allMemberActivity.sort((a, b) => {
-                    const timestampA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-                    const timestampB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-                    return timestampB.getTime() - timestampA.getTime();
-                  });
-                  
-                  return allMemberActivity.length > 0 ? (
-                    <View style={styles.insightsContent}>
-                      {/* Member Voting Insights */}
-                      <View style={styles.insightsSection}>
-                        <Text style={styles.insightsTitle}>Member Voting Insights</Text>
-                        <View style={styles.insightsGrid}>
-                          {Object.entries(memberVotingStats)
-                            .filter(([userId, stats]) => stats.total > 0)
-                            .filter(([userId, stats]) => {
-                              // Suppress unknown members in shared collections
-                              if (collection.is_public) {
-                                const member = collection.collaborators?.find((m: any) => 
-                                  typeof m === 'string' ? m === userId : m.userId === userId
-                                );
-                                const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                                return memberName && memberName !== 'Unknown' && memberName !== 'Unknown User';
-                              }
-                              return true;
-                            })
-                            .slice(0, 6)
-                            .map(([userId, stats]) => {
-                              const member = collection.collaborators?.find((m: any) => 
-                                typeof m === 'string' ? m === userId : m.userId === userId
-                              );
-                              const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
-                              const firstName = memberName ? memberName.split(' ')[0] : 'Unknown';
-                              const percentage = Math.round((stats.likes / stats.total) * 100);
-                              
-                              return (
-                                <View key={userId} style={styles.memberInsight}>
-                                  <View style={styles.memberInsightHeader}>
-                                    <View style={styles.memberInsightAvatar}>
-                                      <Text style={styles.memberInsightInitial}>
-                                        {firstName ? firstName.charAt(0).toUpperCase() : '?'}
-                                      </Text>
-                                    </View>
-                                    <View style={styles.memberInsightName}>{firstName}</View>
-                                  </View>
-                                  <View style={styles.memberInsightStats}>
-                                    <Text style={styles.memberInsightVotes}>
-                                      {stats.total} votes • {percentage}% positive
-                                    </Text>
-                                    <Text style={styles.memberInsightPercentage}>
-                                      👍 {stats.likes} • 👎 {stats.dislikes}
-                                    </Text>
-                                  </View>
-                                </View>
-                              );
-                            })}
-                        </View>
-                      </View>
-
-                      {/* Restaurant Voting Summary */}
-                      <View style={styles.restaurantVotingSection}>
-                        <Text style={styles.restaurantVotingTitle}>🏆 Restaurant Voting Summary</Text>
-                        {rankedRestaurants
-                          .filter(({ meta }) => meta.likes > 0 || meta.dislikes > 0)
-                          .slice(0, 5)
-                          .map(({ restaurant, meta }, index) => (
-                            <View key={restaurant.id} style={styles.restaurantVotingItem}>
-                              <View style={styles.restaurantVotingHeader}>
-                                <Text style={styles.restaurantVotingName}>{restaurant.name}</Text>
-                                <View style={styles.restaurantVotingBadge}>
-                                  <Text style={styles.restaurantVotingRank}>#{meta.rank}</Text>
-                                </View>
-                              </View>
-                              <View style={styles.restaurantVotingStats}>
-                                <View style={styles.voteStat}>
-                                  <Text style={styles.voteStatLabel}>👍 Likes</Text>
-                                  <Text style={styles.voteStatValue}>{meta.likes}</Text>
-                                </View>
-                                <View style={styles.voteStat}>
-                                  <Text style={styles.voteStatLabel}>👎 Dislikes</Text>
-                                  <Text style={styles.voteStatValue}>{meta.dislikes}</Text>
-                                </View>
-                                <View style={styles.voteStat}>
-                                  <Text style={styles.voteStatLabel}>📊 Approval</Text>
-                                  <Text style={styles.voteStatValue}>{meta.approvalPercent}%</Text>
-                                </View>
-                              </View>
-                              {meta.voteDetails.likeVoters.length > 0 && (
-                                <Text style={styles.restaurantVotingVoters}>
-                                  Liked by: {meta.voteDetails.likeVoters.map(v => v.name).join(', ')}
+                  return activeMembers.length > 0 ? (
+                    <View style={styles.insightsGrid}>
+                      {activeMembers.map(([userId, stats]) => {
+                        const member = collection.collaborators?.find((m: any) => 
+                          typeof m === 'string' ? m === userId : m.userId === userId
+                        );
+                        const memberName = typeof member === 'string' ? 'Unknown' : member?.name || 'Unknown';
+                        const firstName = memberName ? memberName.split(' ')[0] : 'Unknown';
+                        const percentage = Math.round((stats.likes / stats.total) * 100);
+                        
+                        return (
+                          <View key={userId} style={styles.memberInsight}>
+                            <View style={styles.memberInsightHeader}>
+                              <View style={styles.memberInsightAvatar}>
+                                <Text style={styles.memberInsightInitial}>
+                                  {firstName ? firstName.charAt(0).toUpperCase() : '?'}
                                 </Text>
-                              )}
+                              </View>
+                              <Text style={styles.memberInsightName}>{firstName}</Text>
                             </View>
-                          ))}
-                      </View>
+                            <View style={styles.memberInsightStats}>
+                              <Text style={styles.memberInsightVotes}>
+                                {stats.total} votes • {percentage}% positive
+                              </Text>
+                              <Text style={styles.memberInsightPercentage}>
+                                👍 {stats.likes} • 👎 {stats.dislikes}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
                   ) : (
                     <View style={styles.emptyActivityContainer}>
