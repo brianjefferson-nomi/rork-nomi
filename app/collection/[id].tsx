@@ -696,22 +696,21 @@ export default function CollectionDetailScreen() {
           )}
         </View>
 
-        {/* Recent Discussions */}
-        {discussions.length > 0 && (
-          <View style={styles.discussionsSection}>
-            <Text style={styles.sectionTitle}>Recent Discussions</Text>
-            {discussions.slice(0, 5).map((discussion: any) => (
-              <View key={discussion.id} style={styles.discussionItem}>
-                <Text style={styles.discussionUser}>{discussion.userName}</Text>
-                <Text style={styles.discussionMessage}>{discussion.message}</Text>
-                <Text style={styles.discussionTime}>
-                  {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
-                </Text>
+            {/* Recent Discussions */}
+            {discussions.length > 0 && (
+              <View style={styles.discussionsSection}>
+                <Text style={styles.sectionTitle}>Recent Discussions</Text>
+                {discussions.slice(0, 5).map((discussion: any) => (
+                  <View key={discussion.id} style={styles.discussionItem}>
+                    <Text style={styles.discussionUser}>{discussion.userName}</Text>
+                    <Text style={styles.discussionMessage}>{discussion.message}</Text>
+                    <Text style={styles.discussionTime}>
+                      {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        )}
-            </View>
+            )}
           </>
         ) : (
           <>
