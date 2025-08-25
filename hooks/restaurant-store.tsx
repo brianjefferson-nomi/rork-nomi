@@ -45,6 +45,9 @@ interface RestaurantStore {
   addRestaurantToCollection: (collectionId: string, restaurantId: string) => Promise<void>;
   removeRestaurantFromCollection: (collectionId: string, restaurantId: string) => Promise<void>;
   deleteCollection: (collectionId: string) => Promise<void>;
+  leaveCollection: (collectionId: string) => Promise<void>;
+  isCollectionOwner: (collectionId: string) => Promise<boolean>;
+  isCollectionMember: (collectionId: string) => Promise<boolean>;
   getCollectionDiscussions: (collectionId: string, restaurantId?: string) => Promise<any[]>;
   inviteToCollection: (collectionId: string, email: string, message?: string) => Promise<void>;
   updateCollectionSettings: (collectionId: string, settings: any) => Promise<void>;
@@ -428,7 +431,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     
     try {
       console.log('[RestaurantStore] Deleting plan:', planId);
-      await dbHelpers.deletePlan(planId);
+      await dbHelpers.deletePlan(planId, user.id);
       console.log('[RestaurantStore] Plan deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
     } catch (error) {
@@ -498,7 +501,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     
     try {
       console.log('[RestaurantStore] Deleting collection:', collectionId);
-      await dbHelpers.deletePlan(collectionId);
+      await dbHelpers.deletePlan(collectionId, user.id);
       console.log('[RestaurantStore] Collection deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
     } catch (error) {
@@ -510,6 +513,53 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       }
     }
   }, [user?.id, queryClient]);
+
+  const leaveCollection = useCallback(async (collectionId: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for leaving collection');
+      throw new Error('User not authenticated');
+    }
+    
+    try {
+      console.log('[RestaurantStore] Leaving collection:', collectionId);
+      await dbHelpers.leaveCollection(collectionId, user.id);
+      console.log('[RestaurantStore] Successfully left collection');
+      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error leaving collection:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to leave collection: ${error.message}`);
+      } else {
+        throw new Error('Failed to leave collection: Unknown error occurred');
+      }
+    }
+  }, [user?.id, queryClient]);
+
+  const isCollectionOwner = useCallback(async (collectionId: string): Promise<boolean> => {
+    if (!user?.id) {
+      return false;
+    }
+    
+    try {
+      return await dbHelpers.isCollectionOwner(collectionId, user.id);
+    } catch (error) {
+      console.error('[RestaurantStore] Error checking collection ownership:', error);
+      return false;
+    }
+  }, [user?.id]);
+
+  const isCollectionMember = useCallback(async (collectionId: string): Promise<boolean> => {
+    if (!user?.id) {
+      return false;
+    }
+    
+    try {
+      return await dbHelpers.isCollectionMember(collectionId, user.id);
+    } catch (error) {
+      console.error('[RestaurantStore] Error checking collection membership:', error);
+      return false;
+    }
+  }, [user?.id]);
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
     return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
   }, []);
@@ -784,6 +834,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addRestaurantToCollection,
     removeRestaurantFromCollection,
     deleteCollection,
+    leaveCollection,
+    isCollectionOwner,
+    isCollectionMember,
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
@@ -821,6 +874,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addRestaurantToCollection,
     removeRestaurantFromCollection,
     deleteCollection,
+    leaveCollection,
+    isCollectionOwner,
+    isCollectionMember,
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,

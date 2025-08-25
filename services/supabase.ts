@@ -971,10 +971,29 @@ export const dbHelpers = {
     return data;
   },
 
-  async deletePlan(id: string) {
+  async deletePlan(id: string, userId: string) {
     try {
-      console.log('[Supabase] Deleting plan with ID:', id);
+      console.log('[Supabase] Attempting to delete plan with ID:', id, 'by user:', userId);
       
+      // First check if user is the creator/owner of this collection
+      const { data: collection, error: fetchError } = await supabase
+        .from('collections')
+        .select('created_by, creator_id')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) {
+        console.error('[Supabase] Error fetching collection:', fetchError);
+        throw new Error('Collection not found');
+      }
+      
+      // Check if user is the creator
+      if (collection.created_by !== userId && collection.creator_id !== userId) {
+        console.error('[Supabase] Permission denied: User is not the creator');
+        throw new Error('Permission denied. Only the collection creator can delete it.');
+      }
+      
+      // User is authorized, proceed with deletion
       const { error } = await supabase
         .from('collections')
         .delete()
@@ -1002,6 +1021,74 @@ export const dbHelpers = {
     }
   },
 
+  async isCollectionOwner(collectionId: string, userId: string): Promise<boolean> {
+    try {
+      const { data: collection, error } = await supabase
+        .from('collections')
+        .select('created_by, creator_id')
+        .eq('id', collectionId)
+        .single();
+      
+      if (error || !collection) {
+        return false;
+      }
+      
+      return collection.created_by === userId || collection.creator_id === userId;
+    } catch (error) {
+      console.error('[Supabase] Error checking collection ownership:', error);
+      return false;
+    }
+  },
+
+  async isCollectionMember(collectionId: string, userId: string): Promise<boolean> {
+    try {
+      const { data: member, error } = await supabase
+        .from('collection_members')
+        .select('id')
+        .eq('collection_id', collectionId)
+        .eq('user_id', userId)
+        .single();
+      
+      return !error && !!member;
+    } catch (error) {
+      console.error('[Supabase] Error checking collection membership:', error);
+      return false;
+    }
+  },
+
+  async leaveCollection(collectionId: string, userId: string) {
+    try {
+      console.log('[Supabase] User leaving collection:', collectionId, 'user:', userId);
+      
+      // Check if user is the creator (creators cannot leave, they must delete or transfer ownership)
+      const isOwner = await this.isCollectionOwner(collectionId, userId);
+      if (isOwner) {
+        throw new Error('Collection creators cannot leave. You must delete the collection or transfer ownership.');
+      }
+      
+      // Remove user from collection_members
+      const { error } = await supabase
+        .from('collection_members')
+        .delete()
+        .eq('collection_id', collectionId)
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('[Supabase] Error leaving collection:', error);
+        throw new Error(`Failed to leave collection: ${error.message}`);
+      }
+      
+      console.log('[Supabase] User successfully left collection');
+    } catch (error) {
+      console.error('[Supabase] leaveCollection error:', error);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown error occurred while leaving collection');
+      }
+    }
+  },
+
   // Collection operations (new names)
   async createCollection(collectionData: Database['public']['Tables']['collections']['Insert']) {
     return this.createPlan(collectionData);
@@ -1019,8 +1106,8 @@ export const dbHelpers = {
     return this.updatePlan(id, updates);
   },
 
-  async deleteCollection(id: string) {
-    return this.deletePlan(id);
+  async deleteCollection(id: string, userId: string) {
+    return this.deletePlan(id, userId);
   },
 
   // Collection member operations
