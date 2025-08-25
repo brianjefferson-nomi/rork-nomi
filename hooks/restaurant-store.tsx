@@ -1194,8 +1194,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           
           // Save new restaurant to database
           const restaurantData = {
-            id: result.id,
-            restaurant_code: `rest_${result.id}_${Date.now()}`,
+            restaurant_code: result.id, // Use Google Place ID as restaurant_code
             name: result.name,
             cuisine: result.cuisine,
             price_range: result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$',
@@ -1229,7 +1228,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           console.error(`[RestaurantStore] Error saving ${result.name}:`, error);
           // Return a basic restaurant object if saving fails
           return {
-            id: result.id,
+            id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate temporary ID
             name: result.name,
             cuisine: result.cuisine,
             priceRange: (result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
