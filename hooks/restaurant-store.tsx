@@ -1712,10 +1712,11 @@ export function useCollectionById(id: string) {
               // If member is a string (UUID), create a proper member object
               if (typeof member === 'string') {
                 return {
-                  userId: member,
+                  memberId: `member_${member.substring(0, 8)}`, // Use truncated ID for privacy
                   name: member.length > 10 ? `Member ${member.substring(0, 8)}` : member,
                   role: 'member',
-                  isVerified: false
+                  isVerified: false,
+                  _internalUserId: member // Keep for internal operations only
                 };
               }
               return member;

@@ -1314,6 +1314,8 @@ export const dbHelpers = {
           error: JSON.stringify(error, null, 2),
           message: error.message || 'No message',
           code: error.code || 'No code',
+          details: error.details || 'No details',
+          hint: error.hint || 'No hint',
           collectionId
         });
         return [];
@@ -1321,15 +1323,18 @@ export const dbHelpers = {
       
       console.log('[Supabase] Successfully fetched collection members:', data?.length || 0);
       
-      // Transform the data to include proper member information
+      // Transform the data to include proper member information (without exposing user IDs)
       return (data || []).map((member: any) => ({
-        userId: member.user_id,
+        // Don't expose the actual user_id for privacy
+        memberId: `member_${member.user_id?.substring(0, 8)}`, // Use a truncated, non-identifying ID
         name: member.users?.name || `Member ${member.user_id?.substring(0, 8)}`,
         avatar_url: member.users?.avatar_url,
         role: member.role || 'member',
         isVerified: member.users?.is_local_expert || false,
         expert_areas: member.users?.expert_areas || [],
-        joined_at: member.joined_at
+        joined_at: member.joined_at,
+        // Keep the actual user_id only for internal operations (not exposed to UI)
+        _internalUserId: member.user_id
       }));
     } catch (error) {
       console.error('[Supabase] getCollectionMembers error:', {
@@ -1488,11 +1493,15 @@ export const dbHelpers = {
       
       console.log('[Supabase] Successfully fetched restaurant votes:', data?.length || 0);
       
-      // Transform the data to include proper user information
+      // Transform the data to include proper user information (without exposing user IDs)
       return (data || []).map((vote: any) => ({
         ...vote,
+        // Don't expose the actual user_id for privacy
+        userId: `user_${vote.user_id?.substring(0, 8)}`, // Use truncated, non-identifying ID
         userName: vote.users?.name || `User ${vote.user_id?.substring(0, 8)}`,
-        userAvatar: vote.users?.avatar_url
+        userAvatar: vote.users?.avatar_url,
+        // Keep the actual user_id only for internal operations (not exposed to UI)
+        _internalUserId: vote.user_id
       }));
     } catch (error) {
       console.error('[Supabase] getRestaurantVotes error:', {
@@ -1511,27 +1520,37 @@ export const dbHelpers = {
       
       const { data, error } = await supabase
         .from('restaurant_votes')
-        .select('*, users(name, avatar_url)')
+        .select('*, users(id, name, avatar_url)')
         .eq('collection_id', collectionId);
       
       if (error) {
         console.error('[Supabase] Error fetching collection votes:', {
-          error,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
+          error: JSON.stringify(error, null, 2),
+          message: error.message || 'No message',
+          code: error.code || 'No code',
+          details: error.details || 'No details',
+          hint: error.hint || 'No hint',
           collectionId
         });
         return [];
       }
       
       console.log('[Supabase] Successfully fetched collection votes:', data?.length || 0);
-      return data || [];
+      
+      // Transform the data to include proper user information (without exposing user IDs)
+      return (data || []).map((vote: any) => ({
+        ...vote,
+        // Don't expose the actual user_id for privacy
+        userId: `user_${vote.user_id?.substring(0, 8)}`, // Use truncated, non-identifying ID
+        userName: vote.users?.name || `User ${vote.user_id?.substring(0, 8)}`,
+        userAvatar: vote.users?.avatar_url,
+        // Keep the actual user_id only for internal operations (not exposed to UI)
+        _internalUserId: vote.user_id
+      }));
     } catch (error) {
       console.error('[Supabase] getCollectionVotes error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error),
         collectionId
       });
       return [];
