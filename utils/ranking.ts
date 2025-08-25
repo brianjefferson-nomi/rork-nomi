@@ -43,18 +43,28 @@ export function computeRankings(
 
       for (const v of rvotes) {
         const weight = getAuthorityWeight(v.authority);
-        const memberWeight = options?.collection?.collaborators.find(m => m.userId === v.userId)?.voteWeight ?? 1;
+        
+        // Handle both string and object collaborators
+        const collaborator = options?.collection?.collaborators?.find(m => {
+          if (typeof m === 'string') {
+            return m === v.userId;
+          } else {
+            return m.userId === v.userId;
+          }
+        });
+        
+        const memberWeight = (typeof collaborator === 'string' ? 1 : collaborator?.voteWeight) ?? 1;
         const finalWeight = (v.weight ?? 1) * weight * memberWeight;
         
         if (weight !== 1 || memberWeight !== 1) authorityApplied = true;
         
         const voterInfo: VoterInfo = {
           userId: v.userId,
-          name: options?.collection?.collaborators.find(m => m.userId === v.userId)?.name ?? 'Unknown',
-          avatar: options?.collection?.collaborators.find(m => m.userId === v.userId)?.avatar ?? '',
+          name: (typeof collaborator === 'string' ? 'Unknown' : collaborator?.name) ?? 'Unknown',
+          avatar: (typeof collaborator === 'string' ? '' : collaborator?.avatar) ?? '',
           timestamp: new Date(v.timestamp ?? Date.now()),
           weight: finalWeight,
-          isVerified: options?.collection?.collaborators.find(m => m.userId === v.userId)?.isVerified,
+          isVerified: (typeof collaborator === 'string' ? false : collaborator?.isVerified) ?? false,
           reason: v.reason
         };
 
@@ -108,7 +118,7 @@ export function computeRankings(
       const consensus = computeConsensus(likeRatio);
 
       let badge: RankedRestaurantMeta['badge'] | undefined = undefined;
-      const consensusThreshold = options?.collection?.settings.consensusThreshold ?? 0.7;
+      const consensusThreshold = options?.collection?.consensus_threshold ?? 0.7;
       
       if (totalVotes >= 3 && likeRatio >= consensusThreshold) badge = 'group_favorite';
       if (totalVotes >= 3 && likes === totalVotes) badge = 'unanimous';
@@ -133,7 +143,13 @@ export function computeRankings(
       }
 
       // Get abstentions
-      const allMemberIds = options?.collection?.collaborators.map(m => m.userId) ?? [];
+      const allMemberIds = options?.collection?.collaborators?.map(m => {
+        if (typeof m === 'string') {
+          return m;
+        } else {
+          return m.userId;
+        }
+      }) ?? [];
       const votedMemberIds = rvotes.map(v => v.userId);
       const abstentions = allMemberIds.filter(id => !votedMemberIds.includes(id));
 
