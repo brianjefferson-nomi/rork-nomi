@@ -669,24 +669,41 @@ export const dbHelpers = {
       
       console.log('[Supabase] Creating plan with data:', { ...planData, collection_code: collectionCode });
       
+      // Ensure the user ID is properly set
+      const userId = planData.created_by || planData.creator_id;
+      if (!userId) {
+        throw new Error('User ID is required to create a plan');
+      }
+      
       const { data, error } = await supabase
         .from('collections')
         .insert({
           ...planData,
-          collection_code: collectionCode
+          collection_code: collectionCode,
+          created_by: userId,
+          creator_id: userId
         })
         .select()
         .single();
       
       if (error) {
-        console.error('[Supabase] Error creating plan:', error);
+        console.error('[Supabase] Error creating plan:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        
         // Provide more specific error messages
         if (error.code === '23505') {
           throw new Error('A plan with this name already exists');
         } else if (error.code === '23503') {
           throw new Error('Invalid user reference. Please sign in again.');
-        } else if (error.message.includes('RLS') || error.message.includes('policy')) {
-          throw new Error('Permission denied. Please check your authentication.');
+        } else if (error.code === '42P17') {
+          throw new Error('Database policy error. Please try again or contact support.');
+        } else if (error.message.includes('RLS') || error.message.includes('policy') || error.message.includes('recursion')) {
+          throw new Error('Permission denied. Please check your authentication and try again.');
         } else {
           throw new Error(`Failed to create plan: ${error.message}`);
         }
@@ -695,7 +712,11 @@ export const dbHelpers = {
       console.log('[Supabase] Plan created successfully:', data);
       return data;
     } catch (error) {
-      console.error('[Supabase] createPlan error:', error);
+      console.error('[Supabase] createPlan error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       if (error instanceof Error) {
         throw error;
       } else {

@@ -4168,7 +4168,7 @@ export const getRandomUnsplashImage = async (query: string): Promise<string | nu
   try {
     const images = await searchUnsplashImages(query, 1, 20);
     
-    if (images.length === 0) {
+    if (!images || images.length === 0) {
       console.log(`[Unsplash] No images found for "${query}"`);
       return null;
     }
@@ -4177,8 +4177,24 @@ export const getRandomUnsplashImage = async (query: string): Promise<string | nu
     const randomIndex = Math.floor(Math.random() * images.length);
     const selectedImage = images[randomIndex];
     
-    // Return the image URL
-    const imageUrl = selectedImage.urls?.regular || selectedImage.url || selectedImage.src;
+    // Check if selectedImage exists and has the required properties
+    if (!selectedImage) {
+      console.log(`[Unsplash] No valid image selected for "${query}"`);
+      return null;
+    }
+    
+    // Return the image URL with multiple fallback options
+    const imageUrl = selectedImage.urls?.regular || 
+                    selectedImage.urls?.small || 
+                    selectedImage.urls?.thumb || 
+                    selectedImage.url || 
+                    selectedImage.src ||
+                    selectedImage.image_url;
+    
+    if (!imageUrl) {
+      console.log(`[Unsplash] No valid URL found in image data for "${query}"`);
+      return null;
+    }
     
     console.log(`[Unsplash] Selected random image for "${query}":`, imageUrl);
     return imageUrl;
