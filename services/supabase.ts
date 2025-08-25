@@ -737,8 +737,7 @@ export const dbHelpers = {
         throw new Error('User ID is required');
       }
       
-      // Simplified approach: Get collections where user is creator
-      // This avoids the complex RLS policy recursion issues
+      // Get collections where user is creator
       const { data: creatorCollections, error: creatorError } = await supabase
         .from('collections')
         .select('*')
@@ -748,19 +747,47 @@ export const dbHelpers = {
       
       if (creatorError) {
         console.error('[Supabase] Error fetching creator collections:', creatorError);
-        // Return empty array instead of throwing error to prevent app crashes
         return [];
       }
       
-      console.log('[Supabase] Successfully fetched creator collections:', creatorCollections?.length || 0);
+      // Get collections where user is a member
+      const { data: memberCollections, error: memberError } = await supabase
+        .from('collection_members')
+        .select('collection_id')
+        .eq('user_id', userId);
       
-      // For now, only return creator collections to avoid RLS issues
-      // TODO: Add member collections back once RLS policies are fixed
-      return creatorCollections || [];
+      let memberCollectionsData: any[] = [];
+      if (!memberError && memberCollections && memberCollections.length > 0) {
+        const collectionIds = memberCollections.map(m => m.collection_id);
+        
+        const { data: memberColls, error: memberCollsError } = await supabase
+          .from('collections')
+          .select('*')
+          .in('id', collectionIds)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        
+        if (!memberCollsError) {
+          memberCollectionsData = memberColls || [];
+        }
+      }
+      
+      // Combine and deduplicate collections
+      const allCollections = [...(creatorCollections || []), ...memberCollectionsData];
+      const uniqueCollections = allCollections.filter((collection, index, self) => 
+        index === self.findIndex(c => c.id === collection.id)
+      );
+      
+      console.log('[Supabase] Successfully fetched collections:', {
+        creator: creatorCollections?.length || 0,
+        member: memberCollectionsData.length,
+        total: uniqueCollections.length
+      });
+      
+      return uniqueCollections;
       
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', error);
-      // Return empty array instead of throwing error to prevent app crashes
       return [];
     }
   },
