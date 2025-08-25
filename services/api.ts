@@ -7,6 +7,16 @@ const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
 const FOURSQUARE_API_KEY = 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
 const FOURSQUARE_BASE_URL = 'https://places-api.foursquare.com';
+const STOCK_PHOTOS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const STOCK_PHOTOS_HOST = 'stock-photos-and-videos.p.rapidapi.com';
+const RESTAURANTS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const RESTAURANTS_HOST = 'restaurants222.p.rapidapi.com';
+const TRIPADVISOR_RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const TRIPADVISOR_RAPIDAPI_HOST = 'tripadvisor16.p.rapidapi.com';
+const FORK_SPOON_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const FORK_SPOON_HOST = 'the-fork-the-spoon.p.rapidapi.com';
+const REDDIT_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const REDDIT_HOST = 'reddit3.p.rapidapi.com';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -19,7 +29,12 @@ const API_CONFIG = {
       mapData: 'map-data.p.rapidapi.com',
       yelp: 'yelp-scraper.p.rapidapi.com',
       tripadvisor: 'tripadvisor16.p.rapidapi.com',
-      unsplash: 'unsplash-image-search.p.rapidapi.com'
+      unsplash: 'unsplash-image-search.p.rapidapi.com',
+      stockPhotos: 'stock-photos-and-videos.p.rapidapi.com',
+      restaurants: 'restaurants222.p.rapidapi.com',
+      tripadvisorRapid: 'tripadvisor16.p.rapidapi.com',
+      forkSpoon: 'the-fork-the-spoon.p.rapidapi.com',
+      reddit: 'reddit3.p.rapidapi.com'
     }
   }
 };
@@ -1929,6 +1944,816 @@ export const searchRestaurantsWithFoursquare = async (
     return enhancedResults;
   } catch (error) {
     console.error('[API] Error in Foursquare-enhanced search:', error);
+    return [];
+  }
+};
+
+// Stock Photos API Integration
+export const searchStockPhotos = async (query: string, limit: number = 10): Promise<any[]> => {
+  try {
+    console.log('[Stock Photos] Searching for:', query);
+    
+    const formData = new URLSearchParams();
+    formData.append('query', query);
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://stock-photos-and-videos.p.rapidapi.com/api/suggestions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': STOCK_PHOTOS_HOST,
+        'x-rapidapi-key': STOCK_PHOTOS_API_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Stock Photos API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const photos = data.data || [];
+    
+    console.log(`[Stock Photos] Retrieved ${photos.length} photos for "${query}"`);
+    return photos;
+  } catch (error) {
+    console.error('[Stock Photos] Error searching photos:', error);
+    return [];
+  }
+};
+
+// Get a random stock photo for a given query
+export const getRandomStockPhoto = async (query: string): Promise<string | null> => {
+  try {
+    const photos = await searchStockPhotos(query, 20);
+    
+    if (photos.length === 0) {
+      console.log(`[Stock Photos] No photos found for "${query}"`);
+      return null;
+    }
+    
+    // Select a random photo from the results
+    const randomIndex = Math.floor(Math.random() * photos.length);
+    const selectedPhoto = photos[randomIndex];
+    
+    // Return the photo URL (adjust based on actual API response structure)
+    const photoUrl = selectedPhoto.url || selectedPhoto.image_url || selectedPhoto.src;
+    
+    console.log(`[Stock Photos] Selected random photo for "${query}":`, photoUrl);
+    return photoUrl;
+  } catch (error) {
+    console.error('[Stock Photos] Error getting random photo:', error);
+    return null;
+  }
+};
+
+// Enhanced collection cover image function using Stock Photos API
+export const getEnhancedCollectionCoverImage = async (occasion: string): Promise<string> => {
+  try {
+    // Create search queries based on occasion
+    const searchQueries = [
+      `${occasion} restaurant`,
+      `${occasion} dining`,
+      `${occasion} food`,
+      `${occasion} celebration`,
+      `${occasion} meal`
+    ];
+    
+    // Try each query until we find a photo
+    for (const query of searchQueries) {
+      const photoUrl = await getRandomStockPhoto(query);
+      if (photoUrl) {
+        console.log(`[Stock Photos] Found cover image for "${occasion}" using query: "${query}"`);
+        return photoUrl;
+      }
+    }
+    
+    // Fallback to the original static images
+    console.log(`[Stock Photos] No stock photos found for "${occasion}", using fallback`);
+    return getCollectionCoverImage(occasion);
+  } catch (error) {
+    console.error('[Stock Photos] Error getting enhanced cover image:', error);
+    // Fallback to original function
+    return getCollectionCoverImage(occasion);
+  }
+};
+
+// Restaurants API Integration
+export const searchRestaurantsAPI = async (
+  query: string, 
+  location?: string, 
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[Restaurants API] Searching for:', query, 'in:', location);
+    
+    const formData = new URLSearchParams();
+    formData.append('query', query);
+    if (location) {
+      formData.append('location', location);
+    }
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://restaurants222.p.rapidapi.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': RESTAURANTS_HOST,
+        'x-rapidapi-key': RESTAURANTS_API_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const restaurants = data.data || data.results || [];
+    
+    console.log(`[Restaurants API] Retrieved ${restaurants.length} restaurants for "${query}"`);
+    return restaurants;
+  } catch (error) {
+    console.error('[Restaurants API] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Get restaurant photos
+export const getRestaurantPhotosAPI = async (restaurantId: string, limit: number = 10): Promise<any[]> => {
+  try {
+    console.log('[Restaurants API] Getting photos for restaurant:', restaurantId);
+    
+    const formData = new URLSearchParams();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://restaurants222.p.rapidapi.com/photos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': RESTAURANTS_HOST,
+        'x-rapidapi-key': RESTAURANTS_API_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const photos = data.data || data.photos || [];
+    
+    console.log(`[Restaurants API] Retrieved ${photos.length} photos for restaurant ${restaurantId}`);
+    return photos;
+  } catch (error) {
+    console.error('[Restaurants API] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Get restaurant reviews
+export const getRestaurantReviewsAPI = async (restaurantId: string, limit: number = 20): Promise<any[]> => {
+  try {
+    console.log('[Restaurants API] Getting reviews for restaurant:', restaurantId);
+    
+    const formData = new URLSearchParams();
+    formData.append('restaurant_id', restaurantId);
+    formData.append('limit', limit.toString());
+    
+    const response = await fetch('https://restaurants222.p.rapidapi.com/reviews', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-rapidapi-host': RESTAURANTS_HOST,
+        'x-rapidapi-key': RESTAURANTS_API_KEY
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Restaurants API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const reviews = data.data || data.reviews || [];
+    
+    console.log(`[Restaurants API] Retrieved ${reviews.length} reviews for restaurant ${restaurantId}`);
+    return reviews;
+  } catch (error) {
+    console.error('[Restaurants API] Error getting restaurant reviews:', error);
+    return [];
+  }
+};
+
+// Transform Restaurants API data to our format
+export const transformRestaurantsAPIData = (apiData: any): any => {
+  try {
+    return {
+      id: apiData.id || apiData.restaurant_id || `restaurant_${Date.now()}`,
+      name: apiData.name || apiData.restaurant_name || 'Unknown Restaurant',
+      address: apiData.address || apiData.location?.address || '',
+      city: apiData.city || apiData.location?.city || '',
+      state: apiData.state || apiData.location?.state || '',
+      zipCode: apiData.zip_code || apiData.location?.zip_code || '',
+      country: apiData.country || apiData.location?.country || '',
+      latitude: apiData.latitude || apiData.location?.latitude || 0,
+      longitude: apiData.longitude || apiData.location?.longitude || 0,
+      phone: apiData.phone || apiData.contact?.phone || '',
+      website: apiData.website || apiData.contact?.website || '',
+      rating: apiData.rating || apiData.overall_rating || 0,
+      price: apiData.price_level || apiData.price || 0,
+      cuisine: apiData.cuisine || apiData.category || 'International',
+      categories: apiData.categories || apiData.tags || [],
+      hours: apiData.hours || apiData.opening_hours || 'Hours vary',
+      isOpen: apiData.is_open || apiData.open_now || false,
+      totalPhotos: apiData.total_photos || 0,
+      totalReviews: apiData.total_reviews || apiData.review_count || 0,
+      source: 'restaurants_api'
+    };
+  } catch (error) {
+    console.error('[Restaurants API] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with Restaurants API
+export const searchRestaurantsWithAPI = async (
+  query: string, 
+  location?: string, 
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Restaurants API');
+    
+    // Search using Restaurants API
+    const apiResults = await searchRestaurantsAPI(query, location, limit);
+    
+    // Transform results
+    const transformedResults = apiResults
+      .map(transformRestaurantsAPIData)
+      .filter(Boolean);
+    
+    // Enhance with additional data for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get photos
+          const photos = await getRestaurantPhotosAPI(restaurant.id, 5);
+          const photoUrls = photos.map((photo: any) => photo.url || photo.image_url || photo.src).filter(Boolean);
+          
+          // Get reviews for description
+          const reviews = await getRestaurantReviewsAPI(restaurant.id, 5);
+          const reviewTexts = reviews.map((review: any) => review.text || review.comment || review.review).filter(Boolean);
+          
+          return {
+            ...restaurant,
+            photos: photoUrls,
+            reviews: reviewTexts,
+            description: reviewTexts.length > 0 ? reviewTexts[0] : 'A great dining experience awaits.'
+          };
+        } catch (error) {
+          console.error('[Restaurants API] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Restaurants API data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in Restaurants API search:', error);
+    return [];
+  }
+};
+
+// TripAdvisor RapidAPI Integration
+export const getTripAdvisorRestaurantDetails = async (
+  restaurantId: string,
+  currencyCode: string = 'USD'
+): Promise<any | null> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Getting restaurant details for:', restaurantId);
+    
+    const params = new URLSearchParams({
+      currencyCode,
+      restaurantId
+    });
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantDetailsV2?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log('[TripAdvisor RapidAPI] Retrieved restaurant details');
+    return data;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Search TripAdvisor restaurants by query
+export const searchTripAdvisorRestaurants = async (
+  query: string,
+  location?: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Searching for:', query, 'in:', location);
+    
+    const params = new URLSearchParams({
+      query,
+      limit: limit.toString()
+    });
+    
+    if (location) {
+      params.append('location', location);
+    }
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/search?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const restaurants = data.data || data.results || [];
+    
+    console.log(`[TripAdvisor RapidAPI] Retrieved ${restaurants.length} restaurants for "${query}"`);
+    return restaurants;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Search TripAdvisor restaurants by location ID
+export const searchTripAdvisorRestaurantsByLocation = async (
+  locationId: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Searching restaurants by location ID:', locationId);
+    
+    const params = new URLSearchParams({
+      locationId,
+      limit: limit.toString()
+    });
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/searchRestaurants?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const restaurants = data.data || data.results || [];
+    
+    console.log(`[TripAdvisor RapidAPI] Retrieved ${restaurants.length} restaurants for location ID ${locationId}`);
+    return restaurants;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error searching restaurants by location:', error);
+    return [];
+  }
+};
+
+// Search TripAdvisor locations
+export const searchTripAdvisorLocations = async (
+  query: string,
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Searching locations for:', query);
+    
+    const params = new URLSearchParams({
+      query,
+      limit: limit.toString()
+    });
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/searchLocation?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const locations = data.data || data.results || [];
+    
+    console.log(`[TripAdvisor RapidAPI] Retrieved ${locations.length} locations for "${query}"`);
+    return locations;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error searching locations:', error);
+    return [];
+  }
+};
+
+// Get TripAdvisor restaurant photos
+export const getTripAdvisorRestaurantPhotos = async (
+  restaurantId: string,
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Getting photos for restaurant:', restaurantId);
+    
+    const params = new URLSearchParams({
+      restaurantId,
+      limit: limit.toString()
+    });
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantPhotos?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const photos = data.data || data.photos || [];
+    
+    console.log(`[TripAdvisor RapidAPI] Retrieved ${photos.length} photos for restaurant ${restaurantId}`);
+    return photos;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Get TripAdvisor restaurant reviews
+export const getTripAdvisorRestaurantReviews = async (
+  restaurantId: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[TripAdvisor RapidAPI] Getting reviews for restaurant:', restaurantId);
+    
+    const params = new URLSearchParams({
+      restaurantId,
+      limit: limit.toString()
+    });
+    
+    const url = `https://tripadvisor16.p.rapidapi.com/api/v1/restaurant/getRestaurantReviews?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': TRIPADVISOR_RAPIDAPI_HOST,
+        'x-rapidapi-key': TRIPADVISOR_RAPIDAPI_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`TripAdvisor RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const reviews = data.data || data.reviews || [];
+    
+    console.log(`[TripAdvisor RapidAPI] Retrieved ${reviews.length} reviews for restaurant ${restaurantId}`);
+    return reviews;
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error getting restaurant reviews:', error);
+    return [];
+  }
+};
+
+// Transform TripAdvisor RapidAPI data to our format
+export const transformTripAdvisorRapidAPIData = (apiData: any): any => {
+  try {
+    return {
+      id: apiData.location_id || apiData.restaurant_id || `tripadvisor_${Date.now()}`,
+      name: apiData.name || apiData.restaurant_name || 'Unknown Restaurant',
+      address: apiData.address_string || apiData.address || '',
+      city: apiData.city || apiData.location?.city || '',
+      state: apiData.state || apiData.location?.state || '',
+      zipCode: apiData.postal_code || apiData.location?.postal_code || '',
+      country: apiData.country || apiData.location?.country || '',
+      latitude: apiData.latitude || apiData.location?.latitude || 0,
+      longitude: apiData.longitude || apiData.location?.longitude || 0,
+      phone: apiData.phone || apiData.contact?.phone || '',
+      website: apiData.website || apiData.contact?.website || '',
+      rating: apiData.rating || apiData.overall_rating || 0,
+      price: apiData.price_level || apiData.price || 0,
+      cuisine: apiData.cuisine || apiData.category || 'International',
+      categories: apiData.categories || apiData.tags || [],
+      hours: apiData.hours || apiData.opening_hours || 'Hours vary',
+      isOpen: apiData.is_open || apiData.open_now || false,
+      totalPhotos: apiData.total_photos || 0,
+      totalReviews: apiData.num_reviews || apiData.review_count || 0,
+      tripadvisor_id: apiData.location_id,
+      source: 'tripadvisor_rapidapi'
+    };
+  } catch (error) {
+    console.error('[TripAdvisor RapidAPI] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with TripAdvisor RapidAPI
+export const searchRestaurantsWithTripAdvisorRapidAPI = async (
+  query: string,
+  location?: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with TripAdvisor RapidAPI');
+    
+    let apiResults: any[] = [];
+    
+    // If location is provided, try to find restaurants in that specific location
+    if (location) {
+      try {
+        // First, search for the location to get its ID
+        const locations = await searchTripAdvisorLocations(location, 5);
+        if (locations.length > 0) {
+          const locationId = locations[0].location_id || locations[0].id;
+          console.log(`[TripAdvisor RapidAPI] Found location ID ${locationId} for "${location}"`);
+          
+          // Search restaurants in this location
+          const locationRestaurants = await searchTripAdvisorRestaurantsByLocation(locationId, limit);
+          apiResults = locationRestaurants;
+        }
+      } catch (error) {
+        console.error('[TripAdvisor RapidAPI] Error searching by location, falling back to query search:', error);
+      }
+    }
+    
+    // If no results from location search, fall back to query search
+    if (apiResults.length === 0) {
+      apiResults = await searchTripAdvisorRestaurants(query, location, limit);
+    }
+    
+    // Transform results
+    const transformedResults = apiResults
+      .map(transformTripAdvisorRapidAPIData)
+      .filter(Boolean);
+    
+    // Enhance with additional data for top results
+    const enhancedResults = await Promise.all(
+      transformedResults.slice(0, 10).map(async (restaurant) => {
+        try {
+          // Get photos
+          const photos = await getTripAdvisorRestaurantPhotos(restaurant.tripadvisor_id, 5);
+          const photoUrls = photos.map((photo: any) => photo.url || photo.image_url || photo.src).filter(Boolean);
+          
+          // Get reviews for description
+          const reviews = await getTripAdvisorRestaurantReviews(restaurant.tripadvisor_id, 5);
+          const reviewTexts = reviews.map((review: any) => review.text || review.comment || review.review).filter(Boolean);
+          
+          return {
+            ...restaurant,
+            photos: photoUrls,
+            reviews: reviewTexts,
+            description: reviewTexts.length > 0 ? reviewTexts[0] : 'A great dining experience awaits.'
+          };
+        } catch (error) {
+          console.error('[TripAdvisor RapidAPI] Error enhancing restaurant:', error);
+          return restaurant;
+        }
+      })
+    );
+    
+    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with TripAdvisor RapidAPI data`);
+    return enhancedResults;
+  } catch (error) {
+    console.error('[API] Error in TripAdvisor RapidAPI search:', error);
+    return [];
+  }
+};
+
+// Reddit API Integration
+export const getRedditPosts = async (
+  subreddit: string,
+  filter: 'hot' | 'new' | 'top' | 'rising' = 'hot',
+  limit: number = 25
+): Promise<any[]> => {
+  try {
+    console.log(`[Reddit API] Getting ${filter} posts from r/${subreddit}`);
+    
+    const params = new URLSearchParams({
+      url: `https://www.reddit.com/r/${subreddit}`,
+      filter,
+      limit: limit.toString()
+    });
+    
+    const url = `https://reddit3.p.rapidapi.com/v1/reddit/posts?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-host': REDDIT_HOST,
+        'x-rapidapi-key': REDDIT_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Reddit API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const posts = data.data || data.posts || [];
+    
+    console.log(`[Reddit API] Retrieved ${posts.length} posts from r/${subreddit}`);
+    return posts;
+  } catch (error) {
+    console.error('[Reddit API] Error getting posts:', error);
+    return [];
+  }
+};
+
+// Get restaurant recommendations from food-related subreddits
+export const getRestaurantRecommendationsFromReddit = async (
+  location?: string,
+  cuisine?: string,
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    console.log('[Reddit API] Getting restaurant recommendations');
+    
+    // Define food-related subreddits to search
+    const foodSubreddits = [
+      'food',
+      'restaurants',
+      'dining',
+      'foodporn',
+      'eatsandwiches',
+      'pizza',
+      'sushi',
+      'burgers',
+      'tacos',
+      'ramen'
+    ];
+    
+    // Add location-specific subreddits if location is provided
+    if (location) {
+      const locationSubreddits = [
+        `${location.toLowerCase()}food`,
+        `${location.toLowerCase()}restaurants`,
+        `${location.toLowerCase()}dining`
+      ];
+      foodSubreddits.push(...locationSubreddits);
+    }
+    
+    // Add cuisine-specific subreddits if cuisine is provided
+    if (cuisine) {
+      const cuisineSubreddits = [
+        cuisine.toLowerCase(),
+        `${cuisine.toLowerCase()}food`,
+        `${cuisine.toLowerCase()}recipes`
+      ];
+      foodSubreddits.push(...cuisineSubreddits);
+    }
+    
+    const allPosts: any[] = [];
+    
+    // Get posts from each subreddit
+    for (const subreddit of foodSubreddits.slice(0, 5)) { // Limit to 5 subreddits to avoid rate limits
+      try {
+        const posts = await getRedditPosts(subreddit, 'hot', 10);
+        allPosts.push(...posts);
+      } catch (error) {
+        console.error(`[Reddit API] Error getting posts from r/${subreddit}:`, error);
+        continue;
+      }
+    }
+    
+    // Filter posts that might contain restaurant recommendations
+    const restaurantPosts = allPosts.filter(post => {
+      const title = post.title?.toLowerCase() || '';
+      const content = post.selftext?.toLowerCase() || '';
+      const text = `${title} ${content}`;
+      
+      // Look for restaurant-related keywords
+      const restaurantKeywords = [
+        'restaurant', 'dining', 'food', 'eat', 'meal', 'dinner', 'lunch', 'breakfast',
+        'cafe', 'bistro', 'grill', 'kitchen', 'chef', 'menu', 'dish', 'plate'
+      ];
+      
+      return restaurantKeywords.some(keyword => text.includes(keyword));
+    });
+    
+    console.log(`[Reddit API] Found ${restaurantPosts.length} restaurant-related posts`);
+    return restaurantPosts.slice(0, limit);
+  } catch (error) {
+    console.error('[Reddit API] Error getting restaurant recommendations:', error);
+    return [];
+  }
+};
+
+// Transform Reddit posts to restaurant recommendations
+export const transformRedditPostToRestaurant = (post: any): any => {
+  try {
+    // Extract restaurant name from post title or content
+    const title = post.title || '';
+    const content = post.selftext || '';
+    const text = `${title} ${content}`;
+    
+    // Try to extract restaurant name (this is a simple heuristic)
+    const restaurantNameMatch = text.match(/(?:at|from|tried|visited|went to)\s+([A-Z][a-zA-Z\s&]+?)(?:\s|$|\.|,)/);
+    const restaurantName = restaurantNameMatch ? restaurantNameMatch[1].trim() : 'Reddit Recommendation';
+    
+    return {
+      id: `reddit_${post.id}`,
+      name: restaurantName,
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: '',
+      latitude: 0,
+      longitude: 0,
+      phone: '',
+      website: '',
+      rating: 0,
+      price: 0,
+      cuisine: 'International',
+      categories: [],
+      hours: 'Hours vary',
+      isOpen: false,
+      totalPhotos: 0,
+      totalReviews: 0,
+      description: content.length > 200 ? content.substring(0, 200) + '...' : content,
+      reddit_post: {
+        id: post.id,
+        title: post.title,
+        author: post.author,
+        score: post.score,
+        url: post.url,
+        subreddit: post.subreddit,
+        created_utc: post.created_utc
+      },
+      source: 'reddit'
+    };
+  } catch (error) {
+    console.error('[Reddit API] Error transforming post to restaurant:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with Reddit recommendations
+export const searchRestaurantsWithReddit = async (
+  query: string,
+  location?: string,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] Searching restaurants with Reddit recommendations');
+    
+    // Get Reddit recommendations
+    const redditPosts = await getRestaurantRecommendationsFromReddit(location, query, 10);
+    
+    // Transform Reddit posts to restaurant format
+    const redditRestaurants = redditPosts
+      .map(transformRedditPostToRestaurant)
+      .filter(Boolean);
+    
+    console.log(`[API] Found ${redditRestaurants.length} restaurant recommendations from Reddit`);
+    return redditRestaurants;
+  } catch (error) {
+    console.error('[API] Error in Reddit restaurant search:', error);
     return [];
   }
 };
