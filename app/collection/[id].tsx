@@ -1089,7 +1089,6 @@ export default function CollectionDetailScreen() {
             );
           })()}
         </View>
-            </View>
           </>
         )}
 
@@ -1097,7 +1096,7 @@ export default function CollectionDetailScreen() {
       </ScrollView>
 
       {/* Vote Modal */}
-        <Modal visible={!!showVoteModal} transparent animationType="slide">
+      <Modal visible={!!showVoteModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
