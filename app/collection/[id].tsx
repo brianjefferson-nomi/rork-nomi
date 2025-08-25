@@ -216,152 +216,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
         </View>
       </View>
 
-      {/* Member Activity & Insights */}
-      <View style={styles.memberActivitySection}>
-        <Text style={styles.sectionTitle}>🎯 Member Participation & Activity</Text>
-        {(() => {
-          const memberVotingStats: { [key: string]: { 
-            likes: number; 
-            dislikes: number; 
-            comments: number; 
-            name: string;
-            likedRestaurants: string[];
-            dislikedRestaurants: string[];
-          } } = {};
-          
-          rankedRestaurants.forEach((restaurant, restaurantIndex) => {
-            restaurant.meta.voteDetails.likeVoters.forEach((voter: any) => {
-              if (collection.is_public && !collectionMembers.includes(voter.userId)) return;
-              if (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User') return;
-              
-              if (!memberVotingStats[voter.userId]) {
-                memberVotingStats[voter.userId] = { 
-                  likes: 0, 
-                  dislikes: 0, 
-                  comments: 0, 
-                  name: voter.name,
-                  likedRestaurants: [],
-                  dislikedRestaurants: []
-                };
-              }
-              memberVotingStats[voter.userId].likes++;
-              memberVotingStats[voter.userId].likedRestaurants.push(restaurant.name);
-            });
-            
-            restaurant.meta.voteDetails.dislikeVoters.forEach((voter: any) => {
-              if (collection.is_public && !collectionMembers.includes(voter.userId)) return;
-              if (!voter.name || voter.name === 'Unknown' || voter.name === 'Unknown User') return;
-              
-              if (!memberVotingStats[voter.userId]) {
-                memberVotingStats[voter.userId] = { 
-                  likes: 0, 
-                  dislikes: 0, 
-                  comments: 0, 
-                  name: voter.name,
-                  likedRestaurants: [],
-                  dislikedRestaurants: []
-                };
-              }
-              memberVotingStats[voter.userId].dislikes++;
-              memberVotingStats[voter.userId].dislikedRestaurants.push(restaurant.name);
-            });
-          });
 
-          discussions.forEach((discussion: any) => {
-            if (collection.is_public && !collectionMembers.includes(discussion.userId)) return;
-            if (!discussion.userName || discussion.userName === 'Unknown' || discussion.userName === 'Unknown User') return;
-            
-            if (!memberVotingStats[discussion.userId]) {
-              memberVotingStats[discussion.userId] = { 
-                likes: 0, 
-                dislikes: 0, 
-                comments: 0, 
-                name: discussion.userName,
-                likedRestaurants: [],
-                dislikedRestaurants: []
-              };
-            }
-            memberVotingStats[discussion.userId].comments++;
-          });
-
-          return (
-            <View style={styles.memberStatsGrid}>
-              {Object.entries(memberVotingStats).map(([userId, stats]) => {
-                const firstName = stats.name?.split(' ')[0] || 'Unknown';
-                
-                return (
-                  <View key={userId} style={styles.memberStatCard}>
-                    <View style={styles.memberHeader}>
-                      <View style={styles.memberAvatar}>
-                        <Text style={styles.memberInitial}>
-                          {firstName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.memberInfo}>
-                        <Text style={styles.memberName}>{firstName}</Text>
-                        <Text style={styles.memberRole}>
-                          {stats.likes > stats.dislikes ? '👍 Supporter' : 
-                           stats.dislikes > stats.likes ? '👎 Opposer' : 
-                           stats.comments > 0 ? '💬 Commenter' : '👤 Member'}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.memberStats}>
-                      <View style={styles.statItem}>
-                        <ThumbsUp size={14} color="#10B981" />
-                        <Text style={styles.statValue}>{stats.likes}</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <ThumbsDown size={14} color="#EF4444" />
-                        <Text style={styles.statValue}>{stats.dislikes}</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <MessageCircle size={14} color="#6B7280" />
-                        <Text style={styles.statValue}>{stats.comments}</Text>
-                      </View>
-                    </View>
-                    
-                    {/* Restaurant Activity Details */}
-                    {(stats.likedRestaurants.length > 0 || stats.dislikedRestaurants.length > 0) && (
-                      <View style={styles.memberRestaurantActivity}>
-                        {stats.likedRestaurants.length > 0 && (
-                          <View style={styles.restaurantActivityGroup}>
-                            <Text style={styles.activityLabel}>Liked:</Text>
-                            <Text style={styles.restaurantList} numberOfLines={2}>
-                              {(() => {
-                                const restaurantNames = stats.likedRestaurants.slice(0, 3).join(', ');
-                                return stats.likedRestaurants.length > 3 ? `${restaurantNames}...` : restaurantNames;
-                              })()}
-                            </Text>
-                          </View>
-                        )}
-                        {stats.dislikedRestaurants.length > 0 && (
-                          <View style={styles.restaurantActivityGroup}>
-                            <Text style={styles.activityLabel}>Disliked:</Text>
-                            <Text style={styles.restaurantList} numberOfLines={2}>
-                              {(() => {
-                                const restaurantNames = stats.dislikedRestaurants.slice(0, 3).join(', ');
-                                return stats.dislikedRestaurants.length > 3 ? `${restaurantNames}...` : restaurantNames;
-                              })()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-              {Object.keys(memberVotingStats).length === 0 && (
-                <Text style={styles.noActivity}>
-                  {collection.is_public 
-                    ? 'Start voting and commenting to see activity here!' 
-                    : 'Collection members can vote and comment to see activity here!'}
-                </Text>
-              )}
-            </View>
-          );
-        })()}
-      </View>
     </View>
   );
 }
@@ -833,7 +688,11 @@ export default function CollectionDetailScreen() {
                 <View style={styles.votingSection}>
                   <View style={styles.voteStats}>
                     <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                    <Text style={styles.voteBreakdown}>{meta.likes} likes · {meta.dislikes} dislikes</Text>
+                    <Text style={styles.voteBreakdown}>
+                      {(() => {
+                        return `${meta.likes} likes · ${meta.dislikes} dislikes`;
+                      })()}
+                    </Text>
                     {meta.consensus && (
                       <View style={[styles.consensusMeter, getConsensusStyle(meta.consensus)]}>
                         <Text style={styles.consensusText}>{meta.consensus} consensus</Text>
@@ -1296,7 +1155,7 @@ const styles = StyleSheet.create({
   },
   restaurantItem: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -1304,27 +1163,27 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 32,
-    borderWidth: 3,
-    borderColor: '#FFD700',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   removeButton: {
     marginTop: -8,
@@ -1557,9 +1416,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   approvalText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#1F2937',
     marginBottom: 4,
   },
   voteBreakdown: {
