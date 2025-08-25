@@ -3,11 +3,145 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { router } from 'expo-router';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
-import { ChevronLeft, Users, Lock, Globe, Calendar as CalendarIcon } from 'lucide-react-native';
+import { ChevronLeft, Users, Lock, Globe, Calendar as CalendarIcon, ChevronRight, ChevronDown } from 'lucide-react-native';
 
 const occasions = ['Birthday', 'Date Night', 'Business', 'Casual', 'Late Night', 'Brunch', 'Special Occasion'];
 
 type CollectionType = 'public' | 'private' | 'shared';
+
+// Custom Calendar Component
+const CustomCalendar = ({ onDateSelect, onClose }: { onDateSelect: (date: Date) => void; onClose: () => void }) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startingDayOfWeek };
+  };
+
+  const getMonthName = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const getWeekDays = () => {
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    }
+    setCurrentMonth(newMonth);
+  };
+
+  const handleDatePress = (day: number) => {
+    const selectedDateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    setSelectedDate(selectedDateObj);
+  };
+
+  const confirmDate = () => {
+    if (selectedDate) {
+      onDateSelect(selectedDate);
+    }
+  };
+
+  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
+  const weekDays = getWeekDays();
+
+  // Generate calendar days
+  const calendarDays = [];
+  
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    calendarDays.push(null);
+  }
+  
+  // Add days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push(day);
+  }
+
+  return (
+    <View style={styles.calendarContainer}>
+      <View style={styles.calendarHeader}>
+        <Text style={styles.calendarTitle}>Select Date</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Text style={styles.calendarClose}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.calendarNavigation}>
+        <TouchableOpacity onPress={() => navigateMonth('prev')} style={styles.navButton}>
+          <ChevronLeft size={20} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.monthYear}>{getMonthName(currentMonth)}</Text>
+        <TouchableOpacity onPress={() => navigateMonth('next')} style={styles.navButton}>
+          <ChevronRight size={20} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.weekDaysContainer}>
+        {weekDays.map((day, index) => (
+          <Text key={index} style={styles.weekDay}>{day}</Text>
+        ))}
+      </View>
+
+      <View style={styles.calendarGrid}>
+        {calendarDays.map((day, index) => {
+          if (day === null) {
+            return <View key={index} style={styles.emptyDay} />;
+          }
+          
+          const dateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+          const isSelected = selectedDate && 
+            selectedDate.getDate() === day && 
+            selectedDate.getMonth() === currentMonth.getMonth() && 
+            selectedDate.getFullYear() === currentMonth.getFullYear();
+          const isToday = new Date().toDateString() === dateObj.toDateString();
+          
+          return (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.calendarDay,
+                isToday && styles.today,
+                isSelected && styles.selectedDay
+              ]}
+              onPress={() => handleDatePress(day)}
+            >
+              <Text style={[
+                styles.dayText,
+                isToday && styles.todayText,
+                isSelected && styles.selectedDayText
+              ]}>
+                {day}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={styles.calendarFooter}>
+        <TouchableOpacity 
+          style={[styles.confirmButton, !selectedDate && styles.confirmButtonDisabled]} 
+          onPress={confirmDate}
+          disabled={!selectedDate}
+        >
+          <Text style={styles.confirmButtonText}>Confirm Date</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 export default function CreatePlanScreen() {
   const { createPlan } = useRestaurants();
@@ -103,49 +237,6 @@ export default function CreatePlanScreen() {
     }
   };
 
-  // Simple date picker component
-  const SimpleDatePicker = () => {
-    const today = new Date();
-    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const nextMonth = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    const quickDates = [
-      { label: 'Today', date: today },
-      { label: 'Tomorrow', date: new Date(today.getTime() + 24 * 60 * 60 * 1000) },
-      { label: 'Next Week', date: nextWeek },
-      { label: 'Next Month', date: nextMonth }
-    ];
-
-    return (
-      <View style={styles.datePickerContainer}>
-        <Text style={styles.datePickerTitle}>Quick Select</Text>
-        <View style={styles.quickDatesGrid}>
-          {quickDates.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.quickDateButton}
-              onPress={() => handleDateSelect(item.date)}
-            >
-              <Text style={styles.quickDateLabel}>{item.label}</Text>
-              <Text style={styles.quickDateValue}>
-                {item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        
-        <Text style={styles.datePickerTitle}>Or enter manually</Text>
-        <TextInput
-          style={styles.manualDateInput}
-          placeholder="e.g., Next Friday, Dec 15th"
-          placeholderTextColor="#999"
-          value={plannedDate}
-          onChangeText={setPlannedDate}
-        />
-      </View>
-    );
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -194,6 +285,27 @@ export default function CreatePlanScreen() {
                 {plannedDate || "Select a date"}
               </Text>
             </TouchableOpacity>
+            
+            {/* Quick Date Options */}
+            <View style={styles.quickDateOptions}>
+              <Text style={styles.quickDateLabel}>Quick Select:</Text>
+              <View style={styles.quickDateButtons}>
+                {[
+                  { label: 'Today', date: new Date() },
+                  { label: 'Tomorrow', date: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+                  { label: 'Next Week', date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+                  { label: 'Next Month', date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+                ].map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.quickDateButton}
+                    onPress={() => handleDateSelect(option.date)}
+                  >
+                    <Text style={styles.quickDateButtonText}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -274,15 +386,10 @@ export default function CreatePlanScreen() {
         onRequestClose={() => setShowCalendar(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Select Date</Text>
-              <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                <Text style={styles.calendarClose}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <SimpleDatePicker />
-          </View>
+          <CustomCalendar 
+            onDateSelect={handleDateSelect} 
+            onClose={() => setShowCalendar(false)} 
+          />
         </View>
       </Modal>
     </View>
@@ -485,11 +592,14 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 10,
   },
-  quickDatesGrid: {
+  quickDateOptions: {
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  quickDateButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 15,
   },
   quickDateButton: {
     width: '48%', // Two buttons per row
@@ -500,24 +610,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  quickDateButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  calendarNavigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  navButton: {
+    padding: 10,
+  },
+  monthYear: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   quickDateLabel: {
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
   },
-  quickDateValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  weekDaysContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  weekDay: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  calendarDay: {
+    width: '14%', // 7 days in a week
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  emptyDay: {
+    width: '14%',
+    aspectRatio: 1,
+  },
+  today: {
+    backgroundColor: '#E0F7FA',
+    borderRadius: 10,
+  },
+  todayText: {
+    color: '#007BFF',
+  },
+  selectedDay: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 10,
+  },
+  selectedDayText: {
+    color: '#FFF',
+  },
+  dayText: {
+    fontSize: 16,
     color: '#333',
   },
-  manualDateInput: {
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+  calendarFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  confirmButton: {
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 14,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#D3D3D3',
+    opacity: 0.7,
+  },
+  confirmButtonText: {
+    color: '#FFF',
     fontSize: 16,
-    color: '#1A1A1A',
+    fontWeight: '600',
   },
 });
