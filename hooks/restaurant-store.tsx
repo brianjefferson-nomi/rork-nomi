@@ -53,6 +53,7 @@ interface RestaurantStore {
   inviteToCollection: (collectionId: string, email: string, message?: string) => Promise<void>;
   updateCollectionSettings: (collectionId: string, settings: any) => Promise<void>;
   getRestaurantVotingDetails: (restaurantId: string, planId: string) => any;
+  addRestaurantComment: (restaurantId: string, collectionId: string, commentText: string) => Promise<void>;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -699,7 +700,46 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, [user?.id]);
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
-    return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+    try {
+      // Get both restaurant discussions and user activity comments
+      const [discussions, comments] = await Promise.all([
+        dbHelpers.getCollectionDiscussions(collectionId, restaurantId),
+        dbHelpers.getRestaurantComments(collectionId, restaurantId)
+      ]);
+
+      // Combine and format the data
+      const combinedData = [
+        // Format discussions from restaurant_discussions table
+        ...discussions.map((discussion: any) => ({
+          id: discussion.id,
+          restaurantId: discussion.restaurant_id,
+          userId: discussion.user_id,
+          userName: discussion.users?.name || 'Unknown',
+          message: discussion.message,
+          timestamp: discussion.created_at,
+          type: 'discussion'
+        })),
+        // Format comments from user_activities table
+        ...comments.map((comment: any) => ({
+          id: comment.id,
+          restaurantId: comment.restaurant_id,
+          userId: comment.user_id,
+          userName: comment.user_name || 'Unknown',
+          message: comment.comment_text,
+          timestamp: comment.created_at,
+          type: 'comment'
+        }))
+      ];
+
+      // Sort by timestamp (newest first)
+      return combinedData.sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+    } catch (error) {
+      console.error('[RestaurantStore] Error loading discussions and comments:', error);
+      // Fallback to just discussions if comments fail
+      return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+    }
   }, []);
   const inviteToCollection = useCallback(async (collectionId: string, email: string, message?: string) => {
     if (!user?.id) return;
@@ -918,6 +958,28 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       persistDiscussions.mutate([...discussions, newDiscussion]);
     }
   }, [discussions, persistDiscussions.mutate, user, queryClient]);
+
+  const addRestaurantComment = useCallback(async (restaurantId: string, collectionId: string, commentText: string) => {
+    if (!user?.id) {
+      console.error('[RestaurantStore] No user ID available for adding comment');
+      return;
+    }
+    
+    try {
+      console.log('[RestaurantStore] Adding comment for restaurant:', restaurantId, 'collection:', collectionId);
+      
+      // Save comment to database using the RPC function
+      await dbHelpers.addRestaurantComment(restaurantId, collectionId, commentText);
+      console.log('[RestaurantStore] Comment saved to database successfully');
+      
+      // Refresh data from database
+      queryClient.invalidateQueries({ queryKey: ['discussions', collectionId] });
+      
+    } catch (error) {
+      console.error('[RestaurantStore] Error saving comment to database:', error);
+      throw error;
+    }
+  }, [user, queryClient]);
 
   const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
     const plan = planId ? plansQuery.data?.find((p: any) => p.id === planId) : undefined;
@@ -1229,6 +1291,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     inviteToCollection,
     updateCollectionSettings,
     getRestaurantVotingDetails,
+    addRestaurantComment,
   }), [
     restaurants,
     plansQuery.data,
@@ -1272,6 +1335,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     inviteToCollection,
     updateCollectionSettings,
     getRestaurantVotingDetails,
+    addRestaurantComment,
   ]);
 
   return storeValue;

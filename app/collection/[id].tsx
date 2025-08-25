@@ -23,6 +23,7 @@ interface InsightsTabProps {
   discussions: any[];
   collectionMembers: string[];
   styles: any;
+  setShowCommentModal: (restaurantId: string | null) => void;
 }
 
 function InsightsTab({ collection, rankedRestaurants, discussions, collectionMembers, styles }: InsightsTabProps) {
@@ -238,6 +239,12 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     <View style={styles.discussionsHeader}>
                       <MessageCircle size={14} color="#6B7280" />
                       <Text style={styles.discussionsLabel}>Discussions ({filteredDiscussions.length})</Text>
+                      <TouchableOpacity 
+                        style={styles.addCommentButton}
+                        onPress={() => setShowCommentModal(restaurant.id)}
+                      >
+                        <Text style={styles.addCommentButtonText}>Add Comment</Text>
+                      </TouchableOpacity>
                     </View>
                     {filteredDiscussions.length > 0 ? (
                       filteredDiscussions.slice(0, 3).map((discussion: any) => (
@@ -283,6 +290,7 @@ export default function CollectionDetailScreen() {
     leaveCollection,
     voteRestaurant, 
     addDiscussion, 
+    addRestaurantComment,
     getRankedRestaurants, 
     getGroupRecommendations,
     getCollectionDiscussions,
@@ -295,6 +303,8 @@ export default function CollectionDetailScreen() {
   const [voteReason, setVoteReason] = useState('');
   const [showDiscussionModal, setShowDiscussionModal] = useState<string | null>(null);
   const [discussionMessage, setDiscussionMessage] = useState('');
+  const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
+  const [commentMessage, setCommentMessage] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
@@ -437,6 +447,29 @@ export default function CollectionDetailScreen() {
     setInviteEmail('');
     setInviteMessage('');
     Alert.alert('Invitation Sent', `Invitation sent to ${inviteEmail}`);
+  };
+
+  const handleAddComment = async (restaurantId: string) => {
+    if (!commentMessage.trim()) {
+      Alert.alert('Error', 'Please enter a comment');
+      return;
+    }
+    
+    try {
+      await addRestaurantComment(restaurantId, collection.id, commentMessage);
+      setShowCommentModal(null);
+      setCommentMessage('');
+      
+      // Refresh discussions to show the new comment
+      const updatedDiscussions = await getCollectionDiscussions(id);
+      setDiscussions(updatedDiscussions || []);
+      
+      Alert.alert('Success', 'Comment added successfully');
+    } catch (error) {
+      console.error('[CollectionDetail] Error adding comment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to add comment: ${errorMessage}`);
+    }
   };
 
   const handleShareCollection = async () => {
@@ -817,6 +850,7 @@ export default function CollectionDetailScreen() {
             discussions={discussions}
             collectionMembers={collectionMembers}
             styles={styles}
+            setShowCommentModal={setShowCommentModal}
           />
         )}
 
@@ -936,6 +970,44 @@ export default function CollectionDetailScreen() {
                   setShowInviteModal(false);
                   setInviteEmail('');
                   setInviteMessage('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Comment Modal */}
+      <Modal visible={!!showCommentModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add a Comment</Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Share your thoughts about this restaurant..."
+              multiline
+              value={commentMessage}
+              onChangeText={setCommentMessage}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalButton}
+                onPress={() => {
+                  if (showCommentModal) {
+                    handleAddComment(showCommentModal);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Add Comment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowCommentModal(null);
+                  setCommentMessage('');
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -2348,5 +2420,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  addCommentButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 'auto',
+  },
+  addCommentButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
