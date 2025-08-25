@@ -1090,9 +1090,7 @@ export default function CollectionDetailScreen() {
           })()}
         </View>
           </>
-        ) : (
-          <>
-            {/* Insights Tab Content */}
+        )}
             <View style={styles.insightsContainer}>
               {/* Group Insights */}
               <View style={styles.analyticsSection}>
