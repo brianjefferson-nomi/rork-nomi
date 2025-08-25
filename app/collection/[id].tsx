@@ -414,6 +414,98 @@ export default function CollectionDetailScreen() {
           </View>
         </View>
 
+        {/* Member Activity - Prominent section showing all member contributions */}
+        <View style={styles.memberActivitySection}>
+          <Text style={styles.sectionTitle}>Member Activity</Text>
+          {(() => {
+            // Collect all member activity across all restaurants
+            const allMemberActivity: any[] = [];
+            
+            rankedRestaurants.forEach(({ restaurant, meta }) => {
+              // Add votes
+              meta.voteDetails.likeVoters.forEach(voter => {
+                allMemberActivity.push({
+                  type: 'vote',
+                  vote: 'like',
+                  restaurantName: restaurant.name,
+                  userName: voter.name,
+                  userId: voter.userId,
+                  reason: voter.reason,
+                  timestamp: voter.timestamp
+                });
+              });
+              
+              meta.voteDetails.dislikeVoters.forEach(voter => {
+                allMemberActivity.push({
+                  type: 'vote',
+                  vote: 'dislike',
+                  restaurantName: restaurant.name,
+                  userName: voter.name,
+                  userId: voter.userId,
+                  reason: voter.reason,
+                  timestamp: voter.timestamp
+                });
+              });
+            });
+            
+            // Add discussions
+            discussions.forEach(discussion => {
+              allMemberActivity.push({
+                type: 'comment',
+                restaurantName: discussion.restaurantName || 'Collection',
+                userName: discussion.userName,
+                userId: discussion.userId,
+                message: discussion.message,
+                timestamp: discussion.timestamp
+              });
+            });
+            
+            // Sort by timestamp (most recent first)
+            allMemberActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+            return allMemberActivity.length > 0 ? (
+              <View style={styles.memberActivityList}>
+                {allMemberActivity.slice(0, 10).map((activity, index) => (
+                  <View key={index} style={styles.memberActivityItem}>
+                    <View style={styles.memberActivityHeader}>
+                      <View style={styles.memberActivityAvatar}>
+                        <Text style={styles.memberActivityInitial}>
+                          {activity.userName ? activity.userName.charAt(0).toUpperCase() : '?'}
+                        </Text>
+                      </View>
+                      <View style={styles.memberActivityInfo}>
+                        <Text style={styles.memberActivityName}>{activity.userName}</Text>
+                        <Text style={styles.memberActivityAction}>
+                          {activity.type === 'vote' ? (
+                            <>
+                              {activity.vote === 'like' ? '👍 Liked' : '👎 Disliked'} {activity.restaurantName}
+                            </>
+                          ) : (
+                            <>💬 Commented on {activity.restaurantName}</>
+                          )}
+                        </Text>
+                      </View>
+                      <Text style={styles.memberActivityTime}>
+                        {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString() : 'Unknown date'}
+                      </Text>
+                    </View>
+                    {(activity.reason || activity.message) && (
+                      <Text style={styles.memberActivityContent}>
+                        "{activity.reason || activity.message}"
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyActivityContainer}>
+                <Text style={styles.emptyActivityText}>No member activity yet</Text>
+                <Text style={styles.emptyActivitySubtext}>Start voting and commenting to see activity here!</Text>
+              </View>
+            );
+          })()}
+        </View>
+
         {/* Group Recommendations */}
         {recommendations.length > 0 && (
           <View style={styles.recommendationsSection}>
@@ -449,7 +541,7 @@ export default function CollectionDetailScreen() {
                     styles.rankBadge,
                     meta?.rank === 1 && styles.winningRankBadge
                   ]}>
-                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={20} color="#FFD700" />}
+                    {meta?.rank === 1 && meta?.badge === 'top_choice' && <Crown size={24} color="#B45309" />}
                     {meta?.rank === 2 && <Text style={styles.silverRank}>🥈</Text>}
                     {meta?.rank === 3 && <Text style={styles.bronzeRank}>🥉</Text>}
                     <Text style={[
@@ -542,9 +634,9 @@ export default function CollectionDetailScreen() {
                   </View>
                 )}
 
-                {/* Member Voting Details */}
+                {/* Member Voting Details - Always visible */}
                 <View style={styles.memberVotingSection}>
-                  <Text style={styles.memberVotingTitle}>Member Votes</Text>
+                  <Text style={styles.memberVotingTitle}>Member Votes for {restaurant.name}</Text>
                   {(() => {
                     const votingDetails = getRestaurantVotingDetails(restaurant.id, id);
                     console.log('[CollectionDetail] Meta vote details:', meta.voteDetails);
@@ -586,7 +678,10 @@ export default function CollectionDetailScreen() {
                         ))}
                       </View>
                     ) : (
-                      <Text style={styles.noVotesText}>No votes yet</Text>
+                      <View style={styles.emptyVotesContainer}>
+                        <Text style={styles.noVotesText}>No votes yet for this restaurant</Text>
+                        <Text style={styles.noVotesSubtext}>Be the first to vote!</Text>
+                      </View>
                     );
                   })()}
                 </View>
@@ -1019,10 +1114,14 @@ const styles = StyleSheet.create({
   rankBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
   },
   rankNumber: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1A1A1A',
   },
@@ -1037,14 +1136,25 @@ const styles = StyleSheet.create({
   },
   winningRankBadge: {
     backgroundColor: '#FFD700',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   winningRankNumber: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
     color: '#B45309',
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   badges: {
     flexDirection: 'row',
@@ -1472,5 +1582,90 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9CA3AF',
     marginTop: 2,
+  },
+
+  // Member activity styles
+  memberActivitySection: {
+    backgroundColor: '#FFF',
+    padding: 20,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  memberActivityList: {
+    marginTop: 16,
+  },
+  memberActivityItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  memberActivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  memberActivityAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberActivityInitial: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberActivityInfo: {
+    flex: 1,
+  },
+  memberActivityName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  memberActivityAction: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  memberActivityTime: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  memberActivityContent: {
+    fontSize: 12,
+    color: '#374151',
+    fontStyle: 'italic',
+    marginLeft: 44,
+  },
+  emptyActivityContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyActivityText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  emptyActivitySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  emptyVotesContainer: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  noVotesSubtext: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
   },
 });
