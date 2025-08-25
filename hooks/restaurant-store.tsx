@@ -137,9 +137,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return plans || [];
       } catch (error) {
         console.error('[RestaurantStore] Error loading plans:', error);
-        if (error instanceof Error) {
-          console.error('[RestaurantStore] Error details:', error.message);
-        }
+        // Return empty array instead of throwing error to prevent app crashes
         return [];
       }
     },
@@ -231,24 +229,30 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         
         // Fetch votes for each collection
         for (const plan of plans) {
-          const collectionVotes = await dbHelpers.getCollectionVotes(plan.id);
-          allVotes.push(...collectionVotes.map((vote: any) => ({
-            restaurantId: vote.restaurant_id,
-            userId: vote.user_id,
-            collectionId: vote.collection_id,
-            vote: vote.vote,
-            reason: vote.reason,
-            timestamp: vote.created_at,
-            authority: 'regular',
-            weight: 1,
-            userName: vote.users?.name || 'Unknown User'
-          })));
+          try {
+            const collectionVotes = await dbHelpers.getCollectionVotes(plan.id);
+            allVotes.push(...collectionVotes.map((vote: any) => ({
+              restaurantId: vote.restaurant_id,
+              userId: vote.user_id,
+              collectionId: vote.collection_id,
+              vote: vote.vote,
+              reason: vote.reason,
+              timestamp: vote.created_at,
+              authority: 'regular',
+              weight: 1,
+              userName: vote.users?.name || 'Unknown User'
+            })));
+          } catch (collectionError) {
+            console.error('[RestaurantStore] Error loading votes for collection:', plan.id, collectionError);
+            // Continue with other collections instead of failing completely
+          }
         }
         
         console.log('[RestaurantStore] Loaded all votes from database:', allVotes.length);
         return allVotes;
       } catch (error) {
         console.error('[RestaurantStore] Error loading all votes from database:', error);
+        // Return empty array instead of throwing error to prevent app crashes
         return [];
       }
     },
