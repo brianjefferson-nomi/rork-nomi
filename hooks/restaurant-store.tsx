@@ -880,10 +880,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return acc;
       }, {});
     
-    // For now, use simplified ranking without collection compatibility
+    // Pass the collection data so voter names can be properly displayed
     return computeRankings(pool, planVotes, { 
       memberCount, 
-      collection: undefined,
+      collection: plan, // ✅ Pass the collection data
       discussions: discussionCounts 
     });
   }, [plansQuery.data, restaurants, userVotes, discussions]);

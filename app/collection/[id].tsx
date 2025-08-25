@@ -423,14 +423,30 @@ export default function CollectionDetailScreen() {
               ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
               : [];
             
+            console.log('[CollectionDetail] Collection members:', collectionMembers);
+            console.log('[CollectionDetail] Collection is public:', collection.is_public);
+            console.log('[CollectionDetail] Current user:', user?.id);
+            console.log('[CollectionDetail] Collection data:', collection);
+            console.log('[CollectionDetail] Collection collaborators:', collection.collaborators);
+            
             // Collect all member activity across all restaurants
             const allMemberActivity: any[] = [];
             
             rankedRestaurants.forEach(({ restaurant, meta }) => {
-              // Add votes - only from collection members if private
+              console.log('[CollectionDetail] Restaurant:', restaurant.name);
+              console.log('[CollectionDetail] Like voters:', meta.voteDetails.likeVoters);
+              console.log('[CollectionDetail] Dislike voters:', meta.voteDetails.dislikeVoters);
+              console.log('[CollectionDetail] Meta vote details structure:', {
+                likeVoters: meta.voteDetails.likeVoters.map(v => ({ userId: v.userId, name: v.name })),
+                dislikeVoters: meta.voteDetails.dislikeVoters.map(v => ({ userId: v.userId, name: v.name }))
+              });
+              
+              // Add votes - show all activity for public collections, only members for private
               meta.voteDetails.likeVoters.forEach(voter => {
+                console.log('[CollectionDetail] Processing like voter:', voter);
                 // For private collections, only show activity from actual members
                 if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  console.log('[CollectionDetail] Filtering out non-member like voter:', voter.userId);
                   return;
                 }
                 allMemberActivity.push({
@@ -446,8 +462,10 @@ export default function CollectionDetailScreen() {
               });
               
               meta.voteDetails.dislikeVoters.forEach(voter => {
+                console.log('[CollectionDetail] Processing dislike voter:', voter);
                 // For private collections, only show activity from actual members
                 if (!collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  console.log('[CollectionDetail] Filtering out non-member dislike voter:', voter.userId);
                   return;
                 }
                 allMemberActivity.push({
@@ -463,10 +481,14 @@ export default function CollectionDetailScreen() {
               });
             });
             
-            // Add discussions - only from collection members if private
+            console.log('[CollectionDetail] Discussions:', discussions);
+            
+            // Add discussions - show all activity for public collections, only members for private
             discussions.forEach(discussion => {
+              console.log('[CollectionDetail] Processing discussion:', discussion);
               // For private collections, only show activity from actual members
               if (!collection.is_public && !collectionMembers.includes(discussion.userId)) {
+                console.log('[CollectionDetail] Filtering out non-member discussion:', discussion.userId);
                 return;
               }
               allMemberActivity.push({
@@ -479,6 +501,8 @@ export default function CollectionDetailScreen() {
                 timestamp: discussion.timestamp
               });
             });
+            
+            console.log('[CollectionDetail] All member activity:', allMemberActivity);
             
             // Sort by timestamp (most recent first)
             allMemberActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
