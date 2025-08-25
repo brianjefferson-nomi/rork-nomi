@@ -6,7 +6,7 @@ const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
 const FOURSQUARE_API_KEY = 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
-const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
+const FOURSQUARE_BASE_URL = 'https://places-api.foursquare.com';
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -1583,6 +1583,52 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 // ============================================================================
 // FOURSQUARE API INTEGRATION
 // ============================================================================
+
+// Autocomplete search using Foursquare API
+export const searchFoursquareAutocomplete = async (
+  query: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000
+): Promise<any[]> => {
+  try {
+    console.log('[Foursquare] Autocomplete search for:', query);
+    
+    const params = new URLSearchParams({
+      query,
+      categories: '13065', // Food category
+      limit: '10',
+      radius: radius.toString()
+    });
+    
+    if (lat && lng) {
+      params.append('ll', `${lat},${lng}`);
+    }
+    
+    const url = `${FOURSQUARE_BASE_URL}/autocomplete?${params}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const results = data.results || [];
+    
+    console.log(`[Foursquare] Autocomplete found ${results.length} suggestions`);
+    return results;
+  } catch (error) {
+    console.error('[Foursquare] Error in autocomplete search:', error);
+    return [];
+  }
+};
 
 // Search for restaurants using Foursquare API
 export const searchFoursquareRestaurants = async (
