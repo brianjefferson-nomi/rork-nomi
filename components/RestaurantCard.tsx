@@ -200,9 +200,6 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           
           <View style={styles.ratingRow}>
             {renderStarRating(restaurant.rating || 0)}
-            <Text style={styles.reviewCount}>
-              {restaurant.reviews?.length || 0} reviews
-            </Text>
           </View>
         </View>
         
@@ -258,7 +255,15 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           </Text>
         )}
         
-        {/* Top Picks */}
+        {/* User Notes */}
+        {restaurant.userNotes && (
+          <View style={styles.noteContainer}>
+            <Text style={styles.noteLabel}>Your note:</Text>
+            <Text style={styles.noteText}>{restaurant.userNotes}</Text>
+          </View>
+        )}
+
+        {/* Top Picks - moved to bottom */}
         {(restaurant.aiTopPicks || restaurant.menuHighlights) && 
          ((restaurant.aiTopPicks?.length || 0) > 0 || (restaurant.menuHighlights?.length || 0) > 0) && (
           <View style={styles.topPicksContainer}>
@@ -273,14 +278,6 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
                   </Text>
                 ))}
             </View>
-          </View>
-        )}
-
-        {/* User Notes */}
-        {restaurant.userNotes && (
-          <View style={styles.noteContainer}>
-            <Text style={styles.noteLabel}>Your note:</Text>
-            <Text style={styles.noteText}>{restaurant.userNotes}</Text>
           </View>
         )}
       </View>
@@ -394,11 +391,6 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
   },
-  reviewCount: {
-    fontSize: 14,
-    color: '#717171',
-    fontWeight: '400',
-  },
   cuisine: {
     fontSize: 15,
     color: '#717171',
@@ -452,7 +444,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   topPicksContainer: {
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
   topPicksLabel: {
     fontSize: 15,
