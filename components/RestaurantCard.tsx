@@ -99,38 +99,11 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
     return firstWord && firstWord.length > 0 ? firstWord : 'Hours vary';
   };
 
-  // Create star rating component
+  // Create star rating component - using original store design
   const renderStarRating = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
-    // Add full stars
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star key={`full-${i}`} size={12} color="#FFD700" fill="#FFD700" />
-      );
-    }
-    
-    // Add half star if needed
-    if (hasHalfStar) {
-      stars.push(
-        <Star key="half" size={12} color="#FFD700" fill="#FFD700" />
-      );
-    }
-    
-    // Add empty stars to complete 5 stars
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Star key={`empty-${i}`} size={12} color="#E5E5E5" fill="transparent" />
-      );
-    }
-    
     return (
-      <View style={styles.starContainer}>
-        {stars}
-        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingText}>★ {rating.toFixed(1)}</Text>
       </View>
     );
   };
@@ -238,7 +211,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         {/* Vibe tags - prominently displayed */}
         {(restaurant.aiVibes || restaurant.vibe || []).length > 0 && (
           <View style={styles.vibeContainer}>
-            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 4).map((v, i) => {
+            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 6).map((v, i) => {
               if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
               const firstWord = v.split(' ')[0];
               if (!firstWord || firstWord.length === 0) return null;
@@ -311,7 +284,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFF',
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -322,11 +295,11 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 240,
+    height: 280,
   },
   image: {
     width: '100%',
-    height: 240,
+    height: 280,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
@@ -374,45 +347,44 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   content: {
-    padding: 16,
+    padding: 20,
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   name: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#222222',
     flex: 1,
     marginRight: 8,
-    lineHeight: 24,
+    lineHeight: 26,
   },
   price: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#222222',
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  starContainer: {
+  ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   ratingText: {
-    fontSize: 12,
-    color: '#222222',
-    fontWeight: '500',
-    marginLeft: 4,
+    fontSize: 16,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   reviewCount: {
     fontSize: 14,
@@ -420,15 +392,15 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   cuisine: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#717171',
     fontWeight: '400',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   locationText: {
     fontSize: 14,
@@ -439,7 +411,7 @@ const styles = StyleSheet.create({
   hoursRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   hoursText: {
     fontSize: 14,
@@ -449,36 +421,36 @@ const styles = StyleSheet.create({
   vibeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 16,
   },
   vibeTag: {
     backgroundColor: '#F0F8FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E6F3FF',
   },
   vibeText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#0066CC',
     fontWeight: '600',
   },
   description: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#717171',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 22,
+    marginBottom: 16,
   },
   topPicksContainer: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   topPicksLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#222222',
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   topPicksList: {
     flexDirection: 'column',
@@ -487,25 +459,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#717171',
     fontWeight: '400',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   noteContainer: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: 16,
+    padding: 16,
     backgroundColor: '#F7F7F7',
     borderRadius: 12,
   },
   noteLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#222222',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   noteText: {
     fontSize: 14,
     color: '#717171',
     fontStyle: 'italic',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   // Compact card styles
   compactCard: {
