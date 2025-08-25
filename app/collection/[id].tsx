@@ -542,39 +542,36 @@ export default function CollectionDetailScreen() {
                   </View>
                 )}
 
-                {/* Member Voting Details */}
+                {/* Member Voting Details - Specific to this restaurant */}
                 <View style={styles.memberVotingSection}>
-                  <Text style={styles.memberVotingTitle}>Member Voting Details</Text>
+                  <Text style={styles.memberVotingTitle}>Member Votes for {restaurant.name}</Text>
                   {(() => {
-                    const allVotes: any[] = [];
+                    const restaurantVotes: any[] = [];
                     
-                    rankedRestaurants.forEach(({ restaurant, meta }) => {
-                      meta.voteDetails.likeVoters.forEach(voter => {
-                        allVotes.push({
-                          type: 'like',
-                          restaurantName: restaurant.name,
-                          userName: voter.name,
-                          firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                          reason: voter.reason,
-                          timestamp: voter.timestamp
-                        });
-                      });
-                      
-                      meta.voteDetails.dislikeVoters.forEach(voter => {
-                        allVotes.push({
-                          type: 'dislike',
-                          restaurantName: restaurant.name,
-                          userName: voter.name,
-                          firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
-                          reason: voter.reason,
-                          timestamp: voter.timestamp
-                        });
+                    // Only show votes for this specific restaurant
+                    meta.voteDetails.likeVoters.forEach(voter => {
+                      restaurantVotes.push({
+                        type: 'like',
+                        userName: voter.name,
+                        firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                        reason: voter.reason,
+                        timestamp: voter.timestamp
                       });
                     });
                     
-                    return allVotes.length > 0 ? (
+                    meta.voteDetails.dislikeVoters.forEach(voter => {
+                      restaurantVotes.push({
+                        type: 'dislike',
+                        userName: voter.name,
+                        firstName: voter.name ? voter.name.split(' ')[0] : 'Unknown',
+                        reason: voter.reason,
+                        timestamp: voter.timestamp
+                      });
+                    });
+                    
+                    return restaurantVotes.length > 0 ? (
                       <View style={styles.memberVotesList}>
-                        {allVotes.slice(0, 8).map((vote, index) => (
+                        {restaurantVotes.map((vote, index) => (
                           <View key={index} style={styles.memberVoteItem}>
                             <View style={styles.memberVoteHeader}>
                               <View style={styles.memberVoteAvatar}>
@@ -584,7 +581,6 @@ export default function CollectionDetailScreen() {
                               </View>
                               <View style={styles.memberVoteInfo}>
                                 <Text style={styles.memberVoteName}>{vote.firstName}</Text>
-                                <Text style={styles.memberVoteRestaurant}>{vote.restaurantName}</Text>
                               </View>
                               <View style={[
                                 styles.memberVoteBadge,
@@ -603,8 +599,8 @@ export default function CollectionDetailScreen() {
                       </View>
                     ) : (
                       <View style={styles.emptyVotesContainer}>
-                        <Text style={styles.noVotesText}>No votes yet</Text>
-                        <Text style={styles.noVotesSubtext}>Members can vote on restaurants to see activity here</Text>
+                        <Text style={styles.noVotesText}>No votes yet for this restaurant</Text>
+                        <Text style={styles.noVotesSubtext}>Be the first to vote!</Text>
                       </View>
                     );
                   })()}
@@ -821,41 +817,7 @@ export default function CollectionDetailScreen() {
                   </View>
                 </View>
                 
-                {/* Recent Activity Feed */}
-                <View style={styles.recentActivitySection}>
-                  <Text style={styles.recentActivityTitle}>🕒 Recent Activity</Text>
-                  {allMemberActivity.slice(0, 8).map((activity, index) => (
-                    <View key={index} style={styles.memberActivityItem}>
-                      <View style={styles.memberActivityHeader}>
-                        <View style={styles.memberActivityAvatar}>
-                          <Text style={styles.memberActivityInitial}>
-                            {activity.firstName ? activity.firstName.charAt(0).toUpperCase() : '?'}
-                          </Text>
-                        </View>
-                        <View style={styles.memberActivityInfo}>
-                          <Text style={styles.memberActivityName}>{activity.firstName}</Text>
-                          <Text style={styles.memberActivityAction}>
-                            {activity.type === 'vote' ? (
-                              <>
-                                {activity.vote === 'like' ? '👍 Liked' : '👎 Disliked'} {activity.restaurantName}
-                              </>
-                            ) : (
-                              <>💬 Commented on {activity.restaurantName}</>
-                            )}
-                          </Text>
-                        </View>
-                        <Text style={styles.memberActivityTime}>
-                          {activity.timestamp ? new Date(activity.timestamp).toLocaleDateString() : 'Unknown date'}
-                        </Text>
-                      </View>
-                      {(activity.reason || activity.message) && (
-                        <Text style={styles.memberActivityContent}>
-                          "{activity.reason || activity.message}"
-                        </Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
+
                 
                 {/* Restaurant Voting Summary */}
                 <View style={styles.restaurantVotingSection}>

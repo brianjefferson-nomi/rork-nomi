@@ -885,6 +885,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       }, {});
     
     // Pass the collection data so voter names can be properly displayed
+    console.log('[RestaurantStore] Plan data being passed to ranking:', {
+      planId: plan?.id,
+      planName: plan?.name,
+      hasSettings: !!plan?.settings,
+      settingsKeys: plan?.settings ? Object.keys(plan.settings) : [],
+      consensusThreshold: plan?.consensus_threshold,
+      planKeys: plan ? Object.keys(plan) : []
+    });
+    
     return computeRankings(pool, planVotes, { 
       memberCount, 
       collection: plan, // ✅ Pass the collection data

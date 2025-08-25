@@ -938,12 +938,22 @@ export const dbHelpers = {
         
         // Add settings object if it doesn't exist
         if (!enhancedCollection.settings) {
+          console.log('[Supabase] Creating settings object for collection:', {
+            id: collection.id,
+            consensus_threshold: collection.consensus_threshold,
+            vote_visibility: collection.vote_visibility,
+            discussion_enabled: collection.discussion_enabled,
+            auto_ranking_enabled: collection.auto_ranking_enabled
+          });
+          
           enhancedCollection.settings = {
             voteVisibility: collection.vote_visibility || 'public',
             discussionEnabled: collection.discussion_enabled !== false,
             autoRankingEnabled: collection.auto_ranking_enabled !== false,
             consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
           };
+          
+          console.log('[Supabase] Created settings object:', enhancedCollection.settings);
         }
         
         // Enhance creator info

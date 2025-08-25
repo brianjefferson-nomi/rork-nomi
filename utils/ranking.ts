@@ -25,17 +25,18 @@ export function computeRankings(
   options?: ComputeOptions
 ): { restaurant: Restaurant; meta: RankedRestaurantMeta }[] {
   try {
-    console.log('[ranking] Starting computeRankings with:', {
-      restaurantCount: restaurants.length,
-      voteCount: votes.length,
-      options: options ? {
-        memberCount: options.memberCount,
-        hasCollection: !!options.collection,
-        collectionId: options.collection?.id,
-        collectionSettings: options.collection?.settings,
-        collectionConsensusThreshold: options.collection?.consensus_threshold
-      } : 'no options'
-    });
+          console.log('[ranking] Starting computeRankings with:', {
+        restaurantCount: restaurants.length,
+        voteCount: votes.length,
+        options: options ? {
+          memberCount: options.memberCount,
+          hasCollection: !!options.collection,
+          collectionId: options.collection?.id,
+          collectionSettings: options.collection?.settings,
+          collectionConsensusThreshold: options.collection?.consensus_threshold,
+          collectionKeys: options.collection ? Object.keys(options.collection) : []
+        } : 'no options'
+      });
     
     const now = Date.now();
 
@@ -131,8 +132,18 @@ export function computeRankings(
 
       let badge: RankedRestaurantMeta['badge'] | undefined = undefined;
       // Handle both database format (consensus_threshold) and interface format (settings.consensusThreshold)
+      console.log('[ranking] Collection data for consensus threshold:', {
+        hasSettings: !!options?.collection?.settings,
+        settingsConsensusThreshold: options?.collection?.settings?.consensusThreshold,
+        hasConsensusThreshold: !!options?.collection?.consensus_threshold,
+        consensusThresholdValue: options?.collection?.consensus_threshold,
+        collectionKeys: options?.collection ? Object.keys(options.collection) : []
+      });
+      
       const consensusThreshold = options?.collection?.settings?.consensusThreshold ?? 
                                 (options?.collection?.consensus_threshold ? options.collection.consensus_threshold / 100 : 0.7);
+      
+      console.log('[ranking] Final consensus threshold:', consensusThreshold);
       
       if (totalVotes >= 3 && likeRatio >= consensusThreshold) badge = 'group_favorite';
       if (totalVotes >= 3 && likes === totalVotes) badge = 'unanimous';
