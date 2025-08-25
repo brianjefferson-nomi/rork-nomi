@@ -1089,7 +1089,6 @@ export default function CollectionDetailScreen() {
             );
           })()}
         </View>
-            </View>
           </>
         )}
 
