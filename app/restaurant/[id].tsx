@@ -75,14 +75,18 @@ export default function RestaurantDetailScreen() {
         }
         
         setEnhancedImages(assignedImages);
+        // Only use actual menu highlights, not generated fallback dishes
+        const actualMenuItems = restaurant.aiTopPicks || restaurant.menuHighlights || [];
         setFoodRecommendations(validatedMenuItems.length > 0 ? validatedMenuItems : 
-          (restaurant.aiTopPicks || restaurant.menuHighlights || generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name)).slice(0, 8)
+          (actualMenuItems.length > 0 ? actualMenuItems : []).slice(0, 8)
         );
       } catch (error) {
         console.error('Error loading enhanced restaurant data:', error);
         // Fallback to original data
         setEnhancedImages(restaurant.images || [restaurant.imageUrl]);
-        setFoodRecommendations((restaurant.aiTopPicks || restaurant.menuHighlights || generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name)).slice(0, 8));
+        // Only use actual menu highlights, not generated fallback dishes
+        const actualMenuItems = restaurant.aiTopPicks || restaurant.menuHighlights || [];
+        setFoodRecommendations(actualMenuItems.length > 0 ? actualMenuItems.slice(0, 8) : []);
       } finally {
         setLoadingEnhancements(false);
       }
@@ -302,32 +306,60 @@ export default function RestaurantDetailScreen() {
 
 
 
-          {/* Menu Highlights - Reverted to original clean layout */}
-          {((restaurant.aiTopPicks && restaurant.aiTopPicks.length > 0) || 
-            (restaurant.menuHighlights && restaurant.menuHighlights.length > 0) ||
-            (foodRecommendations && foodRecommendations.length > 0)) && (
-            <View style={styles.menuSection}>
-              <View style={styles.menuHeader}>
-                <Utensils size={20} color="#FF6B6B" />
-                <Text style={styles.sectionTitle}>Menu Highlights</Text>
+          {/* Menu Highlights - only show if there are actual menu highlights */}
+          {(() => {
+            // Only show if there are actual menu highlights (not generated/fallback dishes)
+            const menuHighlights = restaurant.menuHighlights || [];
+            const aiTopPicks = restaurant.aiTopPicks || [];
+            
+            // Filter out generic dishes
+            const filterGenericDishes = (dishes: string[]) => {
+              const genericTerms = [
+                'chef special', 'house favorite', 'seasonal dish', 'signature dish', 
+                'popular item', 'daily special', 'chef\'s choice', 'house special',
+                'special', 'favorite', 'dish', 'item', 'choice', 'recommended'
+              ];
+              
+              return dishes.filter(dish => {
+                const lowerDish = dish.toLowerCase();
+                return !genericTerms.some(term => lowerDish.includes(term));
+              });
+            };
+            
+            // Only use actual menu highlights, not generated dishes
+            const actualMenuItems = [
+              ...filterGenericDishes(menuHighlights),
+              ...filterGenericDishes(aiTopPicks)
+            ];
+            
+            // If no actual menu items, don't show the section
+            if (actualMenuItems.length === 0) {
+              return null;
+            }
+            
+            return (
+              <View style={styles.menuSection}>
+                <View style={styles.menuHeader}>
+                  <Utensils size={20} color="#FF6B6B" />
+                  <Text style={styles.sectionTitle}>Menu Highlights</Text>
+                </View>
+                {loadingEnhancements ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#FF6B6B" />
+                    <Text style={styles.loadingText}>Loading menu items...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.menuGrid}>
+                    {actualMenuItems.slice(0, 8).map((item, i) => (
+                      <View key={i} style={styles.menuHighlightItem}>
+                        <Text style={styles.menuItemName}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
-              {loadingEnhancements ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#FF6B6B" />
-                  <Text style={styles.loadingText}>Loading menu items...</Text>
-                </View>
-              ) : (
-                <View style={styles.menuGrid}>
-                  {(foodRecommendations.length > 0 ? foodRecommendations : 
-                    restaurant.aiTopPicks || restaurant.menuHighlights || []).slice(0, 8).map((item, i) => (
-                    <View key={i} style={styles.menuHighlightItem}>
-                      <Text style={styles.menuItemName}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
+            );
+          })()}
 
           {sortedContributors.length > 0 && (
             <View style={styles.contributorsSection}>

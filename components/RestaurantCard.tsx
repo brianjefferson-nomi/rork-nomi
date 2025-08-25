@@ -352,13 +352,11 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           </View>
         )}
 
-        {/* Top Picks - moved to bottom */}
+        {/* Top Picks - only show if there are actual menu highlights */}
         {(() => {
-          // Get menu highlights from various sources
+          // Only show if there are actual menu highlights (not generated/fallback dishes)
           const menuHighlights = restaurant.menuHighlights || [];
           const aiTopPicks = restaurant.aiTopPicks || [];
-          
-
           
           // Filter out generic dishes and only show specific menu items
           const filterGenericDishes = (dishes: string[]) => {
@@ -374,13 +372,14 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             });
           };
           
-          const specificMenuItems = [
+          // Only use actual menu highlights, not generated dishes
+          const actualMenuItems = [
             ...filterGenericDishes(menuHighlights),
             ...filterGenericDishes(aiTopPicks)
           ];
           
-          // If no specific menu items, don't show the section
-          if (specificMenuItems.length === 0) {
+          // If no actual menu items, don't show the section
+          if (actualMenuItems.length === 0) {
             return null;
           }
           
@@ -388,7 +387,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             <View style={styles.topPicksContainer}>
               <Text style={styles.topPicksLabel}>🔥 Popular dishes</Text>
               <View style={styles.topPicksList}>
-                {specificMenuItems
+                {actualMenuItems
                   .slice(0, 2)
                   .filter(Boolean)
                   .map((item, index) => (
