@@ -191,21 +191,15 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
       </View>
       
       <View style={styles.content}>
-        {/* Airbnb-style header with rating and price */}
+        {/* Header with name and rating on same row */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
-            <Text style={styles.price}>{formatPriceRange(restaurant.priceRange)}</Text>
-          </View>
-          
-          <View style={styles.ratingRow}>
             {renderStarRating(restaurant.rating || 0)}
           </View>
         </View>
         
-        <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
-        
-        {/* Vibe tags - prominently displayed */}
+        {/* Vibe tags */}
         {(() => {
           const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
           console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
@@ -233,6 +227,9 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           );
         })()}
         
+        {/* Price and cuisine */}
+        <Text style={styles.cuisine}>{formatPriceRange(restaurant.priceRange)} · {restaurant.cuisine}</Text>
+        
         {/* Location and distance */}
         <View style={styles.locationRow}>
           <MapPin size={14} color="#666" />
@@ -254,7 +251,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             {restaurant.aiDescription || restaurant.description}
           </Text>
         )}
-        
+
         {/* User Notes */}
         {restaurant.userNotes && (
           <View style={styles.noteContainer}>
@@ -355,13 +352,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   name: {
     fontSize: 20,
@@ -371,11 +368,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
     lineHeight: 26,
   },
-  price: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#222222',
-  },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -384,7 +376,6 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
   },
   ratingText: {
     fontSize: 16,
@@ -395,12 +386,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#717171',
     fontWeight: '400',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   locationText: {
     fontSize: 14,
@@ -411,7 +402,7 @@ const styles = StyleSheet.create({
   hoursRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   hoursText: {
     fontSize: 14,
@@ -421,19 +412,19 @@ const styles = StyleSheet.create({
   vibeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 10,
   },
   vibeTag: {
     backgroundColor: '#F0F8FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E6F3FF',
   },
   vibeText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#0066CC',
     fontWeight: '600',
   },
