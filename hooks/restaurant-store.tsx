@@ -83,7 +83,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [restaurants.length]);
 
   // Helper function to map database restaurant format to component format
-  const mapDatabaseRestaurant = useCallback((dbRestaurant: any): Restaurant => ({
+  const mapDatabaseRestaurant = (dbRestaurant: any): Restaurant => ({
     id: dbRestaurant.id,
     name: dbRestaurant.name,
     cuisine: dbRestaurant.cuisine,
@@ -107,7 +107,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     sharesCount: 0,
     averageGroupStars: dbRestaurant.rating || 0,
     userNotes: dbRestaurant.userNotes || null
-  }), []);
+  });
 
   // Load user plans from database
   const plansQuery = useQuery({
