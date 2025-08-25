@@ -234,11 +234,11 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     willShow: matchesRestaurant && (!isPublic || isMember) && hasValidName
                   });
                   
-                  // Temporarily simplify filtering to debug
+                  // Filter discussions
                   if (!matchesRestaurant) return false;
-                  // Temporarily remove member check to see if discussions exist
-                  // if (isPublic && !isMember) return false;
-                  return true; // Temporarily show all discussions for debugging
+                  // Only check member status for private collections
+                  if (!collection.is_public && !isMember) return false;
+                  return hasValidName;
                 });
 
                 // Debug logging for discussions
@@ -1182,22 +1182,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   rankBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   rankNumber: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   winnerRankNumber: {
     fontSize: 18,

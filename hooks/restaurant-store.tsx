@@ -917,8 +917,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         restaurant_id: restaurantId,
         user_id: user.id,
         collection_id: planId,
-        message,
-        created_at: new Date().toISOString()
+        message
       };
       
       await dbHelpers.createDiscussion(discussionData);

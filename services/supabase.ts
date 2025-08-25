@@ -1433,13 +1433,26 @@ export const dbHelpers = {
 
   // Restaurant discussion operations
   async createDiscussion(discussionData: Database['public']['Tables']['restaurant_discussions']['Insert']) {
+    console.log('[Supabase] Creating discussion with data:', discussionData);
+    
     const { data, error } = await supabase
       .from('restaurant_discussions')
       .insert(discussionData)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[Supabase] Error creating discussion:', {
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        discussionData
+      });
+      throw error;
+    }
+    
+    console.log('[Supabase] Discussion created successfully:', data);
     return data;
   },
 
