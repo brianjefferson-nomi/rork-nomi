@@ -20,6 +20,7 @@ interface RestaurantStore {
   favoriteRestaurants: string[];
   isLoading: boolean;
   searchHistory: string[];
+  searchResults: Restaurant[];
   userLocation: { city: string; lat: number; lng: number } | null;
   searchRestaurants: (query: string) => Promise<Restaurant[]>;
   addSearchQuery: (query: string) => void;
@@ -63,6 +64,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
   // Load user plans from database
   const plansQuery = useQuery({
@@ -772,16 +774,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       }));
       
       console.log(`[RestaurantStore] Found ${mappedResults.length} location-based results`);
+      // Store search results in global state
+      setSearchResults(mappedResults);
       return mappedResults;
       
     } catch (error) {
       console.error('[RestaurantStore] Search error:', error);
       // Fallback to local search
-      return restaurants.filter(r => 
+      const fallbackResults = restaurants.filter(r => 
         r.name.toLowerCase().includes(query.toLowerCase()) ||
         r.cuisine.toLowerCase().includes(query.toLowerCase()) ||
         r.neighborhood.toLowerCase().includes(query.toLowerCase())
       );
+      setSearchResults(fallbackResults);
+      return fallbackResults;
     }
   }, [restaurants, userLocation]);
 
@@ -813,6 +819,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     favoriteRestaurants,
     isLoading: dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading,
     searchHistory,
+    searchResults,
     userLocation,
     searchRestaurants,
     addSearchQuery,
@@ -853,6 +860,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     dataQuery.isLoading,
     plansQuery.isLoading,
     searchHistory,
+    searchResults,
     userLocation,
     searchRestaurants,
     addSearchQuery,
@@ -891,8 +899,22 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
 // Helper hooks
 export function useRestaurantById(id: string) {
-  const { restaurants } = useRestaurants();
-  return restaurants.find((r: any) => r.id === id);
+  const { restaurants, searchResults } = useRestaurants();
+  
+  // First try to find in the current restaurants list
+  let restaurant = restaurants.find((r: any) => r.id === id);
+  
+  // If not found, check search results
+  if (!restaurant) {
+    restaurant = searchResults.find((r: any) => r.id === id);
+  }
+  
+  // If still not found, log for debugging
+  if (!restaurant) {
+    console.log(`Restaurant with ID ${id} not found in current restaurants list or search results`);
+  }
+  
+  return restaurant;
 }
 
 export function usePlanById(id: string) {

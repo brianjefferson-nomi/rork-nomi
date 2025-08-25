@@ -16,7 +16,7 @@ interface SuggestionItem {
 }
 
 export function SearchWizard({ testID }: SearchWizardProps) {
-  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity } = useRestaurants();
+  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity, searchResults } = useRestaurants();
   const [query, setQuery] = useState<string>('');
   const [openFilters, setOpenFilters] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
@@ -24,7 +24,6 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const [price, setPrice] = useState<'$' | '$$' | '$$$' | '$$$$' | 'All'>('All');
   const [rating, setRating] = useState<number>(0);
   const [isOpenNow, setIsOpenNow] = useState<boolean>(false);
-  const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
 
@@ -78,12 +77,25 @@ export function SearchWizard({ testID }: SearchWizardProps) {
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
+    // Use search results if available, otherwise filter from all restaurants
     const resultsToFilter = searchResults.length > 0 ? searchResults : restaurants;
+    
+    // If we have a query and search results, show search results
+    if (q && searchResults.length > 0) {
+      return searchResults.filter(r => {
+        const matchPrice = price === 'All' || r.priceRange === price;
+        const matchRating = r.rating >= rating;
+        const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
+        return matchPrice && matchRating && matchHours;
+      });
+    }
+    
+    // Otherwise, filter from all restaurants
     return resultsToFilter.filter(r => {
       const matchQuery = !q || r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) || r.neighborhood.toLowerCase().includes(q);
       const matchPrice = price === 'All' || r.priceRange === price;
       const matchRating = r.rating >= rating;
-      const matchHours = !isOpenNow || (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon'));
+      const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
       return matchQuery && matchPrice && matchRating && matchHours;
     });
   }, [restaurants, searchResults, query, price, rating, isOpenNow]);
@@ -99,24 +111,22 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       const location = userLocation;
       if (!location) {
         console.log('No user location available, using default search');
-        const results = await searchRestaurants(searchQuery);
-        setSearchResults(results);
+        await searchRestaurants(searchQuery);
         addSearchQuery(searchQuery);
         return;
       }
       
       // Use location-based search with user coordinates
-      const results = await searchRestaurants(searchQuery, location.lat, location.lng);
-      setSearchResults(results);
+      await searchRestaurants(searchQuery, location.lat, location.lng);
       addSearchQuery(searchQuery);
-      console.log(`Found ${results.length} results near ${location.city}`);
+      console.log(`Found ${searchResults.length} results near ${location.city}`);
     } catch (error) {
       console.error('Search error:', error);
       Alert.alert('Search Error', 'Failed to search restaurants. Please try again.');
     } finally {
       setIsSearching(false);
     }
-  }, [searchRestaurants, addSearchQuery, userLocation]);
+  }, [searchRestaurants, addSearchQuery, userLocation, searchResults.length]);
 
   const onSubmit = () => {
     performSearch(query);
