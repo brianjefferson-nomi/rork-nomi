@@ -202,6 +202,21 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   }))
                 });
 
+                // Debug logging for all discussions
+                console.log(`[InsightsTab] All discussions for debugging:`, {
+                  totalDiscussions: discussions.length,
+                  discussions: discussions.map(d => ({
+                    id: d.id,
+                    restaurantId: d.restaurantId,
+                    userId: d.userId,
+                    userName: d.userName,
+                    message: d.message?.substring(0, 50) + '...',
+                    type: d.type
+                  })),
+                  collectionMembers: collectionMembers,
+                  collectionIsPublic: collection.is_public
+                });
+
                 const filteredDiscussions = discussions.filter((discussion: any) => {
                   const matchesRestaurant = discussion.restaurantId === restaurant.id;
                   const isPublic = collection.is_public;
@@ -210,6 +225,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   
                   console.log(`[InsightsTab] Filtering discussion:`, {
                     discussionId: discussion.id,
+                    restaurantId: discussion.restaurantId,
+                    targetRestaurantId: restaurant.id,
                     matchesRestaurant,
                     isPublic,
                     isMember,
@@ -217,9 +234,11 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     willShow: matchesRestaurant && (!isPublic || isMember) && hasValidName
                   });
                   
+                  // Temporarily simplify filtering to debug
                   if (!matchesRestaurant) return false;
-                  if (isPublic && !isMember) return false;
-                  return hasValidName;
+                  // Temporarily remove member check to see if discussions exist
+                  // if (isPublic && !isMember) return false;
+                  return true; // Temporarily show all discussions for debugging
                 });
 
                 // Debug logging for discussions
@@ -1161,6 +1180,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#D97706',
     borderColor: '#B45309',
     borderWidth: 2,
+  },
+  rankBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rankNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   winnerRankNumber: {
     fontSize: 18,
