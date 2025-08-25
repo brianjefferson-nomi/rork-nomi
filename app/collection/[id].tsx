@@ -86,7 +86,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
       <View style={styles.insightsSection}>
         <Text style={styles.insightsTitle}>📊 Restaurant Voting Breakdown</Text>
         <View style={styles.insightsGrid}>
-          {rankedRestaurants.slice(0, 6).map((restaurant, index) => {
+          {rankedRestaurants.slice(0, 6).map(({ restaurant, meta }, index) => {
             console.log(`[InsightsTab] Rendering restaurant ${index}:`, {
               id: restaurant.id,
               name: restaurant.name,
@@ -113,19 +113,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               
               {/* Vote Statistics */}
               {(() => {
-                const restaurantVotes = rankedRestaurants.find(r => r.id === restaurant.id);
-                console.log(`[InsightsTab] Vote data for ${restaurant.name}:`, {
-                  restaurantId: restaurant.id,
-                  foundVotes: !!restaurantVotes,
-                  hasMeta: !!restaurantVotes?.meta,
-                  hasVoteDetails: !!restaurantVotes?.meta?.voteDetails,
-                  likeVoters: restaurantVotes?.meta?.voteDetails?.likeVoters?.length || 0,
-                  dislikeVoters: restaurantVotes?.meta?.voteDetails?.dislikeVoters?.length || 0
-                });
-                if (!restaurantVotes?.meta?.voteDetails) return <></>;
+                if (!meta?.voteDetails) return <></>;
 
-                const totalVotes = restaurantVotes.meta.voteDetails.likeVoters.length + restaurantVotes.meta.voteDetails.dislikeVoters.length;
-                const approvalRate = totalVotes > 0 ? Math.round((restaurantVotes.meta.voteDetails.likeVoters.length / totalVotes) * 100) : 0;
+                const totalVotes = meta.voteDetails.likeVoters.length + meta.voteDetails.dislikeVoters.length;
+                const approvalRate = totalVotes > 0 ? Math.round((meta.voteDetails.likeVoters.length / totalVotes) * 100) : 0;
 
                 return (
                   <View style={styles.approvalSection}>
@@ -134,9 +125,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
                     <Text style={styles.voteBreakdown}>
-                      {(() => {
-                        return `${restaurantVotes.meta.voteDetails.likeVoters.length} likes · ${restaurantVotes.meta.voteDetails.dislikeVoters.length} dislikes`;
-                      })()}
+                      {meta.voteDetails.likeVoters.length} likes · {meta.voteDetails.dislikeVoters.length} dislikes
                     </Text>
                     <View style={styles.consensusBadge}>
                       <Text style={styles.consensusBadgeText}>
@@ -149,17 +138,16 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               
               {/* Member Voting Details */}
               {(() => {
-                const restaurantVotes = rankedRestaurants.find(r => r.id === restaurant.id);
-                if (!restaurantVotes?.meta?.voteDetails) return <></>;
+                if (!meta?.voteDetails) return <></>;
 
-                const filteredLikeVoters = restaurantVotes.meta.voteDetails.likeVoters.filter((voter: any) => {
+                const filteredLikeVoters = meta.voteDetails.likeVoters.filter((voter: any) => {
                   if (collection.is_public && !collectionMembers.includes(voter.userId)) {
                     return false;
                   }
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
                 });
 
-                const filteredDislikeVoters = restaurantVotes.meta.voteDetails.dislikeVoters.filter((voter: any) => {
+                const filteredDislikeVoters = meta.voteDetails.dislikeVoters.filter((voter: any) => {
                   if (collection.is_public && !collectionMembers.includes(voter.userId)) {
                     return false;
                   }
@@ -1745,79 +1733,79 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   insightsContainer: {
-    padding: 20,
-    backgroundColor: '#F8FAFC',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
   },
   analyticsSection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   analyticsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   analyticCard: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
     minWidth: '45%',
     flex: 1,
   },
   analyticValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
+    color: '#111827',
+    marginBottom: 2,
   },
   analyticLabel: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: 12,
+    color: '#6B7280',
     fontWeight: '500',
   },
   insightsSection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   insightsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 20,
+    color: '#111827',
+    marginBottom: 16,
   },
   insightsGrid: {
-    gap: 16,
+    gap: 12,
   },
   insightsContent: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 20,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   restaurantHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 12,
+    gap: 8,
   },
   restaurantImageContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F3F4F6',
     flexShrink: 0,
   },
   restaurantImage: {
@@ -1842,15 +1830,15 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   restaurantName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
   },
   restaurantSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '400',
   },
   restaurantRank: {
     backgroundColor: '#FEF3C7',
@@ -2080,14 +2068,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   approvalSection: {
-    marginTop: 16,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 16,
   },
   approvalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   approvalTitle: {
     fontSize: 14,
@@ -2118,13 +2106,13 @@ const styles = StyleSheet.create({
     textTransform: 'lowercase',
   },
   memberVotesSection: {
-    marginTop: 20,
+    marginTop: 16,
   },
   memberVotesTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
+    color: '#111827',
+    marginBottom: 8,
   },
   memberVotesList: {
     gap: 8,
