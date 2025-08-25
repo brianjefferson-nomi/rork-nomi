@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Heart, MapPin, DollarSign, Clock, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Heart, MapPin, DollarSign, Clock, ChevronLeft, ChevronRight, Star } from 'lucide-react-native';
 import { Restaurant } from '@/types/restaurant';
 import { useRestaurants } from '@/hooks/restaurant-store';
 
@@ -99,6 +99,42 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
     return firstWord && firstWord.length > 0 ? firstWord : 'Hours vary';
   };
 
+  // Create star rating component
+  const renderStarRating = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <Star key={`full-${i}`} size={14} color="#FFD700" fill="#FFD700" />
+      );
+    }
+    
+    // Add half star if needed
+    if (hasHalfStar) {
+      stars.push(
+        <Star key="half" size={14} color="#FFD700" fill="#FFD700" />
+      );
+    }
+    
+    // Add empty stars to complete 5 stars
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <Star key={`empty-${i}`} size={14} color="#E5E5E5" fill="transparent" />
+      );
+    }
+    
+    return (
+      <View style={styles.starContainer}>
+        {stars}
+        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+      </View>
+    );
+  };
+
   if (compact) {
     return (
       <TouchableOpacity style={styles.compactCard} onPress={onPress} activeOpacity={0.9}>
@@ -182,83 +218,84 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
       </View>
       
       <View style={styles.content}>
+        {/* Airbnb-style header with rating and price */}
         <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
-          <View style={styles.rating}>
-            <Text style={styles.ratingText}>★ {restaurant.rating}</Text>
+          <View style={styles.headerTop}>
+            <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
+            <Text style={styles.price}>{formatPriceRange(restaurant.priceRange)}</Text>
+          </View>
+          
+          <View style={styles.ratingRow}>
+            {renderStarRating(restaurant.rating || 0)}
+            <Text style={styles.reviewCount}>
+              {restaurant.reviews?.length || 0} reviews
+            </Text>
           </View>
         </View>
         
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
         
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <MapPin size={16} color="#666" />
-            <Text style={styles.infoText} numberOfLines={1}>{restaurant.neighborhood}</Text>
-          </View>
-          {restaurant.distance && (
-            <View style={styles.infoItem}>
-              <Text style={styles.infoText}>{restaurant.distance}</Text>
-            </View>
-          )}
+        {/* Location and distance */}
+        <View style={styles.locationRow}>
+          <MapPin size={14} color="#666" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {restaurant.neighborhood}
+            {restaurant.distance && ` • ${restaurant.distance}`}
+          </Text>
         </View>
         
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <Text style={styles.price}>{formatPriceRange(restaurant.priceRange)}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Clock size={16} color="#666" />
-            <Text style={styles.infoText}>{formatHours(restaurant.hours)}</Text>
-          </View>
+        {/* Hours */}
+        <View style={styles.hoursRow}>
+          <Clock size={14} color="#666" />
+          <Text style={styles.hoursText}>{formatHours(restaurant.hours)}</Text>
         </View>
         
-        <View style={styles.vibeContainer}>
-          {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 3).map((v, i) => {
-            // Ensure single word and capitalized with safety checks
-            if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
-            const firstWord = v.split(' ')[0];
-            if (!firstWord || firstWord.length === 0) return null;
-            const firstChar = firstWord.charAt(0);
-            const restOfWord = firstWord.slice(1);
-            const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-            if (!cleanTag || cleanTag.length === 0) return null;
-            return (
-              <View key={i} style={styles.vibeTag}>
-                <Text style={styles.vibeText}>{cleanTag}</Text>
-              </View>
-            );
-          })}
-        </View>
+        {/* Vibe tags */}
+        {(restaurant.aiVibes || restaurant.vibe || []).length > 0 && (
+          <View style={styles.vibeContainer}>
+            {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 3).map((v, i) => {
+              if (!v || typeof v !== 'string' || v.trim().length === 0) return null;
+              const firstWord = v.split(' ')[0];
+              if (!firstWord || firstWord.length === 0) return null;
+              const firstChar = firstWord.charAt(0);
+              const restOfWord = firstWord.slice(1);
+              const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+              if (!cleanTag || cleanTag.length === 0) return null;
+              return (
+                <View key={i} style={styles.vibeTag}>
+                  <Text style={styles.vibeText}>{cleanTag}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
         
-        <Text style={styles.description} numberOfLines={2}>
-          {restaurant.aiDescription || restaurant.description}
-        </Text>
+        {/* Description */}
+        {(restaurant.aiDescription || restaurant.description) && (
+          <Text style={styles.description} numberOfLines={2}>
+            {restaurant.aiDescription || restaurant.description}
+          </Text>
+        )}
         
-        {/* Enhanced Top Picks Display */}
+        {/* Top Picks */}
         {(restaurant.aiTopPicks || restaurant.menuHighlights) && 
-         (restaurant.aiTopPicks?.length > 0 || restaurant.menuHighlights?.length > 0) && (
+         ((restaurant.aiTopPicks?.length || 0) > 0 || (restaurant.menuHighlights?.length || 0) > 0) && (
           <View style={styles.topPicksContainer}>
-            <View style={styles.topPicksHeader}>
-              <Text style={styles.topPicksLabel}>🔥 Top Picks</Text>
-              <Text style={styles.topPicksCount}>
-                {((restaurant.aiTopPicks || []).length + (restaurant.menuHighlights || []).length)} items
-              </Text>
-            </View>
+            <Text style={styles.topPicksLabel}>🔥 Popular dishes</Text>
             <View style={styles.topPicksList}>
               {[...(restaurant.aiTopPicks || []), ...(restaurant.menuHighlights || [])]
-                .slice(0, 3)
+                .slice(0, 2)
                 .filter(Boolean)
                 .map((item, index) => (
-                  <View key={index} style={styles.topPickItem}>
-                    <Text style={styles.topPickBullet}>•</Text>
-                    <Text style={styles.topPickText} numberOfLines={1}>{item}</Text>
-                  </View>
+                  <Text key={index} style={styles.topPickText} numberOfLines={1}>
+                    • {item}
+                  </Text>
                 ))}
             </View>
           </View>
         )}
 
+        {/* User Notes */}
         {restaurant.userNotes && (
           <View style={styles.noteContainer}>
             <Text style={styles.noteLabel}>Your note:</Text>
@@ -273,243 +310,234 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
-    marginBottom: 20,
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     width: '100%',
   },
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 260,
+    height: 240,
   },
   image: {
     width: '100%',
-    height: 260,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    height: 240,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   imageNavButton: {
     position: 'absolute',
     top: '50%',
-    transform: [{ translateY: -24 }],
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 24,
-    padding: 12,
+    transform: [{ translateY: -20 }],
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 8,
     zIndex: 2,
   },
   prevButton: {
-    left: 16,
+    left: 12,
   },
   nextButton: {
-    right: 16,
+    right: 12,
   },
   imageIndicators: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 12,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   activeIndicator: {
     backgroundColor: '#FFF',
-    width: 24,
+    width: 18,
   },
   favoriteButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 12,
+    right: 12,
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 20,
     padding: 8,
     zIndex: 2,
   },
   content: {
-    padding: 20,
+    padding: 16,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   name: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    lineHeight: 28,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#222222',
+    flex: 1,
+    marginRight: 8,
+    lineHeight: 24,
   },
-  rating: {
-    backgroundColor: '#FFE5B4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  price: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222222',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  starContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   ratingText: {
-    fontSize: 16,
-    color: '#FF6B6B',
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: 14,
+    color: '#222222',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  reviewCount: {
+    fontSize: 14,
+    color: '#717171',
+    fontWeight: '400',
   },
   cuisine: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#717171',
+    fontWeight: '400',
+    marginBottom: 8,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#717171',
+    marginLeft: 4,
+    flex: 1,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  hoursText: {
+    fontSize: 14,
+    color: '#717171',
+    marginLeft: 4,
   },
   vibeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   vibeTag: {
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
+    backgroundColor: '#F7F7F7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   vibeText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#222222',
     fontWeight: '500',
   },
   description: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  infoText: {
-    fontSize: 15,
-    color: '#666',
-    marginLeft: 6,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2E7D32',
-  },
-  noteContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#FFF9E6',
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFD54F',
-  },
-  noteLabel: {
-    fontSize: 13,
-    color: '#D4A574',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  noteText: {
-    fontSize: 15,
-    color: '#666',
-    fontStyle: 'italic',
+    fontSize: 14,
+    color: '#717171',
     lineHeight: 20,
+    marginBottom: 12,
   },
   topPicksContainer: {
-    marginTop: 16,
-    marginBottom: 8,
-    padding: 16,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  topPicksHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
   topPicksLabel: {
-    fontSize: 15,
-    color: '#FF6B6B',
-    fontWeight: '700',
-  },
-  topPicksCount: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#222222',
+    fontWeight: '600',
+    marginBottom: 6,
   },
   topPicksList: {
     flexDirection: 'column',
   },
-  topPickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  topPickBullet: {
-    fontSize: 16,
-    color: '#FF6B6B',
-    marginRight: 10,
-    fontWeight: '600',
-  },
   topPickText: {
-    fontSize: 15,
-    color: '#444',
-    fontWeight: '500',
-    flex: 1,
+    fontSize: 14,
+    color: '#717171',
+    fontWeight: '400',
+    marginBottom: 4,
+  },
+  noteContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
+  },
+  noteLabel: {
+    fontSize: 12,
+    color: '#222222',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#717171',
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   // Compact card styles
   compactCard: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   compactImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 12,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
   },
   compactContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
     justifyContent: 'center',
   },
   compactName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 6,
+    color: '#222222',
+    marginBottom: 4,
   },
   compactCuisine: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: 13,
+    color: '#717171',
+    marginBottom: 6,
   },
   compactInfo: {
     flexDirection: 'row',
@@ -518,29 +546,19 @@ const styles = StyleSheet.create({
   compactPrice: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#222222',
   },
   compactDot: {
-    fontSize: 13,
-    color: '#999',
-    marginHorizontal: 8,
+    fontSize: 12,
+    color: '#717171',
+    marginHorizontal: 6,
   },
   compactNeighborhood: {
     fontSize: 13,
-    color: '#999',
+    color: '#717171',
   },
   compactFavorite: {
     justifyContent: 'center',
-    paddingLeft: 16,
-  },
-
-  dot: {
-    fontSize: 14,
-    color: '#999',
-    marginHorizontal: 6,
-  },
-  distance: {
-    fontSize: 14,
-    color: '#999',
+    paddingLeft: 12,
   },
 });
