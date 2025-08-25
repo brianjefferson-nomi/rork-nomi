@@ -138,7 +138,7 @@ export default function RestaurantDetailScreen() {
     );
   };
 
-  const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || '']);
+  const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter(img => img && img.trim().length > 0);
   const hasMultipleImages = images.length > 1;
   
   const toggleFollow = (id: string) => {
