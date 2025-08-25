@@ -682,7 +682,6 @@ export const dbHelpers = {
       const testCollection = {
         name: 'Test Collection',
         description: 'Test collection for RLS debugging',
-        collection_type: 'private',
         created_by: '11111111-1111-1111-1111-111111111111',
         creator_id: '11111111-1111-1111-1111-111111111111',
         is_public: false,
@@ -831,8 +830,8 @@ export const dbHelpers = {
       // Test RLS policies
       const { data: rlsTestData, error: rlsTestError } = await supabase
         .from('collections')
-        .select('id, name, collection_type, created_by')
-        .eq('collection_type', 'public')
+        .select('id, name, is_public, created_by')
+        .eq('is_public', true)
         .limit(1);
       
       if (rlsTestError) {
@@ -880,7 +879,7 @@ export const dbHelpers = {
         sql: `
           CREATE POLICY "Collections SELECT policy" ON collections
           FOR SELECT USING (
-            collection_type = 'public' OR
+            is_public = true OR
             created_by = auth.uid() OR
             creator_id = auth.uid()
           );
@@ -1010,107 +1009,41 @@ export const dbHelpers = {
         return [];
       }
       
-      // Try a simple approach first - just get all collections and filter client-side
-      console.log('[Supabase] Trying simple collection fetch approach...');
-      const { data: simpleCollections, error: simpleError } = await supabase
+      // Since RLS is temporarily disabled, we need to filter on the client side
+      const { data: allCollections, error } = await supabase
         .from('collections')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
       
-      if (!simpleError && simpleCollections) {
-        console.log('[Supabase] Simple fetch successful, filtering client-side...');
-        const userCollections = simpleCollections.filter((collection: any) => 
-          collection.created_by === userId || 
-          collection.creator_id === userId
-        );
-        
-        console.log('[Supabase] Found user collections via simple approach:', userCollections.length);
-        return userCollections;
+      if (error) {
+        console.error('[Supabase] Error fetching collections:', error);
+        throw error;
       }
       
-      console.log('[Supabase] Simple approach failed, trying detailed approach...');
+      // Get user's collection memberships for client-side filtering
+      const { data: userMemberships, error: membershipsError } = await supabase
+        .from('collection_members')
+        .select('collection_id')
+        .eq('user_id', userId);
       
-      // Try to get collections where user is creator
-      let creatorCollections: any[] = [];
-      try {
-        const { data, error: creatorError } = await supabase
-          .from('collections')
-          .select('*')
-          .or(`created_by.eq.${userId},creator_id.eq.${userId}`)
-          .order('created_at', { ascending: false })
-          .limit(100);
-        
-        if (creatorError) {
-          console.error('[Supabase] Error fetching creator collections:', {
-            error: JSON.stringify(creatorError, null, 2),
-            message: creatorError.message || 'No message',
-            details: creatorError.details || 'No details',
-            hint: creatorError.hint || 'No hint',
-            code: creatorError.code || 'No code'
-          });
-        } else {
-          creatorCollections = data || [];
-        }
-      } catch (error) {
-        console.error('[Supabase] Exception fetching creator collections:', error);
+      if (membershipsError) {
+        console.error('[Supabase] Error fetching user memberships:', membershipsError);
+        // Continue without memberships if there's an error
       }
       
-      // Try to get collections where user is a member
-      let memberCollectionsData: any[] = [];
-      try {
-        const { data: memberCollections, error: memberError } = await supabase
-          .from('collection_members')
-          .select('collection_id')
-          .eq('user_id', userId);
-        
-        if (memberError) {
-          console.error('[Supabase] Error fetching member collections:', {
-            error: JSON.stringify(memberError, null, 2),
-            message: memberError.message || 'No message',
-            details: memberError.details || 'No details',
-            hint: memberError.hint || 'No hint',
-            code: memberError.code || 'No code'
-          });
-        } else if (memberCollections && memberCollections.length > 0) {
-          const collectionIds = memberCollections.map(m => m.collection_id);
-          
-          const { data: memberColls, error: memberCollsError } = await supabase
-            .from('collections')
-            .select('*')
-            .in('id', collectionIds)
-            .order('created_at', { ascending: false })
-            .limit(100);
-          
-          if (memberCollsError) {
-            console.error('[Supabase] Error fetching member collection details:', {
-              error: JSON.stringify(memberCollsError, null, 2),
-              message: memberCollsError.message || 'No message',
-              details: memberCollsError.details || 'No details',
-              hint: memberCollsError.hint || 'No hint',
-              code: memberCollsError.code || 'No code'
-            });
-          } else {
-            memberCollectionsData = memberColls || [];
-          }
-        }
-      } catch (error) {
-        console.error('[Supabase] Exception fetching member collections:', error);
-      }
+      // Create a set of collection IDs the user is a member of
+      const userCollectionIds = new Set(userMemberships?.map(m => m.collection_id) || []);
       
-      // Combine and deduplicate collections
-      const allCollections = [...creatorCollections, ...memberCollectionsData];
-      const uniqueCollections = allCollections.filter((collection, index, self) => 
-        index === self.findIndex(c => c.id === collection.id)
+      // Filter collections: user is creator OR user is a member
+      const userCollections = (allCollections || []).filter((collection: any) => 
+        collection.created_by === userId || 
+        collection.creator_id === userId ||
+        userCollectionIds.has(collection.id)
       );
       
-      console.log('[Supabase] Successfully fetched collections:', {
-        creator: creatorCollections.length,
-        member: memberCollectionsData.length,
-        total: uniqueCollections.length
-      });
-      
-      return uniqueCollections;
+      console.log('[Supabase] Found user collections:', userCollections.length);
+      return userCollections;
       
     } catch (error) {
       console.error('[Supabase] getUserPlans error:', {
@@ -1359,14 +1292,13 @@ export const dbHelpers = {
 
   // Collection operations (new names)
   async createCollection(collectionData: Database['public']['Tables']['collections']['Insert'] & { collection_type?: 'public' | 'private' | 'shared' }) {
-    // Ensure collection_type is set and is_public is derived from it
+    // Ensure is_public is set based on collection_type if provided
     const enhancedData = {
       ...collectionData,
-      collection_type: collectionData.collection_type || 'public',
-      is_public: collectionData.collection_type === 'public' || collectionData.is_public
+      is_public: collectionData.collection_type === 'public' || collectionData.is_public !== false
     };
     
-    console.log('[Supabase] Creating collection with type:', enhancedData.collection_type);
+    console.log('[Supabase] Creating collection with is_public:', enhancedData.is_public);
     return this.createPlan(enhancedData);
   },
 
@@ -2130,33 +2062,62 @@ export const dbHelpers = {
   async getCollectionsByType(userId: string, collectionType?: 'public' | 'private' | 'shared') {
     console.log('[Supabase] Getting collections by type:', { userId, collectionType });
     
-    let query = supabase
-      .from('collections')
-      .select('*, collection_members(user_id, role)');
-    
-    if (collectionType === 'public') {
-      // Public collections are visible to everyone
-      query = query.eq('collection_type', 'public');
-    } else if (collectionType === 'private') {
-      // Private collections are only visible to the creator
-      query = query.eq('collection_type', 'private').eq('created_by', userId);
-    } else if (collectionType === 'shared') {
-      // Shared collections are visible to creator and members
-      query = query.eq('collection_type', 'shared').or(`created_by.eq.${userId},collection_members.user_id.eq.${userId}`);
-    } else {
-      // Get all collections the user has access to
-      query = query.or(`collection_type.eq.public,created_by.eq.${userId},collection_members.user_id.eq.${userId}`);
-    }
-    
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('[Supabase] Error getting collections by type:', error);
+    try {
+      // Since RLS is temporarily disabled, we need to filter on the client side
+      let query = supabase
+        .from('collections')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      const { data: allCollections, error } = await query;
+      
+      if (error) {
+        console.error('[Supabase] Error getting collections by type:', error);
+        throw error;
+      }
+      
+      // Get user's collection memberships for client-side filtering
+      const { data: userMemberships, error: membershipsError } = await supabase
+        .from('collection_members')
+        .select('collection_id, role')
+        .eq('user_id', userId);
+      
+      if (membershipsError) {
+        console.error('[Supabase] Error fetching user memberships:', membershipsError);
+        // Continue without memberships if there's an error
+      }
+      
+      // Create a set of collection IDs the user is a member of
+      const userCollectionIds = new Set(userMemberships?.map(m => m.collection_id) || []);
+      
+      // Filter collections based on type and user access
+      let filteredCollections = allCollections || [];
+      
+      if (collectionType === 'public') {
+        // Public collections are visible to everyone
+        filteredCollections = filteredCollections.filter(c => c.is_public === true);
+      } else if (collectionType === 'private') {
+        // Private collections are only visible to the creator
+        filteredCollections = filteredCollections.filter(c => c.is_public === false && c.created_by === userId);
+      } else if (collectionType === 'shared') {
+        // Shared collections are visible to creator and members
+        filteredCollections = filteredCollections.filter(c => 
+          c.is_public === false && (c.created_by === userId || userCollectionIds.has(c.id))
+        );
+      } else {
+        // Get all collections the user has access to
+        filteredCollections = filteredCollections.filter(c => 
+          c.is_public === true || c.created_by === userId || userCollectionIds.has(c.id)
+        );
+      }
+      
+      console.log('[Supabase] Collections retrieved:', filteredCollections.length);
+      return filteredCollections;
+      
+    } catch (error) {
+      console.error('[Supabase] Error in getCollectionsByType:', error);
       throw error;
     }
-    
-    console.log('[Supabase] Collections retrieved:', data?.length || 0);
-    return data || [];
   },
 
   async addMemberToCollection(collectionId: string, userId: string, role: 'member' | 'admin' = 'member') {
@@ -2204,7 +2165,6 @@ export const dbHelpers = {
     const { data, error } = await supabase
       .from('collections')
       .update({
-        collection_type: collectionType,
         is_public: collectionType === 'public',
         updated_at: new Date().toISOString()
       })

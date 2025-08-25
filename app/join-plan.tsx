@@ -32,26 +32,29 @@ export default function JoinPlanScreen() {
         return;
       }
 
+      // Type assertion to fix TypeScript error
+      const typedPlan = plan as any;
+
       // Check if user is already a collaborator
-      if (plan.collaborators && Array.isArray(plan.collaborators) && plan.collaborators.includes(user!.id) || plan.creator_id === user!.id) {
+      if (typedPlan.collaborators && Array.isArray(typedPlan.collaborators) && typedPlan.collaborators.includes(user!.id) || typedPlan.creator_id === user!.id) {
         Alert.alert('Info', 'You are already part of this plan.');
-        router.push(`/collection/${plan.id}` as any);
+        router.push(`/collection/${typedPlan.id}` as any);
         return;
       }
 
       // Add user to collaborators
-      const updatedCollaborators = plan.collaborators && Array.isArray(plan.collaborators) ? [...plan.collaborators, user!.id] : [user!.id];
-      await dbHelpers.updatePlan(plan.id, {
+      const updatedCollaborators = typedPlan.collaborators && Array.isArray(typedPlan.collaborators) ? [...typedPlan.collaborators, user!.id] : [user!.id];
+      await dbHelpers.updatePlan(typedPlan.id, {
         collaborators: updatedCollaborators,
         updated_at: new Date().toISOString()
       });
 
-      Alert.alert('Success', `You've joined "${plan.name || 'the plan'}"!`, [
+      Alert.alert('Success', `You've joined "${typedPlan.name || 'the plan'}"!`, [
         {
           text: 'View Plan',
           onPress: () => {
             router.back();
-            router.push(`/collection/${plan.id}` as any);
+            router.push(`/collection/${typedPlan.id}` as any);
           }
         }
       ]);
