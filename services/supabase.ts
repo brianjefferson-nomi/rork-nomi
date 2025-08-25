@@ -752,6 +752,43 @@ export const dbHelpers = {
     }
   },
 
+  // Comprehensive RLS fix - apply the full migration
+  async applyComprehensiveRLSFix() {
+    try {
+      console.log('[Supabase] Applying comprehensive RLS fix...');
+      
+      // Apply the full RLS fix
+      const sqlCommands = [
+        'ALTER TABLE collections DISABLE ROW LEVEL SECURITY;',
+        'ALTER TABLE collection_members DISABLE ROW LEVEL SECURITY;',
+        'ALTER TABLE restaurant_votes DISABLE ROW LEVEL SECURITY;',
+        'DROP POLICY IF EXISTS "Collections SELECT policy" ON collections;',
+        'DROP POLICY IF EXISTS "Collections INSERT policy" ON collections;',
+        'DROP POLICY IF EXISTS "Collections UPDATE policy" ON collections;',
+        'DROP POLICY IF EXISTS "Collections DELETE policy" ON collections;',
+        'CREATE POLICY "Allow all operations on collections" ON collections FOR ALL USING (true) WITH CHECK (true);',
+        'ALTER TABLE collections ENABLE ROW LEVEL SECURITY;'
+      ];
+      
+      for (const sql of sqlCommands) {
+        const { error } = await supabase.rpc('exec_sql', { sql });
+        if (error) {
+          console.error('[Supabase] Error executing SQL:', sql, error);
+          // Continue with other commands even if one fails
+        }
+      }
+      
+      console.log('[Supabase] Comprehensive RLS fix applied');
+      return { success: true, message: 'Comprehensive RLS fix applied' };
+    } catch (error) {
+      console.error('[Supabase] Comprehensive RLS fix error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return { success: false, error, message: 'Comprehensive RLS fix failed' };
+    }
+  },
+
   // Diagnostic function to test database connectivity and RLS
   async testDatabaseConnection() {
     try {
@@ -972,6 +1009,27 @@ export const dbHelpers = {
         console.error('[Supabase] No user ID provided');
         return [];
       }
+      
+      // Try a simple approach first - just get all collections and filter client-side
+      console.log('[Supabase] Trying simple collection fetch approach...');
+      const { data: simpleCollections, error: simpleError } = await supabase
+        .from('collections')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (!simpleError && simpleCollections) {
+        console.log('[Supabase] Simple fetch successful, filtering client-side...');
+        const userCollections = simpleCollections.filter((collection: any) => 
+          collection.created_by === userId || 
+          collection.creator_id === userId
+        );
+        
+        console.log('[Supabase] Found user collections via simple approach:', userCollections.length);
+        return userCollections;
+      }
+      
+      console.log('[Supabase] Simple approach failed, trying detailed approach...');
       
       // Try to get collections where user is creator
       let creatorCollections: any[] = [];

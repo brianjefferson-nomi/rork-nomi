@@ -224,6 +224,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   });
 
+  // Comprehensive RLS fix function
+  const applyComprehensiveRLSFix = useMutation({
+    mutationFn: async () => {
+      console.log('[RestaurantStore] Applying comprehensive RLS fix...');
+      const result = await dbHelpers.applyComprehensiveRLSFix();
+      console.log('[RestaurantStore] Comprehensive RLS fix result:', result);
+      return result;
+    },
+    onSuccess: (data) => {
+      console.log('[RestaurantStore] Comprehensive RLS fix completed:', data);
+      // Refetch data after fix
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+      queryClient.invalidateQueries({ queryKey: ['collectionMembers'] });
+    },
+    onError: (error) => {
+      console.error('[RestaurantStore] Comprehensive RLS fix failed:', error);
+    }
+  });
+
   // Test database connection on startup
   const dbTestQuery = useQuery({
     queryKey: ['dbTest'],
@@ -1568,6 +1588,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     updateCollectionType,
     applyRLSFix, // Add the new function to the memoized value
     disableRLSTemporarily, // Add the RLS disable function
+    applyComprehensiveRLSFix, // Add the comprehensive RLS fix function
   }), [
     restaurants,
     plansQuery.data,
