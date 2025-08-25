@@ -198,20 +198,22 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                 });
 
-                if (filteredDiscussions.length === 0) return <></>;
-
                 return (
                   <View style={styles.commentsSection}>
                     <View style={styles.commentsHeader}>
-                      <MessageCircle size={12} color="#6B7280" />
-                      <Text style={styles.commentsLabel}>Comments</Text>
+                      <MessageCircle size={14} color="#6B7280" />
+                      <Text style={styles.commentsLabel}>Comments ({filteredDiscussions.length})</Text>
                     </View>
-                    {filteredDiscussions.slice(0, 2).map((discussion: any) => (
-                      <View key={discussion.id} style={styles.commentItem}>
-                        <Text style={styles.commentAuthor}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
-                        <Text style={styles.commentText} numberOfLines={2}>{discussion.message}</Text>
-                      </View>
-                    ))}
+                    {filteredDiscussions.length > 0 ? (
+                      filteredDiscussions.slice(0, 3).map((discussion: any) => (
+                        <View key={discussion.id} style={styles.commentItem}>
+                          <Text style={styles.commentAuthor}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
+                          <Text style={styles.commentText} numberOfLines={3}>{discussion.message}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.noComments}>No comments yet</Text>
+                    )}
                   </View>
                 );
               })()}
@@ -1779,20 +1781,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   insightsGrid: {
-    gap: 12,
+    gap: 16,
   },
   insightsContent: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 12,
+    borderColor: '#F3F4F6',
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   restaurantHeader: {
     flexDirection: 'row',
@@ -1946,38 +1948,47 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   commentsSection: {
-    marginTop: 12,
-    gap: 8,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   commentsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   commentsLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: '#374151',
+  },
+  noComments: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
   commentItem: {
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 6,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
   },
   commentAuthor: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
-    marginBottom: 4,
+    color: '#374151',
+    marginBottom: 6,
   },
   commentText: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
   },
   memberActivitySection: {
     marginBottom: 32,
