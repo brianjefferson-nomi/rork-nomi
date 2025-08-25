@@ -1223,13 +1223,26 @@ export const dbHelpers = {
 
   // Restaurant vote operations
   async createRestaurantVote(voteData: Database['public']['Tables']['restaurant_votes']['Insert']) {
+    console.log('[dbHelpers] Creating restaurant vote with data:', voteData);
+    
     const { data, error } = await supabase
       .from('restaurant_votes')
       .upsert(voteData, { onConflict: 'restaurant_id,user_id,collection_id' })
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[dbHelpers] Error creating restaurant vote:', {
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        voteData
+      });
+      throw error;
+    }
+    
+    console.log('[dbHelpers] Restaurant vote created successfully:', data);
     return data;
   },
 

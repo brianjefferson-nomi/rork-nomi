@@ -674,29 +674,20 @@ export default function CollectionDetailScreen() {
               <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
             </View>
           ) : (
-            rankedRestaurants.map(({ restaurant, meta }, index) => (
+                        rankedRestaurants.map(({ restaurant, meta }, index) => (
               <View key={restaurant?.id || index} style={[
                 styles.restaurantItem,
                 meta?.rank === 1 && styles.winningRestaurantItem
               ]}>
-                {/* Clean Header with Rank Badge */}
-                <View style={styles.restaurantHeader}>
+                {/* Top Badges Row */}
+                <View style={styles.badgesRow}>
                   <View style={[
                     styles.rankBadge,
                     meta?.rank === 1 && styles.winnerRankBadge,
                     meta?.rank === 2 && styles.silverRankBadge,
                     meta?.rank === 3 && styles.bronzeRankBadge
                   ]}>
-                    {meta?.rank === 1 && <Crown size={16} color="#FFFFFF" />}
                     <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
-                  </View>
-                  
-                  <View style={styles.restaurantInfo}>
-                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                    <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
-                    <Text style={styles.restaurantDetails}>
-                      {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
-                    </Text>
                   </View>
                   
                   {/* Top Choice Badge for Winner */}
@@ -708,12 +699,28 @@ export default function CollectionDetailScreen() {
                   )}
                 </View>
 
-                {/* Restaurant Card */}
-                <RestaurantCard
-                  restaurant={restaurant}
-                  onPress={() => router.push({ pathname: '/restaurant/[id]', params: { id: restaurant.id } })}
-                  compact
-                />
+                {/* Restaurant Info Section */}
+                <View style={styles.restaurantInfoSection}>
+                  <View style={styles.restaurantImageContainer}>
+                    <Image 
+                      source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
+                      style={styles.restaurantImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  
+                  <View style={styles.restaurantInfo}>
+                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                    <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
+                    <Text style={styles.restaurantDetails}>
+                      {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity style={styles.heartButton}>
+                    <Text style={styles.heartIcon}>♡</Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Approval Section */}
                 <View style={styles.approvalSection}>
@@ -731,8 +738,6 @@ export default function CollectionDetailScreen() {
                 {/* Vote Actions */}
                 <View style={styles.voteActions}>
                   {(() => {
-                    const userVote = meta.voteDetails?.likeVoters?.find((v: any) => v.userId === user?.id) || 
-                                   meta.voteDetails?.dislikeVoters?.find((v: any) => v.userId === user?.id);
                     const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
                     const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
                     
@@ -744,19 +749,16 @@ export default function CollectionDetailScreen() {
                             styles.likeButton,
                             userLiked && styles.likeButtonActive
                           ]}
-                                                      onPress={() => {
-                              if (userDisliked) {
-                                // Remove dislike and add like
-                                voteRestaurant(restaurant.id, 'dislike', id, '');
-                                setTimeout(() => voteRestaurant(restaurant.id, 'like', id, ''), 100);
-                              } else if (userLiked) {
-                                // Remove like
-                                voteRestaurant(restaurant.id, 'like', id, '');
-                              } else {
-                                // Add like
-                                setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
-                              }
-                            }}
+                          onPress={() => {
+                            if (userDisliked) {
+                              voteRestaurant(restaurant.id, 'dislike', id, '');
+                              setTimeout(() => voteRestaurant(restaurant.id, 'like', id, ''), 100);
+                            } else if (userLiked) {
+                              voteRestaurant(restaurant.id, 'like', id, '');
+                            } else {
+                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'like' });
+                            }
+                          }}
                         >
                           <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
@@ -768,19 +770,16 @@ export default function CollectionDetailScreen() {
                             styles.dislikeButton,
                             userDisliked && styles.dislikeButtonActive
                           ]}
-                                                      onPress={() => {
-                              if (userLiked) {
-                                // Remove like and add dislike
-                                voteRestaurant(restaurant.id, 'like', id, '');
-                                setTimeout(() => voteRestaurant(restaurant.id, 'dislike', id, ''), 100);
-                              } else if (userDisliked) {
-                                // Remove dislike
-                                voteRestaurant(restaurant.id, 'dislike', id, '');
-                              } else {
-                                // Add dislike
-                                setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
-                              }
-                            }}
+                          onPress={() => {
+                            if (userLiked) {
+                              voteRestaurant(restaurant.id, 'like', id, '');
+                              setTimeout(() => voteRestaurant(restaurant.id, 'dislike', id, ''), 100);
+                            } else if (userDisliked) {
+                              voteRestaurant(restaurant.id, 'dislike', id, '');
+                            } else {
+                              setShowVoteModal({ restaurantId: restaurant.id, vote: 'dislike' });
+                            }
+                          }}
                         >
                           <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
@@ -796,38 +795,6 @@ export default function CollectionDetailScreen() {
                       </>
                     );
                   })()}
-                </View>
-
-                {/* Member Votes Section */}
-                <View style={styles.memberVotesSection}>
-                  <Text style={styles.memberVotesTitle}>Member Votes for {restaurant.name}</Text>
-                  <View style={styles.memberVotesList}>
-                    {meta.voteDetails?.likeVoters?.slice(0, 3).map((voter: any, voterIndex: number) => (
-                      <View key={`${restaurant.id}-like-${voter.userId}-${voterIndex}`} style={styles.memberVoteItem}>
-                        <View style={styles.memberVoteAvatar}>
-                          <Text style={styles.memberVoteInitial}>
-                            {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
-                          </Text>
-                        </View>
-                        <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                        <ThumbsUp size={16} color="#10B981" />
-                      </View>
-                    ))}
-                    {meta.voteDetails?.dislikeVoters?.slice(0, 3).map((voter: any, voterIndex: number) => (
-                      <View key={`${restaurant.id}-dislike-${voter.userId}-${voterIndex}`} style={styles.memberVoteItem}>
-                        <View style={styles.memberVoteAvatar}>
-                          <Text style={styles.memberVoteInitial}>
-                            {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
-                          </Text>
-                        </View>
-                        <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                        <ThumbsDown size={16} color="#EF4444" />
-                      </View>
-                    ))}
-                    {(!meta.voteDetails?.likeVoters?.length && !meta.voteDetails?.dislikeVoters?.length) && (
-                      <Text style={styles.noVotes}>No votes yet</Text>
-                    )}
-                  </View>
                 </View>
 
                 {/* Remove Button */}

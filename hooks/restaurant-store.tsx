@@ -733,13 +733,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         restaurant_id: restaurantId,
         user_id: user.id,
         collection_id: planId,
-        vote,
-        reason,
-        created_at: new Date().toISOString()
+        vote: vote as 'like' | 'dislike',
+        reason: reason || undefined,
+        authority: 'regular' as const,
+        weight: 1
       };
       
-      const savedVote = await dbHelpers.createRestaurantVote(voteData);
-      console.log('[RestaurantStore] Vote saved to database successfully:', savedVote);
+      console.log('[RestaurantStore] Attempting to save vote data:', voteData);
+      
+      try {
+        const savedVote = await dbHelpers.createRestaurantVote(voteData);
+        console.log('[RestaurantStore] Vote saved to database successfully:', savedVote);
+      } catch (dbError) {
+        console.error('[RestaurantStore] Database error details:', {
+          error: dbError,
+          message: dbError instanceof Error ? dbError.message : 'Unknown error',
+          voteData
+        });
+        throw dbError;
+      }
       
       // Update local state
       const existingVoteIndex = userVotes.findIndex((v: any) => 
