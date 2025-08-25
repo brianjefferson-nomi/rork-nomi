@@ -84,7 +84,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
       {/* Voting Insights */}
       <View style={styles.insightsSection}>
-        <Text style={styles.insightsTitle}>Voting Insights</Text>
+        <Text style={styles.insightsTitle}>📊 Voting Insights</Text>
         <View style={styles.insightsGrid}>
           {rankedRestaurants.slice(0, 6).map((restaurant, index) => (
             <View key={restaurant.id} style={styles.insightsContent}>
@@ -176,7 +176,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
       {/* Member Activity & Insights */}
       <View style={styles.memberActivitySection}>
-        <Text style={styles.sectionTitle}>Member Activity & Insights</Text>
+        <Text style={styles.sectionTitle}>🎯 Member Activity & Insights</Text>
         {(() => {
           const memberVotingStats: { [key: string]: { likes: number; dislikes: number; comments: number; name: string } } = {};
           
@@ -214,25 +214,46 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
           return (
             <View style={styles.memberStatsGrid}>
-              {Object.entries(memberVotingStats).map(([userId, stats]) => (
-                <View key={userId} style={styles.memberStatCard}>
-                  <Text style={styles.memberName}>{stats.name?.split(' ')[0] || 'Unknown'}</Text>
-                  <View style={styles.memberStats}>
-                    <View style={styles.statItem}>
-                      <ThumbsUp size={14} color="#10B981" />
-                      <Text style={styles.statValue}>{stats.likes}</Text>
+              {Object.entries(memberVotingStats).map(([userId, stats]) => {
+                const firstName = stats.name?.split(' ')[0] || 'Unknown';
+                const totalActivity = stats.likes + stats.dislikes + stats.comments;
+                const positiveRate = totalActivity > 0 ? Math.round((stats.likes / totalActivity) * 100) : 0;
+                
+                return (
+                  <View key={userId} style={styles.memberStatCard}>
+                    <View style={styles.memberStatHeader}>
+                      <View style={styles.memberStatAvatar}>
+                        <Text style={styles.memberStatInitial}>
+                          {firstName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.memberStatInfo}>
+                        <Text style={styles.memberStatName}>{firstName}</Text>
+                        <Text style={styles.memberStatSummary}>
+                          {totalActivity} actions • {positiveRate}% positive
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.statItem}>
-                      <ThumbsDown size={14} color="#EF4444" />
-                      <Text style={styles.statValue}>{stats.dislikes}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <MessageCircle size={14} color="#6B7280" />
-                      <Text style={styles.statValue}>{stats.comments}</Text>
+                    <View style={styles.memberStats}>
+                      <View style={styles.statItemLarge}>
+                        <ThumbsUp size={16} color="#10B981" />
+                        <Text style={styles.statValueLarge}>{stats.likes}</Text>
+                        <Text style={styles.statLabelSmall}>likes</Text>
+                      </View>
+                      <View style={styles.statItemLarge}>
+                        <ThumbsDown size={16} color="#EF4444" />
+                        <Text style={styles.statValueLarge}>{stats.dislikes}</Text>
+                        <Text style={styles.statLabelSmall}>dislikes</Text>
+                      </View>
+                      <View style={styles.statItemLarge}>
+                        <MessageCircle size={16} color="#6B7280" />
+                        <Text style={styles.statValueLarge}>{stats.comments}</Text>
+                        <Text style={styles.statLabelSmall}>comments</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
               {Object.keys(memberVotingStats).length === 0 && (
                 <Text style={styles.noActivity}>
                   {collection.is_public 
@@ -1131,7 +1152,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   restaurantsList: {
-    padding: 16,
+    padding: 20,
   },
   recommendationsSection: {
     backgroundColor: '#FFF',
@@ -1166,7 +1187,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyState: {
     paddingVertical: 40,
@@ -1177,23 +1198,23 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 2,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 3,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   removeButton: {
     marginTop: -8,
@@ -1416,22 +1437,26 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   votingSection: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   voteStats: {
-    marginBottom: 8,
+    flex: 1,
   },
   approvalText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
   },
   voteBreakdown: {
-    fontSize: 11,
-    color: '#9CA3AF',
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
   consensusMeter: {
     marginBottom: 8,
@@ -1495,55 +1520,56 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   memberVoteItem: {
-    backgroundColor: '#FFF',
-    padding: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
   },
   memberVoteHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   memberVoteAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   memberVoteInitial: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#FFFFFF',
   },
   memberVoteInfo: {
     flex: 1,
   },
   memberVoteName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1A1A1A',
   },
   memberVoteBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 32,
+    alignItems: 'center',
   },
   likeVoteBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#D1FAE5',
   },
   dislikeVoteBadge: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
   },
   memberVoteBadgeText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '600',
   },
   memberVoteReason: {
     fontSize: 11,
@@ -1784,14 +1810,54 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   memberStatsGrid: {
-    gap: 12,
+    gap: 16,
   },
   memberStatCard: {
     backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  memberStatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  memberStatAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberStatInitial: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberStatInfo: {
+    flex: 1,
+  },
+  memberStatName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  memberStatSummary: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
   memberName: {
     fontSize: 12,
@@ -1801,10 +1867,15 @@ const styles = StyleSheet.create({
   },
   memberStats: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
+    justifyContent: 'space-around',
   },
   statItem: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statItemLarge: {
     alignItems: 'center',
     gap: 4,
   },
@@ -1812,6 +1883,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: '#6B7280',
+  },
+  statValueLarge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  statLabelSmall: {
+    fontSize: 10,
+    color: '#9CA3AF',
   },
   noActivity: {
     fontSize: 12,
