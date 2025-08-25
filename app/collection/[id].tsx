@@ -36,10 +36,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             <Text style={styles.analyticValue}>
               {(() => {
                 const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
-                const participatingMembers = rankedRestaurants.reduce((total, { meta }) => {
+                const participatingMembers = rankedRestaurants.reduce((total, { meta }, restaurantIndex) => {
                   const uniqueVoters = new Set([
-                    ...meta.voteDetails.likeVoters.map((v: any, index: number) => `${v.userId}-${index}`),
-                    ...meta.voteDetails.dislikeVoters.map((v: any, index: number) => `${v.userId}-${index}`)
+                    ...meta.voteDetails.likeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`),
+                    ...meta.voteDetails.dislikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`)
                   ]);
                   return total + uniqueVoters.size;
                 }, 0);
@@ -84,11 +84,40 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
       {/* Voting Insights */}
       <View style={styles.insightsSection}>
-        <Text style={styles.insightsTitle}>📊 Voting Insights</Text>
+        <Text style={styles.insightsTitle}>📊 Detailed Voting Insights</Text>
         <View style={styles.insightsGrid}>
           {rankedRestaurants.slice(0, 6).map((restaurant, index) => (
             <View key={restaurant.id} style={styles.insightsContent}>
-              <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+              <View style={styles.restaurantHeader}>
+                <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
+                <View style={styles.restaurantRank}>
+                  <Text style={styles.rankText}>#{index + 1}</Text>
+                </View>
+              </View>
+              
+              {/* Vote Statistics */}
+              {(() => {
+                const restaurantVotes = rankedRestaurants.find(r => r.id === restaurant.id);
+                if (!restaurantVotes?.meta?.voteDetails) return <></>;
+
+                const totalVotes = restaurantVotes.meta.voteDetails.likeVoters.length + restaurantVotes.meta.voteDetails.dislikeVoters.length;
+                const approvalRate = totalVotes > 0 ? Math.round((restaurantVotes.meta.voteDetails.likeVoters.length / totalVotes) * 100) : 0;
+
+                return (
+                  <View style={styles.voteStats}>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Total Votes:</Text>
+                      <Text style={styles.statValue}>{totalVotes}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Approval Rate:</Text>
+                      <Text style={[styles.statValue, { color: approvalRate >= 70 ? '#10B981' : approvalRate >= 50 ? '#F59E0B' : '#EF4444' }]}>
+                        {approvalRate}%
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
               
               {/* Member Voting Details */}
               {(() => {
@@ -109,36 +138,52 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
                 });
 
-                const likeVoterNames = filteredLikeVoters.length > 0 
-                  ? filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')
-                  : 'None';
-                
-                const dislikeVoterNames = filteredDislikeVoters.length > 0 
-                  ? filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')
-                  : 'None';
-
                 return (
                   <View style={styles.votingDetails}>
                     {filteredLikeVoters.length > 0 && (
                       <View style={styles.voteGroup}>
                         <View style={styles.voteHeader}>
-                          <ThumbsUp size={12} color="#10B981" />
-                          <Text style={styles.voteLabel}>Likes</Text>
+                          <ThumbsUp size={14} color="#10B981" />
+                          <Text style={styles.voteLabel}>Likes ({filteredLikeVoters.length})</Text>
                         </View>
-                        <Text style={styles.voterNames}>
-                          {likeVoterNames}
-                        </Text>
+                        <View style={styles.voterList}>
+                          {filteredLikeVoters.map((voter: any, index: number) => (
+                            <View key={`${voter.userId}-${index}`} style={styles.voterItem}>
+                              <View style={styles.voterAvatar}>
+                                <Text style={styles.voterInitial}>
+                                  {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
+                                </Text>
+                              </View>
+                              <Text style={styles.voterName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                              {voter.reason && (
+                                <Text style={styles.voterReason} numberOfLines={1}>"{voter.reason}"</Text>
+                              )}
+                            </View>
+                          ))}
+                        </View>
                       </View>
                     )}
                     {filteredDislikeVoters.length > 0 && (
                       <View style={styles.voteGroup}>
                         <View style={styles.voteHeader}>
-                          <ThumbsDown size={12} color="#EF4444" />
-                          <Text style={styles.voteLabel}>Dislikes</Text>
+                          <ThumbsDown size={14} color="#EF4444" />
+                          <Text style={styles.voteLabel}>Dislikes ({filteredDislikeVoters.length})</Text>
                         </View>
-                        <Text style={styles.voterNames}>
-                          {dislikeVoterNames}
-                        </Text>
+                        <View style={styles.voterList}>
+                          {filteredDislikeVoters.map((voter: any, index: number) => (
+                            <View key={`${voter.userId}-${index}`} style={styles.voterItem}>
+                              <View style={styles.voterAvatar}>
+                                <Text style={styles.voterInitial}>
+                                  {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
+                                </Text>
+                              </View>
+                              <Text style={styles.voterName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                              {voter.reason && (
+                                <Text style={styles.voterReason} numberOfLines={1}>"{voter.reason}"</Text>
+                              )}
+                            </View>
+                          ))}
+                        </View>
                       </View>
                     )}
                     {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
@@ -1187,7 +1232,20 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
@@ -1799,11 +1857,54 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  restaurantHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   restaurantName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1E293B',
+    flex: 1,
+  },
+  restaurantRank: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  voteStats: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
   },
   votingDetails: {
     gap: 12,
@@ -1825,6 +1926,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#475569',
+  },
+  voterList: {
+    gap: 8,
+    marginTop: 8,
+  },
+  voterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  voterAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voterInitial: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  voterName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1E293B',
+    flex: 1,
+  },
+  voterReason: {
+    fontSize: 11,
+    color: '#64748B',
+    fontStyle: 'italic',
+    flex: 1,
   },
   voterNames: {
     fontSize: 12,
