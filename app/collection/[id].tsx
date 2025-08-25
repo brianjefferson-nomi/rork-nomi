@@ -84,14 +84,21 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
       {/* Voting Insights */}
       <View style={styles.insightsSection}>
-        <Text style={styles.insightsTitle}>📊 Detailed Voting Insights</Text>
+        <Text style={styles.insightsTitle}>📊 Restaurant Voting Breakdown</Text>
         <View style={styles.insightsGrid}>
           {rankedRestaurants.slice(0, 6).map((restaurant, index) => (
             <View key={restaurant.id} style={styles.insightsContent}>
               <View style={styles.restaurantHeader}>
+                <View style={styles.restaurantImageContainer}>
+                  <Image 
+                    source={{ uri: restaurant.imageUrl || 'https://via.placeholder.com/60x60' }} 
+                    style={styles.restaurantImage}
+                    resizeMode="cover"
+                  />
+                </View>
                 <View style={styles.restaurantTitleContainer}>
                   <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
-                  <Text style={styles.restaurantSubtitle}>Restaurant #{index + 1} in ranking</Text>
+                  <Text style={styles.restaurantSubtitle}>Ranked #{index + 1} • {restaurant.cuisine || 'Restaurant'}</Text>
                 </View>
                 <View style={styles.restaurantRank}>
                   <Text style={styles.rankText}>#{index + 1}</Text>
@@ -113,10 +120,29 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <Text style={styles.statValue}>{totalVotes}</Text>
                     </View>
                     <View style={styles.statRow}>
-                      <Text style={styles.statLabel}>Approval Rate:</Text>
+                      <Text style={styles.statLabel}>Group Consensus:</Text>
                       <Text style={[styles.statValue, { color: approvalRate >= 70 ? '#10B981' : approvalRate >= 50 ? '#F59E0B' : '#EF4444' }]}>
                         {approvalRate}%
                       </Text>
+                    </View>
+                    
+                    {/* Progress Bar */}
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <View 
+                          style={[
+                            styles.progressFill, 
+                            { 
+                              width: `${approvalRate}%`,
+                              backgroundColor: approvalRate >= 70 ? '#10B981' : approvalRate >= 50 ? '#F59E0B' : '#EF4444'
+                            }
+                          ]} 
+                        />
+                      </View>
+                      <View style={styles.progressLabels}>
+                        <Text style={styles.progressLabel}>Likes: {restaurantVotes.meta.voteDetails.likeVoters.length}</Text>
+                        <Text style={styles.progressLabel}>Dislikes: {restaurantVotes.meta.voteDetails.dislikeVoters.length}</Text>
+                      </View>
                     </View>
                   </View>
                 );
@@ -151,7 +177,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </View>
                         <View style={styles.voterList}>
                           {filteredLikeVoters.map((voter: any, index: number) => (
-                            <View key={`like-${voter.userId}-${index}`} style={styles.voterItem}>
+                            <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.voterItem}>
                               <View style={styles.voterAvatar}>
                                 <Text style={styles.voterInitial}>
                                   {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
@@ -174,7 +200,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         </View>
                         <View style={styles.voterList}>
                           {filteredDislikeVoters.map((voter: any, index: number) => (
-                            <View key={`dislike-${voter.userId}-${index}`} style={styles.voterItem}>
+                            <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.voterItem}>
                               <View style={styles.voterAvatar}>
                                 <Text style={styles.voterInitial}>
                                   {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
@@ -230,7 +256,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
       {/* Member Activity & Insights */}
       <View style={styles.memberActivitySection}>
-        <Text style={styles.sectionTitle}>🎯 Member Activity & Insights</Text>
+        <Text style={styles.sectionTitle}>🎯 Member Participation & Activity</Text>
         {(() => {
           const memberVotingStats: { [key: string]: { 
             likes: number; 
@@ -303,7 +329,21 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 
                 return (
                   <View key={userId} style={styles.memberStatCard}>
-                    <Text style={styles.memberName}>{firstName}</Text>
+                    <View style={styles.memberHeader}>
+                      <View style={styles.memberAvatar}>
+                        <Text style={styles.memberInitial}>
+                          {firstName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{firstName}</Text>
+                        <Text style={styles.memberRole}>
+                          {stats.likes > stats.dislikes ? '👍 Supporter' : 
+                           stats.dislikes > stats.likes ? '👎 Opposer' : 
+                           stats.comments > 0 ? '💬 Commenter' : '👤 Member'}
+                        </Text>
+                      </View>
+                    </View>
                     <View style={styles.memberStats}>
                       <View style={styles.statItem}>
                         <ThumbsUp size={14} color="#10B981" />
@@ -1924,6 +1964,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  restaurantImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  restaurantImage: {
+    width: '100%',
+    height: '100%',
+  },
   restaurantTitleContainer: {
     flex: 1,
   },
@@ -2095,11 +2147,38 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  memberHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberInitial: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberInfo: {
+    flex: 1,
+  },
   memberName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 8,
+    marginBottom: 2,
+  },
+  memberRole: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
   },
   memberStats: {
     flexDirection: 'row',
@@ -2114,6 +2193,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#475569',
+  },
+  progressContainer: {
+    marginTop: 12,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
   },
   memberRestaurantActivity: {
     marginTop: 12,
