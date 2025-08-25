@@ -477,14 +477,18 @@ export default function CollectionDetailScreen() {
     }
     
     try {
-      await addRestaurantComment(restaurantId, collection.id, commentMessage);
-      setShowCommentModal(null);
-      setCommentMessage('');
+      console.log('[CollectionDetail] Adding comment for restaurant:', restaurantId, 'collection:', id);
+      await addRestaurantComment(restaurantId, id, commentMessage);
       
-      // Refresh discussions to show the new comment
+      // Refresh discussions after adding comment
+      console.log('[CollectionDetail] Refreshing discussions after adding comment');
       const updatedDiscussions = await getCollectionDiscussions(id);
       setDiscussions(updatedDiscussions || []);
       
+      console.log('[CollectionDetail] Updated discussions:', updatedDiscussions?.length || 0);
+      
+      setShowCommentModal(null);
+      setCommentMessage('');
       Alert.alert('Success', 'Comment added successfully');
     } catch (error) {
       console.error('[CollectionDetail] Error adding comment:', error);
@@ -492,6 +496,8 @@ export default function CollectionDetailScreen() {
       Alert.alert('Error', `Failed to add comment: ${errorMessage}`);
     }
   };
+
+
 
   const handleShareCollection = async () => {
     const shareUrl = `https://yourapp.com/collection/${collection.id}`;
@@ -970,7 +976,7 @@ export default function CollectionDetailScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity 
                 style={styles.modalButton}
-                onPress={() => {
+                onPress={async () => {
                   console.log('[CollectionDetail] Discussion modal submit:', {
                     showDiscussionModal,
                     discussionMessage,
@@ -978,8 +984,20 @@ export default function CollectionDetailScreen() {
                   });
                   
                   if (showDiscussionModal && discussionMessage.trim()) {
-                    // FIXED: Correct parameter order (restaurantId, planId, message)
-                    addDiscussion(showDiscussionModal, id, discussionMessage);
+                    try {
+                      // FIXED: Correct parameter order (restaurantId, planId, message)
+                      await addDiscussion(showDiscussionModal, id, discussionMessage);
+                      
+                      // Refresh discussions after adding
+                      console.log('[CollectionDetail] Refreshing discussions after adding comment');
+                      const updatedDiscussions = await getCollectionDiscussions(id);
+                      setDiscussions(updatedDiscussions || []);
+                      
+                      console.log('[CollectionDetail] Updated discussions:', updatedDiscussions?.length || 0);
+                    } catch (error) {
+                      console.error('[CollectionDetail] Error adding discussion:', error);
+                      Alert.alert('Error', 'Failed to add comment. Please try again.');
+                    }
                   }
                   setShowDiscussionModal(null);
                   setDiscussionMessage('');
