@@ -1092,7 +1092,7 @@ export default function CollectionDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#FFFFFF',
   },
   errorContainer: {
     flex: 1,
@@ -1104,7 +1104,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   name: {
     fontSize: 28,
@@ -1134,6 +1134,7 @@ const styles = StyleSheet.create({
   },
   restaurantsList: {
     padding: 20,
+    paddingTop: 0,
   },
   recommendationsSection: {
     backgroundColor: '#FFF',
@@ -1168,7 +1169,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   emptyState: {
     paddingVertical: 40,
@@ -1179,23 +1180,23 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 32,
-    borderWidth: 3,
+    marginBottom: 24,
+    borderWidth: 2,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   removeButton: {
     marginTop: -8,
@@ -1732,51 +1733,60 @@ const styles = StyleSheet.create({
   },
   insightsContainer: {
     padding: 20,
+    paddingTop: 0,
   },
   insightsSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   insightsTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   insightsGrid: {
-    gap: 12,
+    gap: 16,
   },
   insightsContent: {
     backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   restaurantName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   votingDetails: {
-    gap: 6,
+    gap: 8,
   },
   voteGroup: {
-    gap: 4,
+    gap: 6,
   },
   voteHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   voteLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#6B7280',
   },
   voterNames: {
-    fontSize: 11,
-    color: '#9CA3AF',
+    fontSize: 12,
+    color: '#6B7280',
   },
   noVotes: {
     fontSize: 11,
@@ -1810,36 +1820,44 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   memberActivitySection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   memberStatsGrid: {
-    gap: 12,
+    gap: 16,
   },
   memberStatCard: {
     backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   memberName: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   memberStats: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   statValue: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#6B7280',
   },
   noActivity: {
