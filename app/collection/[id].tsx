@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -1209,6 +1209,36 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  restaurantInfoSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  restaurantImageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    marginRight: 16,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  restaurantImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heartButton: {
+    padding: 8,
+  },
+  heartIcon: {
+    fontSize: 20,
+    color: '#9CA3AF',
   },
   discussionsSection: {
     marginTop: 16,
