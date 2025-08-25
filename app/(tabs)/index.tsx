@@ -335,13 +335,13 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   section: {
-    marginTop: 24,
+    marginTop: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     gap: 8,
   },
   sectionTitle: {
@@ -359,8 +359,8 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
   },
   cardWrapper: {
-    marginRight: 12,
-    width: 260,
+    marginRight: 10,
+    width: 240,
   },
   collectionsGrid: {
     flexDirection: 'row',
