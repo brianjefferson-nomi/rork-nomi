@@ -90,11 +90,11 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             <View key={restaurant.id} style={styles.insightsContent}>
               <View style={styles.restaurantHeader}>
                 <View style={styles.restaurantImageContainer}>
-                  <Image 
-                    source={{ uri: restaurant.imageUrl || 'https://via.placeholder.com/60x60' }} 
-                    style={styles.restaurantImage}
-                    resizeMode="cover"
-                  />
+                  <View style={styles.restaurantImagePlaceholder}>
+                    <Text style={styles.restaurantImagePlaceholderText}>
+                      {restaurant.name?.charAt(0).toUpperCase() || 'R'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.restaurantTitleContainer}>
                   <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
@@ -114,35 +114,18 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 const approvalRate = totalVotes > 0 ? Math.round((restaurantVotes.meta.voteDetails.likeVoters.length / totalVotes) * 100) : 0;
 
                 return (
-                  <View style={styles.voteStats}>
-                    <View style={styles.statRow}>
-                      <Text style={styles.statLabel}>Total Votes:</Text>
-                      <Text style={styles.statValue}>{totalVotes}</Text>
+                  <View style={styles.approvalSection}>
+                    <View style={styles.approvalHeader}>
+                      <Text style={styles.approvalTitle}>Approval</Text>
+                      <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
-                    <View style={styles.statRow}>
-                      <Text style={styles.statLabel}>Group Consensus:</Text>
-                      <Text style={[styles.statValue, { color: approvalRate >= 70 ? '#10B981' : approvalRate >= 50 ? '#F59E0B' : '#EF4444' }]}>
-                        {approvalRate}%
+                    <Text style={styles.voteBreakdown}>
+                      {restaurantVotes.meta.voteDetails.likeVoters.length} likes · {restaurantVotes.meta.voteDetails.dislikeVoters.length} dislikes
+                    </Text>
+                    <View style={styles.consensusBadge}>
+                      <Text style={styles.consensusBadgeText}>
+                        {approvalRate >= 70 ? 'strong consensus' : approvalRate >= 50 ? 'moderate consensus' : 'mixed consensus'}
                       </Text>
-                    </View>
-                    
-                    {/* Progress Bar */}
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBar}>
-                        <View 
-                          style={[
-                            styles.progressFill, 
-                            { 
-                              width: `${approvalRate}%`,
-                              backgroundColor: approvalRate >= 70 ? '#10B981' : approvalRate >= 50 ? '#F59E0B' : '#EF4444'
-                            }
-                          ]} 
-                        />
-                      </View>
-                      <View style={styles.progressLabels}>
-                        <Text style={styles.progressLabel}>Likes: {restaurantVotes.meta.voteDetails.likeVoters.length}</Text>
-                        <Text style={styles.progressLabel}>Dislikes: {restaurantVotes.meta.voteDetails.dislikeVoters.length}</Text>
-                      </View>
                     </View>
                   </View>
                 );
@@ -168,56 +151,35 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 });
 
                 return (
-                  <View style={styles.votingDetails}>
-                    {filteredLikeVoters.length > 0 && (
-                      <View style={styles.voteGroup}>
-                        <View style={styles.voteHeader}>
-                          <ThumbsUp size={14} color="#10B981" />
-                          <Text style={styles.voteLabel}>Likes ({filteredLikeVoters.length})</Text>
+                  <View style={styles.memberVotesSection}>
+                    <Text style={styles.memberVotesTitle}>Member Votes for {restaurant.name}</Text>
+                    <View style={styles.memberVotesList}>
+                      {filteredLikeVoters.map((voter: any, index: number) => (
+                        <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                          <View style={styles.memberVoteAvatar}>
+                            <Text style={styles.memberVoteInitial}>
+                              {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                            </Text>
+                          </View>
+                          <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                          <ThumbsUp size={16} color="#10B981" />
                         </View>
-                        <View style={styles.voterList}>
-                          {filteredLikeVoters.map((voter: any, index: number) => (
-                            <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.voterItem}>
-                              <View style={styles.voterAvatar}>
-                                <Text style={styles.voterInitial}>
-                                  {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
-                                </Text>
-                              </View>
-                              <Text style={styles.voterName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                              {voter.reason && (
-                                <Text style={styles.voterReason} numberOfLines={1}>"{voter.reason}"</Text>
-                              )}
-                            </View>
-                          ))}
+                      ))}
+                      {filteredDislikeVoters.map((voter: any, index: number) => (
+                        <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                          <View style={styles.memberVoteAvatar}>
+                            <Text style={styles.memberVoteInitial}>
+                              {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                            </Text>
+                          </View>
+                          <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                          <ThumbsDown size={16} color="#EF4444" />
                         </View>
-                      </View>
-                    )}
-                    {filteredDislikeVoters.length > 0 && (
-                      <View style={styles.voteGroup}>
-                        <View style={styles.voteHeader}>
-                          <ThumbsDown size={14} color="#EF4444" />
-                          <Text style={styles.voteLabel}>Dislikes ({filteredDislikeVoters.length})</Text>
-                        </View>
-                        <View style={styles.voterList}>
-                          {filteredDislikeVoters.map((voter: any, index: number) => (
-                            <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.voterItem}>
-                              <View style={styles.voterAvatar}>
-                                <Text style={styles.voterInitial}>
-                                  {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || '?'}
-                                </Text>
-                              </View>
-                              <Text style={styles.voterName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                              {voter.reason && (
-                                <Text style={styles.voterReason} numberOfLines={1}>"{voter.reason}"</Text>
-                              )}
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-                    {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
-                      <Text style={styles.noVotes}>No votes yet</Text>
-                    )}
+                      ))}
+                      {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
+                        <Text style={styles.noVotes}>No votes yet</Text>
+                      )}
+                    </View>
                   </View>
                 );
               })()}
@@ -1948,15 +1910,16 @@ const styles = StyleSheet.create({
   },
   insightsContent: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   restaurantHeader: {
     flexDirection: 'row',
@@ -1975,6 +1938,19 @@ const styles = StyleSheet.create({
   restaurantImage: {
     width: '100%',
     height: '100%',
+  },
+  restaurantImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  restaurantImagePlaceholderText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   restaurantTitleContainer: {
     flex: 1,
@@ -2216,6 +2192,80 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     fontWeight: '500',
+  },
+  approvalSection: {
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  approvalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  approvalTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  approvalRate: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  voteBreakdown: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  consensusBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  consensusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'lowercase',
+  },
+  memberVotesSection: {
+    marginTop: 16,
+  },
+  memberVotesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  memberVotesList: {
+    gap: 8,
+  },
+  memberVoteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  memberVoteAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberVoteInitial: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  memberVoteName: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#1F2937',
+    flex: 1,
   },
   memberRestaurantActivity: {
     marginTop: 12,
