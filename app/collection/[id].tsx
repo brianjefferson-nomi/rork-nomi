@@ -118,7 +118,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Likes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredLikeVoters.map((v: any) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
+                          {filteredLikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
                         </Text>
                       </View>
                     )}
@@ -129,7 +129,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <Text style={styles.voteLabel}>Dislikes</Text>
                         </View>
                         <Text style={styles.voterNames}>
-                          {filteredDislikeVoters.map((v: any) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
+                          {filteredDislikeVoters.map((v: any, index: number) => v.name?.split(' ')[0] || 'Unknown').join(', ')}
                         </Text>
                       </View>
                     )}
@@ -1092,7 +1092,7 @@ export default function CollectionDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFA',
   },
   errorContainer: {
     flex: 1,
@@ -1104,7 +1104,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-    marginBottom: 0,
+    marginBottom: 8,
   },
   name: {
     fontSize: 28,
@@ -1134,7 +1134,6 @@ const styles = StyleSheet.create({
   },
   restaurantsList: {
     padding: 20,
-    paddingTop: 0,
   },
   recommendationsSection: {
     backgroundColor: '#FFF',
@@ -1169,7 +1168,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyState: {
     paddingVertical: 40,
@@ -1180,23 +1179,23 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   restaurantItem: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   winningRestaurantItem: {
     backgroundColor: '#FEF7E0',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    marginBottom: 24,
-    borderWidth: 2,
+    marginBottom: 32,
+    borderWidth: 3,
     borderColor: '#FFD700',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   removeButton: {
     marginTop: -8,
@@ -1733,60 +1732,51 @@ const styles = StyleSheet.create({
   },
   insightsContainer: {
     padding: 20,
-    paddingTop: 0,
   },
   insightsSection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   insightsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   insightsGrid: {
-    gap: 16,
+    gap: 12,
   },
   insightsContent: {
     backgroundColor: '#FFF',
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
   },
   restaurantName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   votingDetails: {
-    gap: 8,
+    gap: 6,
   },
   voteGroup: {
-    gap: 6,
+    gap: 4,
   },
   voteHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   voteLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
     color: '#6B7280',
   },
   voterNames: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#9CA3AF',
   },
   noVotes: {
     fontSize: 11,
@@ -1820,44 +1810,36 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   memberActivitySection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   memberStatsGrid: {
-    gap: 16,
+    gap: 12,
   },
   memberStatCard: {
     backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
   },
   memberName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   memberStats: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   statValue: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '500',
     color: '#6B7280',
   },
   noActivity: {
