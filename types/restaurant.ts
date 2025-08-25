@@ -27,6 +27,10 @@ export interface Restaurant {
   website?: string;
   priceLevel?: number;
   vibeTags?: string[];
+  // Location-based fields
+  distance?: string;
+  proximity?: 'Very Close' | 'Nearby' | 'Close' | 'Within Range';
+  isFavorite?: boolean;
 }
 
 export interface Collection {

@@ -12,6 +12,9 @@ const API_CONFIG = {
     key: RAPIDAPI_KEY,
     hosts: {
       googlePlaces: 'google-map-places.p.rapidapi.com',
+      googleMapsExtractor: 'google-maps-extractor.p.rapidapi.com',
+      localBusinessData: 'local-business-data.p.rapidapi.com',
+      mapData: 'map-data.p.rapidapi.com',
       yelp: 'yelp-scraper.p.rapidapi.com',
       tripadvisor: 'tripadvisor16.p.rapidapi.com',
       unsplash: 'unsplash-image-search.p.rapidapi.com'
@@ -348,6 +351,93 @@ export const searchGooglePlaces = async (query: string, location: string): Promi
     return data.results || [];
   } catch (error) {
     console.error('Error searching Google Places:', error);
+    return [];
+  }
+};
+
+// New Google Maps Extractor API for enhanced location-based search
+export const searchGoogleMapsExtractor = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
+  try {
+    console.log(`[GoogleMapsExtractor] Searching for: ${query} near ${lat}, ${lng}`);
+    
+    const response = await fetch(
+      `https://${API_CONFIG.rapidapi.hosts.googleMapsExtractor}/search?query=${encodeURIComponent(query + ' restaurant')}&lat=${lat}&lng=${lng}&radius=${radius}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.googleMapsExtractor
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Google Maps Extractor API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[GoogleMapsExtractor] Found ${data.data?.length || 0} results`);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error searching Google Maps Extractor:', error);
+    return [];
+  }
+};
+
+// New Local Business Data API for comprehensive business information
+export const searchLocalBusinessData = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
+  try {
+    console.log(`[LocalBusinessData] Searching for: ${query} near ${lat}, ${lng}`);
+    
+    const response = await fetch(
+      `https://${API_CONFIG.rapidapi.hosts.localBusinessData}/search?query=${encodeURIComponent(query + ' restaurant')}&lat=${lat}&lng=${lng}&radius=${radius}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.localBusinessData
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Local Business Data API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[LocalBusinessData] Found ${data.data?.length || 0} results`);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error searching Local Business Data:', error);
+    return [];
+  }
+};
+
+// New Map Data API for location-based restaurant discovery
+export const searchMapData = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
+  try {
+    console.log(`[MapData] Searching for: ${query} near ${lat}, ${lng}`);
+    
+    const response = await fetch(
+      `https://${API_CONFIG.rapidapi.hosts.mapData}/search?query=${encodeURIComponent(query + ' restaurant')}&lat=${lat}&lng=${lng}&radius=${radius}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': API_CONFIG.rapidapi.key,
+          'X-RapidAPI-Host': API_CONFIG.rapidapi.hosts.mapData
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Map Data API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[MapData] Found ${data.data?.length || 0} results`);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error searching Map Data:', error);
     return [];
   }
 };
@@ -879,12 +969,21 @@ export const searchReddit = async (query: string, location: string) => {
   }
 };
 
-// Enhanced restaurant data aggregation with real API integration
-export const aggregateRestaurantData = async (query: string, location: string) => {
+// Enhanced restaurant data aggregation with real API integration and location-based search
+export const aggregateRestaurantData = async (query: string, location: string, userLat?: number, userLng?: number) => {
   try {
-    // Restrict to NYC/LA only
-    const city = /los angeles/i.test(location) ? 'Los Angeles' : 'New York';
-    const cacheKey = `restaurant_search_${city}_${query.toLowerCase()}`;
+    // Get user location if not provided
+    let userLocation = { city: location, lat: 40.7128, lng: -74.0060 }; // Default to NYC
+    if (userLat && userLng) {
+      userLocation = { city: location, lat: userLat, lng: userLng };
+    } else {
+      const locationData = await getUserLocation();
+      if (locationData) {
+        userLocation = locationData;
+      }
+    }
+
+    const cacheKey = `restaurant_search_${userLocation.city}_${query.toLowerCase()}_${Math.round(userLocation.lat * 1000)}_${Math.round(userLocation.lng * 1000)}`;
 
     // 90-day cache for aggregated restaurant data
     const cachedRaw = await AsyncStorage.getItem(cacheKey);
@@ -892,53 +991,77 @@ export const aggregateRestaurantData = async (query: string, location: string) =
       try {
         const cached = JSON.parse(cachedRaw) as { t: number; data: any[] };
         if (Date.now() - cached.t < CACHE_DURATION) {
-          console.log(`[API] Using cached search results for ${city} :: ${query}`);
+          console.log(`[API] Using cached search results for ${userLocation.city} :: ${query}`);
           return cached.data;
         }
       } catch {}
     }
 
-    console.log(`[API] Searching for restaurants: ${query} in ${city}`);
+    console.log(`[API] Searching for restaurants: ${query} near ${userLocation.lat}, ${userLocation.lng} in ${userLocation.city}`);
 
     let allResults: any[] = [];
 
     try {
+      // Use location-based APIs for better proximity results
       const apiPromises = [
         Promise.race([
-          searchGooglePlaces(query, city),
+          searchGoogleMapsExtractor(query, userLocation.lat, userLocation.lng, 5000),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Google Maps Extractor timeout')), 8000))
+        ]),
+        Promise.race([
+          searchLocalBusinessData(query, userLocation.lat, userLocation.lng, 5000),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Local Business Data timeout')), 8000))
+        ]),
+        Promise.race([
+          searchMapData(query, userLocation.lat, userLocation.lng, 5000),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Map Data timeout')), 8000))
+        ]),
+        Promise.race([
+          searchGooglePlaces(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Google Places timeout')), 5000))
         ]),
         Promise.race([
-          searchYelp(query, city),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 5000))
-        ]),
-        Promise.race([
-          searchTripAdvisor(query, city),
+          searchTripAdvisor(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
-        Promise.resolve([]) // Skip Reddit API due to 404 errors
+        Promise.resolve([]) // Skip Yelp and Reddit APIs due to issues
       ];
 
-      const [googleResults, yelpResults, tripAdvisorResults, redditResults] = await Promise.allSettled(apiPromises);
+      const [mapsExtractorResults, localBusinessResults, mapDataResults, googleResults, tripAdvisorResults] = await Promise.allSettled(apiPromises);
 
+      const mapsExtractorData = mapsExtractorResults.status === 'fulfilled' ? mapsExtractorResults.value : [];
+      const localBusinessData = localBusinessResults.status === 'fulfilled' ? localBusinessResults.value : [];
+      const mapDataData = mapDataResults.status === 'fulfilled' ? mapDataResults.value : [];
       const googleData = googleResults.status === 'fulfilled' ? googleResults.value : [];
-      const yelpData = yelpResults.status === 'fulfilled' ? yelpResults.value : [];
       const tripAdvisorData = tripAdvisorResults.status === 'fulfilled' ? tripAdvisorResults.value : [];
-      const redditData = redditResults.status === 'fulfilled' ? redditResults.value : [];
 
-      console.log(`[API] Results - Google: ${googleData.length}, Yelp: ${yelpData.length}, TripAdvisor: ${tripAdvisorData.length}, Reddit: ${redditData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length}, Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length}, Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}`);
 
-      allResults = await combineApiResults(googleData, yelpData, tripAdvisorData, city, redditData);
+      allResults = await combineLocationBasedResults(
+        mapsExtractorData, 
+        localBusinessData, 
+        mapDataData, 
+        googleData, 
+        tripAdvisorData, 
+        userLocation
+      );
     } catch (error) {
       console.error('[API] Error with real APIs, falling back to mock data:', error);
     }
 
     if (allResults.length === 0) {
       console.log('[API] Using mock data as fallback');
-      allResults = generateMockSearchResults(query, city);
+      allResults = generateMockSearchResults(query, userLocation.city);
     }
 
-    const resultsToEnhance = allResults.slice(0, 10);
+    // Sort results by proximity to user location
+    allResults.sort((a, b) => {
+      const distanceA = calculateDistance(userLocation.lat, userLocation.lng, a.location?.lat || 0, a.location?.lng || 0);
+      const distanceB = calculateDistance(userLocation.lat, userLocation.lng, b.location?.lat || 0, b.location?.lng || 0);
+      return distanceA - distanceB;
+    });
+
+    const resultsToEnhance = allResults.slice(0, 15); // Enhance more results since we have better location data
     const enhancedResults: any[] = [];
 
     for (const result of resultsToEnhance) {
@@ -961,36 +1084,49 @@ export const aggregateRestaurantData = async (query: string, location: string) =
         const [description, vibeTags, topPicks] = await Promise.all(enhancementPromises);
         const assignedImages = await assignRestaurantImages(result);
 
+        // Calculate distance from user
+        const distance = calculateDistance(userLocation.lat, userLocation.lng, result.location?.lat || 0, result.location?.lng || 0);
+
         enhancedResults.push({
           ...result,
           description: description || result.description || 'A great dining experience awaits.',
           vibeTags: (vibeTags && (vibeTags as string[]).length > 0) ? (vibeTags as string[]).map((tag: string) => capitalizeTag(tag)) : (result.vibeTags || ['Popular']),
           topPicks: (Array.isArray(topPicks) && topPicks.length > 0) ? topPicks : (result.topPicks || []),
-          photos: assignedImages
+          photos: assignedImages,
+          distance: distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`,
+          proximity: distance < 1 ? 'Very Close' : distance < 3 ? 'Nearby' : distance < 5 ? 'Close' : 'Within Range'
         });
       } catch (error) {
         console.error(`[API] Error enhancing result for ${result.name}:`, error);
         const assignedImages = await assignRestaurantImages(result);
+        const distance = calculateDistance(userLocation.lat, userLocation.lng, result.location?.lat || 0, result.location?.lng || 0);
+        
         enhancedResults.push({
           ...result,
           description: result.description || 'A great dining experience awaits.',
           vibeTags: (result.vibeTags || ['Popular']).map((tag: string) => capitalizeTag(tag)),
           topPicks: result.topPicks || [],
-          photos: assignedImages
+          photos: assignedImages,
+          distance: distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`,
+          proximity: distance < 1 ? 'Very Close' : distance < 3 ? 'Nearby' : distance < 5 ? 'Close' : 'Within Range'
         });
       }
     }
 
-    if (allResults.length > 10) {
+    if (allResults.length > 15) {
       const remainingResults = await Promise.all(
-        allResults.slice(10).map(async (result) => {
+        allResults.slice(15).map(async (result) => {
           const assignedImages = await assignRestaurantImages(result);
+          const distance = calculateDistance(userLocation.lat, userLocation.lng, result.location?.lat || 0, result.location?.lng || 0);
+          
           return {
             ...result,
             description: result.description || 'A great dining experience awaits.',
             vibeTags: (result.vibeTags || ['Popular']).map((tag: string) => capitalizeTag(tag)),
             topPicks: result.topPicks || [],
-            photos: assignedImages
+            photos: assignedImages,
+            distance: distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`,
+            proximity: distance < 1 ? 'Very Close' : distance < 3 ? 'Nearby' : distance < 5 ? 'Close' : 'Within Range'
           };
         })
       );
@@ -1000,7 +1136,7 @@ export const aggregateRestaurantData = async (query: string, location: string) =
     // Store cache
     await AsyncStorage.setItem(cacheKey, JSON.stringify({ t: Date.now(), data: enhancedResults }));
 
-    console.log(`[API] Successfully processed ${enhancedResults.length} search results`);
+    console.log(`[API] Successfully processed ${enhancedResults.length} location-based search results`);
     return enhancedResults;
   } catch (error) {
     console.error('[API] Error aggregating restaurant data:', error);
@@ -1109,7 +1245,14 @@ const generateFallbackMenuItems = (cuisine: string): string[] => {
 };
 
 // Combine results from different APIs and remove duplicates
-const combineApiResults = async (googleResults: any[], yelpResults: any[], tripAdvisorResults: any[], location: string, redditResults: any[] = []) => {
+const combineLocationBasedResults = async (
+  mapsExtractorResults: any[], 
+  localBusinessResults: any[], 
+  mapDataResults: any[], 
+  googleResults: any[], 
+  tripAdvisorResults: any[], 
+  userLocation: { lat: number; lng: number; city: string }
+) => {
   const combined: any[] = [];
   const seenNames = new Set<string>();
 
@@ -1133,7 +1276,7 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     const photos: string[] = [];
 
     // Format address and parse hours
-    const formattedAddress = formatAddress(place.formatted_address || details?.formatted_address || '', location);
+    const formattedAddress = formatAddress(place.formatted_address || details?.formatted_address || '', userLocation.city);
     const hours = parseRestaurantHours(details?.opening_hours?.weekday_text || details?.current_opening_hours?.weekday_text);
 
     combined.push({
@@ -1149,35 +1292,74 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       reviews: (details?.reviews || []).map((r: any) => r.text).slice(0, 3),
       hours: hours,
       source: 'google',
-      location: place.geometry?.location || { lat: 40.7128, lng: -74.0060 }
+      location: place.geometry?.location || { lat: userLocation.lat, lng: userLocation.lng }
     });
   }
 
-  // Yelp
-  for (const business of yelpResults) {
+  // Process new location-based APIs
+  // Google Maps Extractor
+  for (const place of mapsExtractorResults) {
+    if (!place.name || seenNames.has(place.name.toLowerCase())) continue;
+    seenNames.add(place.name.toLowerCase());
+
+    combined.push({
+      id: `maps_extractor_${place.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: place.name,
+      cuisine: determineCuisineFromTypes(place.types || []),
+      rating: place.rating || 4.0,
+      priceLevel: place.price_level || 2,
+      address: formatAddress(place.address || '', userLocation.city),
+      phone: place.phone || '',
+      website: place.website || '',
+      photos: place.photos || [],
+      reviews: place.reviews || [],
+      hours: parseRestaurantHours(place.hours),
+      source: 'maps_extractor',
+      location: place.location || { lat: userLocation.lat, lng: userLocation.lng }
+    });
+  }
+
+  // Local Business Data
+  for (const business of localBusinessResults) {
     if (!business.name || seenNames.has(business.name.toLowerCase())) continue;
     seenNames.add(business.name.toLowerCase());
 
-    const photos = Array.isArray(business.photos) ? business.photos.slice(0, 3) : [];
+    combined.push({
+      id: `local_business_${business.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: business.name,
+      cuisine: determineCuisineFromTypes(business.types || []),
+      rating: business.rating || 4.0,
+      priceLevel: business.price_level || 2,
+      address: formatAddress(business.address || '', userLocation.city),
+      phone: business.phone || '',
+      website: business.website || '',
+      photos: business.photos || [],
+      reviews: business.reviews || [],
+      hours: parseRestaurantHours(business.hours),
+      source: 'local_business',
+      location: business.location || { lat: userLocation.lat, lng: userLocation.lng }
+    });
+  }
 
-    // Format address and parse hours
-    const formattedAddress = formatAddress(business.location?.display_address?.join(', ') || '', location);
-    const hours = parseRestaurantHours(business.hours?.[0]);
+  // Map Data
+  for (const place of mapDataResults) {
+    if (!place.name || seenNames.has(place.name.toLowerCase())) continue;
+    seenNames.add(place.name.toLowerCase());
 
     combined.push({
-      id: `yelp_${business.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: business.name,
-      cuisine: determineCuisineFromCategories(business.categories || []),
-      rating: business.rating || 4.0,
-      priceLevel: business.price ? business.price.length : 2,
-      address: formattedAddress,
-      phone: business.phone || '',
-      website: business.url || '',
-      photos,
-      reviews: [],
-      hours: hours,
-      source: 'yelp',
-      location: business.coordinates || { lat: 40.7128, lng: -74.0060 }
+      id: `map_data_${place.id || Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: place.name,
+      cuisine: determineCuisineFromTypes(place.types || []),
+      rating: place.rating || 4.0,
+      priceLevel: place.price_level || 2,
+      address: formatAddress(place.address || '', userLocation.city),
+      phone: place.phone || '',
+      website: place.website || '',
+      photos: place.photos || [],
+      reviews: place.reviews || [],
+      hours: parseRestaurantHours(place.hours),
+      source: 'map_data',
+      location: place.location || { lat: userLocation.lat, lng: userLocation.lng }
     });
   }
 
@@ -1226,7 +1408,7 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
     }
 
     // Format address consistently
-    const formattedAddress = formatAddress(restaurant.address || '', location);
+    const formattedAddress = formatAddress(restaurant.address || '', userLocation.city);
     
     // Parse hours if available
     const hours = parseRestaurantHours(restaurant.hours || restaurant.open_hours || restaurant.hours_open || restaurant.opening_hours);
@@ -1244,7 +1426,7 @@ const combineApiResults = async (googleResults: any[], yelpResults: any[], tripA
       reviews: (restaurant.reviews || []).slice(0, 5),
       hours: hours,
       source: 'tripadvisor',
-      location: { lat: 40.7128, lng: -74.0060 }
+      location: { lat: userLocation.lat, lng: userLocation.lng }
     });
   }
 
@@ -1338,4 +1520,18 @@ const determineCuisineFromCategories = (categories: any[]): string => {
   
   const firstCategory = categories[0];
   return firstCategory.title || firstCategory.alias || 'International';
+};
+
+// Helper function to calculate distance between two geographical points
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
 };

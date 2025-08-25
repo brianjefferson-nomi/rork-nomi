@@ -100,7 +100,25 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           </View>
         </View>
         
-        <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
+        <View style={styles.info}>
+          <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
+          <View style={styles.locationInfo}>
+            <MapPin size={14} color="#666" />
+            <Text style={styles.neighborhood}>{restaurant.neighborhood}</Text>
+            {restaurant.distance && (
+              <>
+                <Text style={styles.dot}>•</Text>
+                <Text style={styles.distance}>{restaurant.distance}</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.details}>
+            <Text style={styles.price}>{restaurant.priceRange}</Text>
+            <Text style={styles.dot}>•</Text>
+            <Clock size={14} color="#666" />
+            <Text style={styles.infoText}>{restaurant.hours ? restaurant.hours.split(' ')[0] : 'Hours vary'}</Text>
+          </View>
+        </View>
         
         <View style={styles.vibeContainer}>
           {(restaurant.aiVibes || restaurant.vibe || []).slice(0, 3).map((v, i) => {
@@ -376,5 +394,34 @@ const styles = StyleSheet.create({
   compactFavorite: {
     justifyContent: 'center',
     paddingLeft: 12,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  neighborhood: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  details: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  price: {
+    fontSize: 12,
+    color: '#999',
+    marginRight: 4,
+  },
+  dot: {
+    fontSize: 12,
+    color: '#999',
+    marginHorizontal: 4,
+  },
+  distance: {
+    fontSize: 12,
+    color: '#999',
   },
 });

@@ -94,17 +94,29 @@ export function SearchWizard({ testID }: SearchWizardProps) {
     setIsSearching(true);
     try {
       console.log(`Performing search for: ${searchQuery}`);
-      const results = await searchRestaurants(searchQuery);
+      
+      // Get user location for proximity-based search
+      const location = userLocation;
+      if (!location) {
+        console.log('No user location available, using default search');
+        const results = await searchRestaurants(searchQuery);
+        setSearchResults(results);
+        addSearchQuery(searchQuery);
+        return;
+      }
+      
+      // Use location-based search with user coordinates
+      const results = await searchRestaurants(searchQuery, location.lat, location.lng);
       setSearchResults(results);
       addSearchQuery(searchQuery);
-      console.log(`Found ${results.length} results`);
+      console.log(`Found ${results.length} results near ${location.city}`);
     } catch (error) {
       console.error('Search error:', error);
-      Alert.alert('Search Error', 'Unable to search restaurants. Please try again.');
+      Alert.alert('Search Error', 'Failed to search restaurants. Please try again.');
     } finally {
       setIsSearching(false);
     }
-  }, [searchRestaurants, addSearchQuery]);
+  }, [searchRestaurants, addSearchQuery, userLocation]);
 
   const onSubmit = () => {
     performSearch(query);

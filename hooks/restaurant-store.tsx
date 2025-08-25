@@ -154,15 +154,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     id: dbRestaurant.id,
     name: dbRestaurant.name,
     cuisine: dbRestaurant.cuisine,
-    priceRange: dbRestaurant.price_range as '$' | '$$' | '$$$' | '$$$$',
+    priceRange: dbRestaurant.price_level as '$' | '$$' | '$$$' | '$$$$',
     imageUrl: dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
     images: (dbRestaurant.images || [dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter((img: string) => img && img.trim().length > 0),
     address: dbRestaurant.address,
     neighborhood: dbRestaurant.neighborhood,
     hours: dbRestaurant.hours || 'Hours vary',
-    vibe: dbRestaurant.vibe || [],
+    vibe: dbRestaurant.vibe_tags || [],
     description: dbRestaurant.description || 'A great dining experience awaits.',
-    menuHighlights: dbRestaurant.menu_highlights || [],
+    menuHighlights: dbRestaurant.top_picks || [],
     rating: dbRestaurant.rating || 0,
     reviews: dbRestaurant.reviews || [],
     aiDescription: dbRestaurant.ai_description,
@@ -176,79 +176,97 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     userNotes: dbRestaurant.userNotes || null
   }), []);
 
-  // Function to populate database with real restaurant data
+  // Populate database with real restaurant data from multiple APIs
   const populateDatabaseWithRealRestaurants = useCallback(async (): Promise<Restaurant[]> => {
     try {
       console.log('[RestaurantStore] Populating database with real restaurant data...');
       
-      // Get popular cuisines and search terms
-      const searchTerms = ['Italian', 'Sushi', 'Pizza', 'Burgers', 'Thai', 'Mexican', 'Chinese', 'Indian'];
-      const location = userLocation?.city || 'New York';
-      
+      // Get user location for proximity-based search
+      const userLocation = await getUserLocation();
+      if (!userLocation) {
+        console.log('[RestaurantStore] Could not get user location, using default');
+        return [];
+      }
+
+      const popularCuisines = ['Italian', 'Sushi', 'Pizza', 'Burgers', 'Thai', 'Mexican', 'Chinese', 'Indian'];
       const allRestaurants: Restaurant[] = [];
       
-      // Search for restaurants using the API
-      for (const term of searchTerms.slice(0, 4)) { // Limit to 4 searches to avoid rate limits
+      // Search for restaurants by cuisine type near user location
+      for (const cuisine of popularCuisines) {
         try {
-          console.log(`[RestaurantStore] Searching for ${term} restaurants...`);
-          const results = await aggregateRestaurantData(term, location);
+          console.log(`[RestaurantStore] Searching for ${cuisine} restaurants near ${userLocation.city}...`);
+          
+          // Use the new location-based API with user coordinates
+          const results = await aggregateRestaurantData(
+            cuisine, 
+            userLocation.city, 
+            userLocation.lat, 
+            userLocation.lng
+          );
           
           if (results && results.length > 0) {
-            // Convert API results to Restaurant format and save to database
-            for (const result of results.slice(0, 3)) { // Limit to 3 restaurants per search
+            // Take top 3 results per cuisine for variety
+            const topResults = results.slice(0, 3);
+            
+            for (const result of topResults) {
               try {
+                // Save to database
                 const restaurantData = {
                   restaurant_code: `rest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                   name: result.name,
                   cuisine: result.cuisine,
-                  price_range: result.priceRange || '$$',
+                  price_range: result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$',
                   image_url: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-                  images: result.photos || [],
+                  images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
                   address: result.address,
-                  neighborhood: result.neighborhood || location,
-                  hours: result.hours || 'Hours vary',
-                  vibe: result.vibeTags || [],
-                  description: result.description || 'A great dining experience awaits.',
-                  menu_highlights: result.topPicks || [],
-                  rating: result.rating || 4.0,
-                  reviews: result.reviews || [],
-                  ai_description: result.description,
-                  ai_vibes: result.vibeTags || [],
-                  ai_top_picks: result.topPicks || [],
+                  neighborhood: userLocation.city,
+                  hours: result.hours,
+                  vibe_tags: result.vibeTags,
+                  description: result.description,
+                  top_picks: result.topPicks,
+                  rating: result.rating,
+                  reviews: result.reviews,
                   phone: result.phone,
                   website: result.website,
                   price_level: result.priceLevel,
-                  vibe_tags: result.vibeTags || [],
-                  booking_url: result.bookingUrl,
+                  vibe: result.vibeTags,
+                  menu_highlights: result.topPicks,
+                  ai_description: result.description,
+                  ai_vibes: result.vibeTags,
+                  ai_top_picks: result.topPicks,
                   latitude: result.location?.lat,
                   longitude: result.location?.lng
                 };
                 
-                // Save to database
-                const savedRestaurant = await dbHelpers.createRestaurant(restaurantData);
-                if (savedRestaurant) {
-                  allRestaurants.push(mapDatabaseRestaurant(savedRestaurant));
-                }
+                await dbHelpers.createRestaurant(restaurantData);
+                console.log(`[RestaurantStore] Saved ${result.name} to database`);
+                
+                // Map to Restaurant format for return
+                const mappedRestaurant = mapDatabaseRestaurant(restaurantData);
+                allRestaurants.push(mappedRestaurant);
+                
               } catch (error) {
-                console.error(`[RestaurantStore] Error saving restaurant ${result.name}:`, error);
+                console.error(`[RestaurantStore] Error saving ${result.name}:`, error);
               }
             }
           }
           
-          // Add delay between searches to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Add delay between API calls to respect rate limits
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
         } catch (error) {
-          console.error(`[RestaurantStore] Error searching for ${term}:`, error);
+          console.error(`[RestaurantStore] Error searching for ${cuisine} restaurants:`, error);
         }
       }
       
       console.log(`[RestaurantStore] Successfully populated database with ${allRestaurants.length} restaurants`);
       return allRestaurants;
+      
     } catch (error) {
-      console.error('[RestaurantStore] Error populating database:', error);
+      console.error('[RestaurantStore] Error populating database with real restaurants:', error);
       return [];
     }
-  }, [userLocation?.city, mapDatabaseRestaurant]);
+  }, [mapDatabaseRestaurant]);
 
   useEffect(() => {
     if (dataQuery.data) {
@@ -635,53 +653,66 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     });
   }, [discussions]);
 
-  const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
-    const location = userLocation || { city: 'New York', lat: 40.7128, lng: -74.0060 };
-    
+  // Search restaurants with location-based results
+  const searchRestaurants = useCallback(async (query: string, userLat?: number, userLng?: number): Promise<Restaurant[]> => {
     try {
-      console.log(`Searching for: ${query} in ${location.city}`);
-      const results = await aggregateRestaurantData(query, location.city);
+      console.log(`[RestaurantStore] Searching for: ${query}`);
+      
+      // Get user location if not provided
+      let location = userLocation;
+      if (userLat && userLng) {
+        location = { city: userLocation?.city || 'New York', lat: userLat, lng: userLng };
+      }
+      
+      if (!location) {
+        console.log('[RestaurantStore] No location available, using default search');
+        return restaurants.filter(r => 
+          r.name.toLowerCase().includes(query.toLowerCase()) ||
+          r.cuisine.toLowerCase().includes(query.toLowerCase()) ||
+          r.neighborhood.toLowerCase().includes(query.toLowerCase())
+        );
+      }
+      
+      // Use the enhanced location-based API
+      const results = await aggregateRestaurantData(query, location.city, location.lat, location.lng);
       
       // Convert API results to Restaurant format
-      const formattedResults: Restaurant[] = results.map(result => ({
+      const mappedResults = results.map(result => ({
         id: result.id,
         name: result.name,
         cuisine: result.cuisine,
-        priceRange: '$'.repeat(Math.min(result.priceLevel || 2, 4)) as '$' | '$$' | '$$$' | '$$$$',
-        imageUrl: result.photos[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-        images: result.photos,
-                          address: result.address || 'Address not available',
-        neighborhood: result.address?.split(',')[1]?.trim() || location.city || 'Unknown',
-        hours: result.hours || 'Hours vary',
+        priceRange: (result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
+        imageUrl: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+        images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
+        address: result.address,
+        neighborhood: result.neighborhood || location.city,
+        hours: result.hours,
         vibe: result.vibeTags || [],
-        description: result.description || 'A great dining experience awaits.',
+        description: result.description,
         menuHighlights: result.topPicks || [],
         rating: result.rating,
         reviews: result.reviews || [],
-        aiDescription: result.description,
-        aiVibes: result.vibeTags,
-        aiTopPicks: result.topPicks,
-        contributors: [],
-        commentsCount: 0,
-        savesCount: 0,
-        sharesCount: 0,
-        averageGroupStars: result.rating
+        phone: result.phone,
+        website: result.website,
+                 userNotes: undefined,
+        isFavorite: false,
+        distance: result.distance,
+        proximity: result.proximity
       }));
-
-      // Add to local restaurants if not already present
-      const existingIds = new Set(restaurants.map((r: any) => r.id));
-      const newRestaurants = formattedResults.filter((r: any) => !existingIds.has(r.id));
       
-      if (newRestaurants.length > 0) {
-        setRestaurants((prev: any) => [...prev, ...newRestaurants]);
-      }
-
-      return formattedResults;
+      console.log(`[RestaurantStore] Found ${mappedResults.length} location-based results`);
+      return mappedResults;
+      
     } catch (error) {
-      console.error('Error searching restaurants:', error);
-      return [];
+      console.error('[RestaurantStore] Search error:', error);
+      // Fallback to local search
+      return restaurants.filter(r => 
+        r.name.toLowerCase().includes(query.toLowerCase()) ||
+        r.cuisine.toLowerCase().includes(query.toLowerCase()) ||
+        r.neighborhood.toLowerCase().includes(query.toLowerCase())
+      );
     }
-  }, [userLocation, restaurants]);
+  }, [restaurants, userLocation]);
 
   const refreshLocation = useCallback(async () => {
     try {
