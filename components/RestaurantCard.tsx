@@ -52,8 +52,8 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
   const hasMultipleImages = images.length > 1;
 
   // Format price range to show proper dollar signs
-  const formatPriceRange = (priceRange: string) => {
-    if (!priceRange) return '$$';
+  const formatPriceRange = (priceRange: string | undefined) => {
+    if (!priceRange || typeof priceRange !== 'string') return '$$';
     // Remove any non-dollar sign characters and ensure it's only $ symbols
     const cleanPrice = priceRange.replace(/[^$]/g, '');
     return cleanPrice.length > 0 ? cleanPrice : '$$';
@@ -235,12 +235,27 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           {restaurant.aiDescription || restaurant.description}
         </Text>
         
-        {restaurant.aiTopPicks && Array.isArray(restaurant.aiTopPicks) && restaurant.aiTopPicks.length > 0 && (
+        {/* Enhanced Top Picks Display */}
+        {(restaurant.aiTopPicks || restaurant.menuHighlights) && 
+         (restaurant.aiTopPicks?.length > 0 || restaurant.menuHighlights?.length > 0) && (
           <View style={styles.topPicksContainer}>
-            <Text style={styles.topPicksLabel}>Top picks:</Text>
-            <Text style={styles.topPicksText} numberOfLines={1}>
-              {restaurant.aiTopPicks.slice(0, 2).filter(Boolean).join(', ')}
-            </Text>
+            <View style={styles.topPicksHeader}>
+              <Text style={styles.topPicksLabel}>🔥 Top Picks</Text>
+              <Text style={styles.topPicksCount}>
+                {((restaurant.aiTopPicks || []).length + (restaurant.menuHighlights || []).length)} items
+              </Text>
+            </View>
+            <View style={styles.topPicksList}>
+              {[...(restaurant.aiTopPicks || []), ...(restaurant.menuHighlights || [])]
+                .slice(0, 3)
+                .filter(Boolean)
+                .map((item, index) => (
+                  <View key={index} style={styles.topPickItem}>
+                    <Text style={styles.topPickBullet}>•</Text>
+                    <Text style={styles.topPickText} numberOfLines={1}>{item}</Text>
+                  </View>
+                ))}
+            </View>
           </View>
         )}
 
@@ -261,20 +276,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
     width: '100%',
   },
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 240,
+    height: 260,
   },
   image: {
     width: '100%',
-    height: 240,
+    height: 260,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -282,9 +297,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     transform: [{ translateY: -24 }],
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 24,
-    padding: 10,
+    padding: 12,
     zIndex: 2,
   },
   prevButton: {
@@ -306,33 +321,33 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   activeIndicator: {
     backgroundColor: '#FFF',
+    width: 24,
   },
   favoriteButton: {
     position: 'absolute',
     top: 16,
     right: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 24,
-    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 2,
   },
   content: {
     padding: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   name: {
     fontSize: 22,
     fontWeight: '700',
     color: '#1A1A1A',
-    flex: 1,
+    marginBottom: 8,
+    lineHeight: 28,
   },
   rating: {
     backgroundColor: '#FFE5B4',
@@ -342,88 +357,125 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 16,
+    color: '#FF6B6B',
     fontWeight: '600',
-    color: '#D4A574',
+    marginBottom: 8,
   },
   cuisine: {
     fontSize: 16,
     color: '#666',
+    fontWeight: '500',
     marginBottom: 12,
   },
   vibeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 16,
   },
   vibeTag: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#F8F9FA',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
   vibeText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
   description: {
-    fontSize: 15,
-    color: '#333',
+    fontSize: 16,
+    color: '#666',
     lineHeight: 22,
     marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    gap: 16,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
+    marginLeft: 6,
   },
   price: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#2E7D32',
   },
   noteContainer: {
     marginTop: 16,
-    padding: 12,
+    padding: 16,
     backgroundColor: '#FFF9E6',
-    borderRadius: 12,
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD54F',
   },
   noteLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#D4A574',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   noteText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
     fontStyle: 'italic',
+    lineHeight: 20,
   },
   topPicksContainer: {
-    marginTop: 12,
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  topPicksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   topPicksLabel: {
-    fontSize: 12,
+    fontSize: 15,
     color: '#FF6B6B',
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
   },
-  topPicksText: {
-    fontSize: 13,
-    color: '#666',
-    fontStyle: 'italic',
+  topPicksCount: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+  },
+  topPicksList: {
+    flexDirection: 'column',
+  },
+  topPickItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  topPickBullet: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    marginRight: 10,
+    fontWeight: '600',
+  },
+  topPickText: {
+    fontSize: 15,
+    color: '#444',
+    fontWeight: '500',
+    flex: 1,
   },
   // Compact card styles
   compactCard: {
