@@ -312,6 +312,7 @@ export default function CollectionDetailScreen() {
     addRestaurantComment,
     getRankedRestaurants, 
     getGroupRecommendations,
+    getCollectionRestaurants,
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
@@ -334,22 +335,33 @@ export default function CollectionDetailScreen() {
   const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
   const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
   
+  // Get restaurants for this collection using the simpler function
+  const collectionRestaurants = getCollectionRestaurants(id);
   const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
   
-  // Debug logging for ranked restaurants
+  // Debug logging for both approaches
+  console.log('[CollectionDetail] Collection ID:', id);
+  console.log('[CollectionDetail] Collection:', collection?.name);
+  console.log('[CollectionDetail] Collection restaurants (simple):', collectionRestaurants.length);
   console.log('[CollectionDetail] Ranked restaurants:', rankedRestaurants.length);
-  rankedRestaurants.forEach(({ restaurant, meta }, index) => {
-    console.log(`[CollectionDetail] Restaurant ${index + 1}:`, {
-      id: restaurant.id,
-      name: restaurant.name,
-      cuisine: restaurant.cuisine,
-      likes: meta.likes,
-      dislikes: meta.dislikes,
-      hasVoteDetails: !!meta.voteDetails,
-      likeVoters: meta.voteDetails?.likeVoters?.length || 0,
-      dislikeVoters: meta.voteDetails?.dislikeVoters?.length || 0
-    });
-  });
+  
+  // Use collectionRestaurants if rankedRestaurants is empty
+  const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : collectionRestaurants.map(r => ({ 
+    restaurant: r, 
+    meta: { 
+      likes: 0, 
+      dislikes: 0, 
+      rank: 1,
+      voteDetails: {
+        likeVoters: [],
+        dislikeVoters: []
+      },
+      approvalPercent: 0,
+      discussionCount: 0
+    } 
+  }));
+  
+  console.log('[CollectionDetail] Display restaurants:', displayRestaurants.length);
   const recommendations = collection ? getGroupRecommendations(id) : [];
   
   // Load discussions asynchronously
@@ -727,14 +739,14 @@ export default function CollectionDetailScreen() {
         </View>
 
                 {/* Tab Content */}
-        {activeTab === 'restaurants' ? (
-          <View style={styles.restaurantsList}>
-          {rankedRestaurants.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
-            </View>
-          ) : (
-                        rankedRestaurants.map(({ restaurant, meta }, index) => {
+                  {activeTab === 'restaurants' ? (
+            <View style={styles.restaurantsList}>
+              {displayRestaurants.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
+                </View>
+              ) : (
+                displayRestaurants.map(({ restaurant, meta }, index) => {
               const isFavorite = favoriteRestaurants.includes(restaurant.id);
               const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
               const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
