@@ -132,6 +132,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           const mappedRestaurants = restaurantsData.map(mapDatabaseRestaurant);
           console.log('[RestaurantStore] Mapped restaurants:', mappedRestaurants.length);
           console.log('[RestaurantStore] Sample restaurant IDs:', mappedRestaurants.slice(0, 3).map(r => r.id));
+          console.log('[RestaurantStore] All restaurant IDs from database:', mappedRestaurants.map(r => r.id));
           return mappedRestaurants;
         } else {
           console.log('[RestaurantStore] No restaurants in database, using mock data');
@@ -651,6 +652,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     console.log('[getCollectionRestaurants] Found collection:', collection.name);
     console.log('[getCollectionRestaurants] Collection restaurant_ids:', collection.restaurant_ids?.length || 0);
+    console.log('[getCollectionRestaurants] Collection restaurant_ids array:', collection.restaurant_ids);
+    console.log('[getCollectionRestaurants] Available restaurants in store:', restaurants.length);
+    console.log('[getCollectionRestaurants] Available restaurant IDs in store:', restaurants.map(r => r.id));
 
     if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
       console.log('[getCollectionRestaurants] No restaurant_ids in collection, using mock restaurants as fallback');
@@ -667,6 +671,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     // If no restaurants found in the collection, use mock restaurants as fallback
     if (collectionRestaurants.length === 0) {
       console.log('[getCollectionRestaurants] No restaurants found in collection, using mock restaurants as fallback');
+      console.log('[getCollectionRestaurants] Missing restaurant IDs:', collection.restaurant_ids.filter((id: string) => !restaurants.some(r => r.id === id)));
       return mockRestaurants.slice(0, 5); // Return first 5 mock restaurants
     }
 
