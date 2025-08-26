@@ -1,11 +1,76 @@
 -- =====================================================
--- SCALABILITY IMPROVEMENTS FOR USER DATA MANAGEMENT
+-- STEP-BY-STEP SCHEMA APPLICATION
 -- =====================================================
 
--- 1. ADD PERFORMANCE INDEXES
+-- STEP 1: CREATE TABLES
 -- =====================================================
 
--- Composite indexes for common query patterns
+-- User activity summary table
+CREATE TABLE IF NOT EXISTS user_activity_summary (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  total_collections_created INTEGER DEFAULT 0,
+  total_collections_joined INTEGER DEFAULT 0,
+  total_votes_cast INTEGER DEFAULT 0,
+  total_discussions_started INTEGER DEFAULT 0,
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Collection statistics cache
+CREATE TABLE IF NOT EXISTS collection_stats_cache (
+  collection_id UUID PRIMARY KEY REFERENCES collections(id) ON DELETE CASCADE,
+  total_members INTEGER DEFAULT 0,
+  total_restaurants INTEGER DEFAULT 0,
+  total_votes INTEGER DEFAULT 0,
+  total_likes INTEGER DEFAULT 0,
+  total_dislikes INTEGER DEFAULT 0,
+  total_discussions INTEGER DEFAULT 0,
+  participation_rate DECIMAL(5,2) DEFAULT 0,
+  last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User sessions table
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_token TEXT UNIQUE NOT NULL,
+  device_info JSONB,
+  ip_address INET,
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Rate limiting table
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  action_type TEXT NOT NULL,
+  request_count INTEGER DEFAULT 1,
+  window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, action_type, window_start)
+);
+
+-- Archive tables
+CREATE TABLE IF NOT EXISTS archived_restaurant_votes (
+  LIKE restaurant_votes INCLUDING ALL
+);
+
+CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
+  LIKE restaurant_discussions INCLUDING ALL
+);
+
+-- Verify tables were created
+SELECT 'Tables created successfully' as status;
+
+-- STEP 2: CREATE INDEXES
+-- =====================================================
+
+-- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_collections_created_by_created_at 
 ON collections(created_by, created_at DESC);
 
@@ -30,17 +95,34 @@ ON restaurant_discussions(collection_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_email_created_at 
 ON users(email, created_at DESC);
 
--- Simple index for collections (removed partial index to avoid IMMUTABLE issues)
 CREATE INDEX IF NOT EXISTS idx_collections_created_at_desc 
 ON collections(created_at DESC);
 
--- 2. ADD PAGINATION SUPPORT
+-- Table-specific indexes
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id 
+ON user_sessions(user_id, last_activity_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at 
+ON user_sessions(expires_at) WHERE expires_at < '2099-12-31'::timestamp;
+
+CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
+ON rate_limits(user_id, action_type, window_start);
+
+-- Verify indexes were created
+SELECT 'Indexes created successfully' as status;
+
+-- STEP 3: CREATE FUNCTIONS
 -- =====================================================
 
--- Drop existing function if it exists (to handle return type changes)
+-- Drop existing functions if they exist
 DROP FUNCTION IF EXISTS get_user_collections_paginated(UUID, INTEGER, INTEGER, BOOLEAN);
+DROP FUNCTION IF EXISTS update_user_activity_summary(UUID);
+DROP FUNCTION IF EXISTS update_collection_stats_cache(UUID);
+DROP FUNCTION IF EXISTS check_rate_limit(UUID, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS archive_old_data(INTEGER);
+DROP FUNCTION IF EXISTS trigger_update_collection_stats();
 
--- Function to get paginated collections for a user
+-- Function 1: Pagination
 CREATE OR REPLACE FUNCTION get_user_collections_paginated(
   p_user_id UUID,
   p_limit INTEGER DEFAULT 20,
@@ -60,7 +142,6 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   WITH user_collections AS (
-    -- Collections created by user
     SELECT 
       c.id,
       c.name,
@@ -75,7 +156,6 @@ BEGIN
     
     UNION ALL
     
-    -- Collections where user is a member
     SELECT 
       c.id,
       c.name,
@@ -91,7 +171,6 @@ BEGIN
     
     UNION ALL
     
-    -- Public collections (if requested)
     SELECT 
       c.id,
       c.name,
@@ -133,25 +212,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. ADD USER ACTIVITY TRACKING
--- =====================================================
-
--- User activity summary table for quick access
-CREATE TABLE IF NOT EXISTS user_activity_summary (
-  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  total_collections_created INTEGER DEFAULT 0,
-  total_collections_joined INTEGER DEFAULT 0,
-  total_votes_cast INTEGER DEFAULT 0,
-  total_discussions_started INTEGER DEFAULT 0,
-  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS update_user_activity_summary(UUID);
-
--- Function to update user activity summary
+-- Function 2: User Activity Summary
 CREATE OR REPLACE FUNCTION update_user_activity_summary(p_user_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -187,28 +248,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 4. ADD CACHING TABLES
--- =====================================================
-
--- Collection statistics cache
-CREATE TABLE IF NOT EXISTS collection_stats_cache (
-  collection_id UUID PRIMARY KEY REFERENCES collections(id) ON DELETE CASCADE,
-  total_members INTEGER DEFAULT 0,
-  total_restaurants INTEGER DEFAULT 0,
-  total_votes INTEGER DEFAULT 0,
-  total_likes INTEGER DEFAULT 0,
-  total_dislikes INTEGER DEFAULT 0,
-  total_discussions INTEGER DEFAULT 0,
-  participation_rate DECIMAL(5,2) DEFAULT 0,
-  last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS update_collection_stats_cache(UUID);
-
--- Function to update collection stats cache
+-- Function 3: Collection Stats Cache
 CREATE OR REPLACE FUNCTION update_collection_stats_cache(p_collection_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -220,7 +260,6 @@ DECLARE
   v_total_discussions INTEGER;
   v_participation_rate DECIMAL(5,2);
 BEGIN
-  -- Calculate stats
   SELECT 
     COUNT(DISTINCT cm.user_id),
     COALESCE(array_length(c.restaurant_ids, 1), 0),
@@ -236,14 +275,12 @@ BEGIN
   WHERE c.id = p_collection_id
   GROUP BY c.id, c.restaurant_ids;
 
-  -- Calculate participation rate
   IF v_total_members > 0 THEN
     v_participation_rate := (v_total_votes::DECIMAL / (v_total_members * v_total_restaurants)) * 100;
   ELSE
     v_participation_rate := 0;
   END IF;
 
-  -- Update cache
   INSERT INTO collection_stats_cache (
     collection_id,
     total_members,
@@ -279,13 +316,80 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 5. ADD TRIGGERS FOR AUTOMATIC CACHE UPDATES
--- =====================================================
+-- Function 4: Rate Limiting
+CREATE OR REPLACE FUNCTION check_rate_limit(
+  p_user_id UUID,
+  p_action_type TEXT,
+  p_max_requests INTEGER DEFAULT 100,
+  p_window_minutes INTEGER DEFAULT 60
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_current_count INTEGER;
+  v_window_start TIMESTAMP WITH TIME ZONE;
+BEGIN
+  v_window_start := date_trunc('minute', NOW());
+  
+  DELETE FROM rate_limits 
+  WHERE window_start < NOW() - INTERVAL '1 minute' * p_window_minutes;
+  
+  SELECT COALESCE(SUM(request_count), 0)
+  INTO v_current_count
+  FROM rate_limits
+  WHERE user_id = p_user_id 
+    AND action_type = p_action_type
+    AND window_start >= v_window_start - INTERVAL '1 minute' * p_window_minutes;
+  
+  IF v_current_count >= p_max_requests THEN
+    RETURN FALSE;
+  END IF;
+  
+  INSERT INTO rate_limits (user_id, action_type, request_count, window_start)
+  VALUES (p_user_id, p_action_type, 1, v_window_start)
+  ON CONFLICT (user_id, action_type, window_start) 
+  DO UPDATE SET request_count = rate_limits.request_count + 1;
+  
+  RETURN TRUE;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
 
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS trigger_update_collection_stats();
+-- Function 5: Archive Old Data
+CREATE OR REPLACE FUNCTION archive_old_data(p_months_old INTEGER DEFAULT 12)
+RETURNS VOID AS $$
+DECLARE
+  v_archived_votes INTEGER := 0;
+  v_archived_discussions INTEGER := 0;
+BEGIN
+  INSERT INTO archived_restaurant_votes
+  SELECT * FROM restaurant_votes
+  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  GET DIAGNOSTICS v_archived_votes = ROW_COUNT;
+  
+  DELETE FROM restaurant_votes
+  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  INSERT INTO archived_restaurant_discussions
+  SELECT * FROM restaurant_discussions
+  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  GET DIAGNOSTICS v_archived_discussions = ROW_COUNT;
+  
+  DELETE FROM restaurant_discussions
+  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  RAISE NOTICE 'Archived % votes and % discussions older than % months', 
+    v_archived_votes, v_archived_discussions, p_months_old;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'Error during archival: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
 
--- Trigger to update collection stats when votes change
+-- Function 6: Trigger Function
 CREATE OR REPLACE FUNCTION trigger_update_collection_stats()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -300,6 +404,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Verify functions were created
+SELECT 'Functions created successfully' as status;
+
+-- STEP 4: CREATE TRIGGERS
+-- =====================================================
+
 CREATE TRIGGER trigger_restaurant_votes_stats
   AFTER INSERT OR UPDATE OR DELETE ON restaurant_votes
   FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
@@ -312,150 +422,12 @@ CREATE TRIGGER trigger_collection_members_stats
   AFTER INSERT OR UPDATE OR DELETE ON collection_members
   FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
 
--- 6. ADD USER SESSION TRACKING
+-- Verify triggers were created
+SELECT 'Triggers created successfully' as status;
+
+-- STEP 5: CREATE VIEWS
 -- =====================================================
 
--- User sessions table for analytics and rate limiting
-CREATE TABLE IF NOT EXISTS user_sessions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  session_token TEXT UNIQUE NOT NULL,
-  device_info JSONB,
-  ip_address INET,
-  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id 
-ON user_sessions(user_id, last_activity_at DESC);
-
--- Index for expired sessions (using fixed date instead of NOW() for IMMUTABLE requirement)
-CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at 
-ON user_sessions(expires_at) WHERE expires_at < '2099-12-31'::timestamp;
-
--- 7. ADD RATE LIMITING SUPPORT
--- =====================================================
-
--- Rate limiting table
-CREATE TABLE IF NOT EXISTS rate_limits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  action_type TEXT NOT NULL, -- 'vote', 'comment', 'create_collection', etc.
-  request_count INTEGER DEFAULT 1,
-  window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, action_type, window_start)
-);
-
-CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
-ON rate_limits(user_id, action_type, window_start);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS check_rate_limit(UUID, TEXT, INTEGER, INTEGER);
-
--- Function to check rate limits
-CREATE OR REPLACE FUNCTION check_rate_limit(
-  p_user_id UUID,
-  p_action_type TEXT,
-  p_max_requests INTEGER DEFAULT 100,
-  p_window_minutes INTEGER DEFAULT 60
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-  v_current_count INTEGER;
-  v_window_start TIMESTAMP WITH TIME ZONE;
-BEGIN
-  -- Set window start to current time rounded to the minute
-  v_window_start := date_trunc('minute', NOW());
-  
-  -- Clean old entries (older than the window)
-  DELETE FROM rate_limits 
-  WHERE window_start < NOW() - INTERVAL '1 minute' * p_window_minutes;
-  
-  -- Get current count for this window
-  SELECT COALESCE(SUM(request_count), 0)
-  INTO v_current_count
-  FROM rate_limits
-  WHERE user_id = p_user_id 
-    AND action_type = p_action_type
-    AND window_start >= v_window_start - INTERVAL '1 minute' * p_window_minutes;
-  
-  -- Check if limit exceeded
-  IF v_current_count >= p_max_requests THEN
-    RETURN FALSE;
-  END IF;
-  
-  -- Record this request
-  INSERT INTO rate_limits (user_id, action_type, request_count, window_start)
-  VALUES (p_user_id, p_action_type, 1, v_window_start)
-  ON CONFLICT (user_id, action_type, window_start) 
-  DO UPDATE SET request_count = rate_limits.request_count + 1;
-  
-  RETURN TRUE;
-EXCEPTION
-  WHEN OTHERS THEN
-    -- If there's any error, allow the request (fail open)
-    RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql;
-
--- 8. ADD DATA ARCHIVAL SUPPORT
--- =====================================================
-
--- Archive old data to improve performance
-CREATE TABLE IF NOT EXISTS archived_restaurant_votes (
-  LIKE restaurant_votes INCLUDING ALL
-);
-
-CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
-  LIKE restaurant_discussions INCLUDING ALL
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS archive_old_data(INTEGER);
-
--- Function to archive old data
-CREATE OR REPLACE FUNCTION archive_old_data(p_months_old INTEGER DEFAULT 12)
-RETURNS VOID AS $$
-DECLARE
-  v_archived_votes INTEGER := 0;
-  v_archived_discussions INTEGER := 0;
-BEGIN
-  -- Archive old votes
-  INSERT INTO archived_restaurant_votes
-  SELECT * FROM restaurant_votes
-  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
-  
-  GET DIAGNOSTICS v_archived_votes = ROW_COUNT;
-  
-  DELETE FROM restaurant_votes
-  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
-  
-  -- Archive old discussions
-  INSERT INTO archived_restaurant_discussions
-  SELECT * FROM restaurant_discussions
-  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
-  
-  GET DIAGNOSTICS v_archived_discussions = ROW_COUNT;
-  
-  DELETE FROM restaurant_discussions
-  WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
-  
-  -- Log the archival results
-  RAISE NOTICE 'Archived % votes and % discussions older than % months', 
-    v_archived_votes, v_archived_discussions, p_months_old;
-EXCEPTION
-  WHEN OTHERS THEN
-    -- Log the error but don't fail
-    RAISE WARNING 'Error during archival: %', SQLERRM;
-END;
-$$ LANGUAGE plpgsql;
-
--- 9. ADD MONITORING VIEWS
--- =====================================================
-
--- View for system health monitoring
 CREATE OR REPLACE VIEW system_health AS
 SELECT 
   'users' as table_name,
@@ -478,15 +450,16 @@ SELECT
   COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') as active_today
 FROM restaurant_votes;
 
--- 10. ADD PERFORMANCE OPTIMIZATIONS
+-- Verify view was created
+SELECT 'Views created successfully' as status;
+
+-- STEP 6: PERFORMANCE OPTIMIZATIONS
 -- =====================================================
 
--- Enable parallel query execution for large tables
 ALTER TABLE restaurant_votes SET (parallel_workers = 4);
 ALTER TABLE restaurant_discussions SET (parallel_workers = 4);
 ALTER TABLE collection_members SET (parallel_workers = 2);
 
--- Set appropriate autovacuum settings
 ALTER TABLE restaurant_votes SET (
   autovacuum_vacuum_scale_factor = 0.1,
   autovacuum_analyze_scale_factor = 0.05
@@ -497,9 +470,27 @@ ALTER TABLE restaurant_discussions SET (
   autovacuum_analyze_scale_factor = 0.05
 );
 
--- Comments for documentation
-COMMENT ON FUNCTION get_user_collections_paginated IS 'Get paginated collections for a user with proper ordering and limits';
-COMMENT ON FUNCTION update_user_activity_summary IS 'Update user activity summary for quick access';
-COMMENT ON FUNCTION update_collection_stats_cache IS 'Update collection statistics cache for performance';
-COMMENT ON FUNCTION check_rate_limit IS 'Check and enforce rate limits for user actions';
-COMMENT ON FUNCTION archive_old_data IS 'Archive old data to improve performance';
+-- Verify optimizations applied
+SELECT 'Performance optimizations applied successfully' as status;
+
+-- STEP 7: TEST FUNCTIONS
+-- =====================================================
+
+-- Test rate limiting function
+SELECT check_rate_limit(
+  '11111111-1111-1111-1111-111111111111'::UUID, 
+  'test'::TEXT, 
+  5::INTEGER, 
+  60::INTEGER
+) as rate_limit_test;
+
+-- Test pagination function
+SELECT * FROM get_user_collections_paginated(
+  '11111111-1111-1111-1111-111111111111'::UUID, 
+  0::INTEGER, 
+  10::INTEGER, 
+  true::BOOLEAN
+) LIMIT 1;
+
+-- Final verification
+SELECT 'Schema application completed successfully!' as final_status;

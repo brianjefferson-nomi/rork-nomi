@@ -1,8 +1,8 @@
 -- =====================================================
--- SCALABILITY IMPROVEMENTS FOR USER DATA MANAGEMENT
+-- SCALABILITY SCHEMA - APPLY IN PARTS
 -- =====================================================
 
--- 1. ADD PERFORMANCE INDEXES
+-- PART 1: PERFORMANCE INDEXES
 -- =====================================================
 
 -- Composite indexes for common query patterns
@@ -34,11 +34,90 @@ ON users(email, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_collections_created_at_desc 
 ON collections(created_at DESC);
 
--- 2. ADD PAGINATION SUPPORT
+-- PART 2: NEW TABLES
 -- =====================================================
 
--- Drop existing function if it exists (to handle return type changes)
+-- User activity summary table for quick access
+CREATE TABLE IF NOT EXISTS user_activity_summary (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  total_collections_created INTEGER DEFAULT 0,
+  total_collections_joined INTEGER DEFAULT 0,
+  total_votes_cast INTEGER DEFAULT 0,
+  total_discussions_started INTEGER DEFAULT 0,
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Collection statistics cache
+CREATE TABLE IF NOT EXISTS collection_stats_cache (
+  collection_id UUID PRIMARY KEY REFERENCES collections(id) ON DELETE CASCADE,
+  total_members INTEGER DEFAULT 0,
+  total_restaurants INTEGER DEFAULT 0,
+  total_votes INTEGER DEFAULT 0,
+  total_likes INTEGER DEFAULT 0,
+  total_dislikes INTEGER DEFAULT 0,
+  total_discussions INTEGER DEFAULT 0,
+  participation_rate DECIMAL(5,2) DEFAULT 0,
+  last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User sessions table for analytics and rate limiting
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_token TEXT UNIQUE NOT NULL,
+  device_info JSONB,
+  ip_address INET,
+  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Rate limiting table
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  action_type TEXT NOT NULL, -- 'vote', 'comment', 'create_collection', etc.
+  request_count INTEGER DEFAULT 1,
+  window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, action_type, window_start)
+);
+
+-- Archive old data to improve performance
+CREATE TABLE IF NOT EXISTS archived_restaurant_votes (
+  LIKE restaurant_votes INCLUDING ALL
+);
+
+CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
+  LIKE restaurant_discussions INCLUDING ALL
+);
+
+-- PART 3: TABLE INDEXES
+-- =====================================================
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id 
+ON user_sessions(user_id, last_activity_at DESC);
+
+-- Index for expired sessions (using fixed date instead of NOW() for IMMUTABLE requirement)
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at 
+ON user_sessions(expires_at) WHERE expires_at < '2099-12-31'::timestamp;
+
+CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
+ON rate_limits(user_id, action_type, window_start);
+
+-- PART 4: FUNCTIONS
+-- =====================================================
+
+-- Drop existing functions if they exist
 DROP FUNCTION IF EXISTS get_user_collections_paginated(UUID, INTEGER, INTEGER, BOOLEAN);
+DROP FUNCTION IF EXISTS update_user_activity_summary(UUID);
+DROP FUNCTION IF EXISTS update_collection_stats_cache(UUID);
+DROP FUNCTION IF EXISTS check_rate_limit(UUID, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS archive_old_data(INTEGER);
 
 -- Function to get paginated collections for a user
 CREATE OR REPLACE FUNCTION get_user_collections_paginated(
@@ -133,24 +212,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. ADD USER ACTIVITY TRACKING
--- =====================================================
-
--- User activity summary table for quick access
-CREATE TABLE IF NOT EXISTS user_activity_summary (
-  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  total_collections_created INTEGER DEFAULT 0,
-  total_collections_joined INTEGER DEFAULT 0,
-  total_votes_cast INTEGER DEFAULT 0,
-  total_discussions_started INTEGER DEFAULT 0,
-  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS update_user_activity_summary(UUID);
-
 -- Function to update user activity summary
 CREATE OR REPLACE FUNCTION update_user_activity_summary(p_user_id UUID)
 RETURNS VOID AS $$
@@ -186,27 +247,6 @@ BEGIN
     updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql;
-
--- 4. ADD CACHING TABLES
--- =====================================================
-
--- Collection statistics cache
-CREATE TABLE IF NOT EXISTS collection_stats_cache (
-  collection_id UUID PRIMARY KEY REFERENCES collections(id) ON DELETE CASCADE,
-  total_members INTEGER DEFAULT 0,
-  total_restaurants INTEGER DEFAULT 0,
-  total_votes INTEGER DEFAULT 0,
-  total_likes INTEGER DEFAULT 0,
-  total_dislikes INTEGER DEFAULT 0,
-  total_discussions INTEGER DEFAULT 0,
-  participation_rate DECIMAL(5,2) DEFAULT 0,
-  last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS update_collection_stats_cache(UUID);
 
 -- Function to update collection stats cache
 CREATE OR REPLACE FUNCTION update_collection_stats_cache(p_collection_id UUID)
@@ -279,81 +319,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 5. ADD TRIGGERS FOR AUTOMATIC CACHE UPDATES
--- =====================================================
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS trigger_update_collection_stats();
-
--- Trigger to update collection stats when votes change
-CREATE OR REPLACE FUNCTION trigger_update_collection_stats()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-    PERFORM update_collection_stats_cache(NEW.collection_id);
-    RETURN NEW;
-  ELSIF TG_OP = 'DELETE' THEN
-    PERFORM update_collection_stats_cache(OLD.collection_id);
-    RETURN OLD;
-  END IF;
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_restaurant_votes_stats
-  AFTER INSERT OR UPDATE OR DELETE ON restaurant_votes
-  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
-
-CREATE TRIGGER trigger_restaurant_discussions_stats
-  AFTER INSERT OR UPDATE OR DELETE ON restaurant_discussions
-  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
-
-CREATE TRIGGER trigger_collection_members_stats
-  AFTER INSERT OR UPDATE OR DELETE ON collection_members
-  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
-
--- 6. ADD USER SESSION TRACKING
--- =====================================================
-
--- User sessions table for analytics and rate limiting
-CREATE TABLE IF NOT EXISTS user_sessions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  session_token TEXT UNIQUE NOT NULL,
-  device_info JSONB,
-  ip_address INET,
-  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id 
-ON user_sessions(user_id, last_activity_at DESC);
-
--- Index for expired sessions (using fixed date instead of NOW() for IMMUTABLE requirement)
-CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at 
-ON user_sessions(expires_at) WHERE expires_at < '2099-12-31'::timestamp;
-
--- 7. ADD RATE LIMITING SUPPORT
--- =====================================================
-
--- Rate limiting table
-CREATE TABLE IF NOT EXISTS rate_limits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  action_type TEXT NOT NULL, -- 'vote', 'comment', 'create_collection', etc.
-  request_count INTEGER DEFAULT 1,
-  window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, action_type, window_start)
-);
-
-CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
-ON rate_limits(user_id, action_type, window_start);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS check_rate_limit(UUID, TEXT, INTEGER, INTEGER);
-
 -- Function to check rate limits
 CREATE OR REPLACE FUNCTION check_rate_limit(
   p_user_id UUID,
@@ -400,21 +365,6 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql;
 
--- 8. ADD DATA ARCHIVAL SUPPORT
--- =====================================================
-
--- Archive old data to improve performance
-CREATE TABLE IF NOT EXISTS archived_restaurant_votes (
-  LIKE restaurant_votes INCLUDING ALL
-);
-
-CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
-  LIKE restaurant_discussions INCLUDING ALL
-);
-
--- Drop existing function if it exists
-DROP FUNCTION IF EXISTS archive_old_data(INTEGER);
-
 -- Function to archive old data
 CREATE OR REPLACE FUNCTION archive_old_data(p_months_old INTEGER DEFAULT 12)
 RETURNS VOID AS $$
@@ -452,7 +402,40 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql;
 
--- 9. ADD MONITORING VIEWS
+-- PART 5: TRIGGERS
+-- =====================================================
+
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS trigger_update_collection_stats();
+
+-- Trigger to update collection stats when votes change
+CREATE OR REPLACE FUNCTION trigger_update_collection_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    PERFORM update_collection_stats_cache(NEW.collection_id);
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM update_collection_stats_cache(OLD.collection_id);
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_restaurant_votes_stats
+  AFTER INSERT OR UPDATE OR DELETE ON restaurant_votes
+  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
+
+CREATE TRIGGER trigger_restaurant_discussions_stats
+  AFTER INSERT OR UPDATE OR DELETE ON restaurant_discussions
+  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
+
+CREATE TRIGGER trigger_collection_members_stats
+  AFTER INSERT OR UPDATE OR DELETE ON collection_members
+  FOR EACH ROW EXECUTE FUNCTION trigger_update_collection_stats();
+
+-- PART 6: MONITORING VIEWS
 -- =====================================================
 
 -- View for system health monitoring
@@ -478,7 +461,7 @@ SELECT
   COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') as active_today
 FROM restaurant_votes;
 
--- 10. ADD PERFORMANCE OPTIMIZATIONS
+-- PART 7: PERFORMANCE OPTIMIZATIONS
 -- =====================================================
 
 -- Enable parallel query execution for large tables
