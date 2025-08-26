@@ -31,6 +31,12 @@ const WORLDWIDE_RESTAURANTS_HOST = 'worldwide-restaurants.p.rapidapi.com';
 const UBER_EATS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 
+// Log API key status for debugging
+console.log('[API] RapidAPI Key loaded:', RAPIDAPI_KEY ? '✅ YES' : '❌ NO');
+console.log('[API] TripAdvisor Key loaded:', TRIPADVISOR_API_KEY ? '✅ YES' : '❌ NO');
+console.log('[API] Foursquare Key loaded:', FOURSQUARE_API_KEY ? '✅ YES' : '❌ NO');
+console.log('[API] Note: Yelp API3 may return 403 errors if your RapidAPI subscription does not include this service');
+
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
   rapidapi: {
@@ -2686,7 +2692,7 @@ export const searchRestaurantsWithYelp = async (
   }
 };
 
-// Yelp API3 Search Suggestions with rate limiting
+// Yelp API3 Search Suggestions with rate limiting and better error handling
 export const getYelpSearchSuggestions = async (
   location: string = 'US',
   query?: string
@@ -2721,9 +2727,15 @@ export const getYelpSearchSuggestions = async (
       return [];
     }
     
+    if (response.status === 403) {
+      console.warn('[Yelp API3] Access forbidden (403) - API key may not have access to this service');
+      console.warn('[Yelp API3] Returning fallback suggestions instead');
+      return getFallbackSearchSuggestions(location, query);
+    }
+    
     if (!response.ok) {
       console.error(`[Yelp API3] Error: ${response.status} ${response.statusText}`);
-      return [];
+      return getFallbackSearchSuggestions(location, query);
     }
     
     const data = await response.json();
@@ -2732,8 +2744,42 @@ export const getYelpSearchSuggestions = async (
     return data.suggestions || [];
   } catch (error) {
     console.error('[Yelp API3] Error getting search suggestions:', error);
-    return [];
+    return getFallbackSearchSuggestions(location, query);
   }
+};
+
+// Fallback search suggestions when Yelp API3 is not available
+const getFallbackSearchSuggestions = (location: string, query?: string): any[] => {
+  console.log('[Yelp API3] Using fallback search suggestions');
+  
+  const fallbackSuggestions = [
+    { name: 'Italian Restaurant', category: 'Italian', location: location },
+    { name: 'Chinese Restaurant', category: 'Chinese', location: location },
+    { name: 'Mexican Restaurant', category: 'Mexican', location: location },
+    { name: 'Japanese Restaurant', category: 'Japanese', location: location },
+    { name: 'American Restaurant', category: 'American', location: location },
+    { name: 'Thai Restaurant', category: 'Thai', location: location },
+    { name: 'Indian Restaurant', category: 'Indian', location: location },
+    { name: 'French Restaurant', category: 'French', location: location },
+    { name: 'Mediterranean Restaurant', category: 'Mediterranean', location: location },
+    { name: 'Pizza Place', category: 'Pizza', location: location },
+    { name: 'Burger Joint', category: 'Burgers', location: location },
+    { name: 'Sushi Bar', category: 'Sushi', location: location },
+    { name: 'Steakhouse', category: 'Steakhouse', location: location },
+    { name: 'Seafood Restaurant', category: 'Seafood', location: location },
+    { name: 'BBQ Restaurant', category: 'BBQ', location: location }
+  ];
+  
+  // Filter by query if provided
+  if (query) {
+    const queryLower = query.toLowerCase();
+    return fallbackSuggestions.filter(suggestion => 
+      suggestion.name.toLowerCase().includes(queryLower) ||
+      suggestion.category.toLowerCase().includes(queryLower)
+    );
+  }
+  
+  return fallbackSuggestions;
 };
 
 export const getYelpAutocompleteSuggestions = async (
@@ -2806,7 +2852,21 @@ export const getYelpPopularSearches = async (
     return uniqueSearches;
   } catch (error) {
     console.error('[Yelp API3] Error getting popular searches:', error);
-    return [];
+    // Return fallback popular searches
+    return [
+      'Italian Restaurant',
+      'Chinese Restaurant', 
+      'Mexican Restaurant',
+      'Japanese Restaurant',
+      'American Restaurant',
+      'Thai Restaurant',
+      'Indian Restaurant',
+      'Pizza Place',
+      'Burger Joint',
+      'Sushi Bar',
+      'Steakhouse',
+      'Seafood Restaurant'
+    ];
   }
 };
 
@@ -2833,8 +2893,14 @@ export const getYelpBusinessMedia = async (
       }
     });
     
+    if (response.status === 403) {
+      console.warn('[Yelp API3] Access forbidden (403) - API key may not have access to business media service');
+      return [];
+    }
+    
     if (!response.ok) {
-      throw new Error(`Yelp API3 error: ${response.status} ${response.statusText}`);
+      console.error(`[Yelp API3] Error: ${response.status} ${response.statusText}`);
+      return [];
     }
     
     const data = await response.json();
