@@ -29,7 +29,7 @@ export default function RestaurantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const restaurant = useRestaurantById(id);
   const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection } = useRestaurants();
-  const votes = useRestaurantVotes(id);
+  const votes = useRestaurantVotes(id || '');
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(restaurant?.userNotes || null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);

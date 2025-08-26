@@ -152,7 +152,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Load user votes from database
   const votesQuery = useQuery({
-    queryKey: ['userVotes', user?.id],
+    queryKey: ['userVotes', user?.id || ''],
     queryFn: async () => {
       try {
         if (!user?.id) return [];
@@ -172,7 +172,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return storedVotes ? JSON.parse(storedVotes) : mockVotes;
       }
     },
-    enabled: !!user?.id,
+    enabled: true, // Always enabled to maintain hook order
     retry: 1,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -181,7 +181,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Load favorites from database
   const favoritesQuery = useQuery({
-    queryKey: ['userFavorites', user?.id],
+    queryKey: ['userFavorites', user?.id || ''],
     queryFn: async () => {
       try {
         const favorites = await dbHelpers.getUserFavorites(user?.id || '');
@@ -192,7 +192,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return storedFavorites ? JSON.parse(storedFavorites) : [];
       }
     },
-    enabled: !!user?.id,
+    enabled: true, // Always enabled to maintain hook order
     retry: 1,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -246,7 +246,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         userLocation: location
       };
     },
-    enabled: !!restaurantsQuery.data && !!favoritesQuery.data,
+    enabled: true, // Always enabled to maintain hook order
     retry: 1,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -878,13 +878,13 @@ export function useCollectionRestaurants(collectionId: string) {
 }
 
 // Enhanced collection hook with member details
-export function useCollectionById(id: string) {
+export function useCollectionById(id: string | undefined) {
   const { plans } = useRestaurants();
   const collection = plans.find((p: any) => p.id === id);
   
   // Fetch collection members with proper names
   const membersQuery = useQuery({
-    queryKey: ['collectionMembers', id],
+    queryKey: ['collectionMembers', id || ''],
     queryFn: async () => {
       if (!id) return [];
       try {
@@ -894,7 +894,7 @@ export function useCollectionById(id: string) {
         return [];
       }
     },
-    enabled: !!id,
+    enabled: true, // Always enabled to maintain hook order
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -918,7 +918,7 @@ export function useCollectionById(id: string) {
 }
 
 // Hook to get a specific restaurant by ID
-export function useRestaurantById(id: string) {
+export function useRestaurantById(id: string | undefined) {
   const { restaurants } = useRestaurants();
   
   return useMemo(() => {
