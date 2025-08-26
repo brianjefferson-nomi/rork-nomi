@@ -527,7 +527,7 @@ export default function CollectionDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteCollection(collection.id);
+              await deleteCollection(effectiveCollection?.id || '');
               Alert.alert('Success', 'Collection deleted successfully', [
                 { text: 'OK', onPress: () => router.back() }
               ]);
@@ -553,7 +553,7 @@ export default function CollectionDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await leaveCollection(collection.id);
+              await leaveCollection(effectiveCollection?.id || '');
               Alert.alert('Success', 'You have left the collection', [
                 { text: 'OK', onPress: () => router.back() }
               ]);
@@ -574,7 +574,7 @@ export default function CollectionDetailScreen() {
       return;
     }
     
-    inviteToCollection(collection.id, inviteEmail, inviteMessage);
+            inviteToCollection(effectiveCollection?.id || '', inviteEmail, inviteMessage);
     setShowInviteModal(false);
     setInviteEmail('');
     setInviteMessage('');
@@ -605,8 +605,8 @@ export default function CollectionDetailScreen() {
   };
 
   const handleShareCollection = async () => {
-    const shareUrl = `https://yourapp.com/collection/${collection.id}`;
-    const message = `Check out this restaurant collection: ${collection.name}\n\n${collection.description}\n\n${shareUrl}`;
+          const shareUrl = `https://yourapp.com/collection/${effectiveCollection?.id || ''}`;
+      const message = `Check out this restaurant collection: ${effectiveCollection?.name || 'Collection'}\n\n${effectiveCollection?.description || ''}\n\n${shareUrl}`;
     
     try {
       if (Platform.OS === 'web') {
@@ -652,7 +652,7 @@ export default function CollectionDetailScreen() {
   };
 
   const copyInviteLink = async () => {
-    const inviteLink = `https://yourapp.com/invite/${collection.id}`;
+          const inviteLink = `https://yourapp.com/invite/${effectiveCollection?.id || ''}`;
     
     try {
       if (Platform.OS === 'web') {
@@ -703,7 +703,7 @@ export default function CollectionDetailScreen() {
         { 
           text: 'Remove', 
           style: 'destructive',
-          onPress: () => removeRestaurantFromCollection(collection.id, restaurantId)
+          onPress: () => removeRestaurantFromCollection(effectiveCollection?.id || '', restaurantId)
         }
       ]
     );
@@ -713,7 +713,7 @@ export default function CollectionDetailScreen() {
     <>
       <Stack.Screen 
         options={{ 
-          title: collection.name,
+          title: effectiveCollection?.name || 'Collection',
           headerRight: () => (
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={handleShareCollection}>
@@ -734,18 +734,18 @@ export default function CollectionDetailScreen() {
       />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.name}>{collection.name}</Text>
-          <Text style={styles.description}>{collection.description}</Text>
+          <Text style={styles.name}>{effectiveCollection?.name || 'Collection'}</Text>
+          <Text style={styles.description}>{effectiveCollection?.description || ''}</Text>
           
           <View style={styles.stats}>
             <View style={styles.stat}>
               <Heart size={16} color="#FF6B6B" fill="#FF6B6B" />
-              <Text style={styles.statText}>{collection.likes} likes</Text>
+              <Text style={styles.statText}>{effectiveCollection?.likes || 0} likes</Text>
             </View>
             <View style={styles.stat}>
               <Users size={16} color="#666" />
               <Text style={styles.statText}>
-                {collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0} members
+                {effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0} members
               </Text>
             </View>
           </View>
@@ -772,8 +772,8 @@ export default function CollectionDetailScreen() {
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collaboratorsList}>
-              {collection.collaborators && Array.isArray(collection.collaborators) ? (
-                collection.collaborators.map((member: any, index: number) => {
+              {effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? (
+                effectiveCollection.collaborators.map((member: any, index: number) => {
                   const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
                   const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
                   const memberRole = typeof member === 'string' ? 'member' : member?.role || 'member';
@@ -841,7 +841,7 @@ export default function CollectionDetailScreen() {
                 
                                  // Only show winning styles if there's 75% participation and this is the top-ranked restaurant
                 const shouldShowWinningStyles = isSharedCollection && 
-                  participationData?.has75PercentParticipation && 
+                  effectiveParticipationData?.has75PercentParticipation && 
                   meta?.rank === 1;
                 
                 return (
