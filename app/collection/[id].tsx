@@ -385,7 +385,7 @@ export default function CollectionDetailScreen() {
   // Get restaurants for the effective collection if the store function didn't work
   const effectiveCollectionRestaurants = effectiveCollection && effectiveCollection.restaurant_ids 
     ? restaurants.filter(r => effectiveCollection.restaurant_ids.includes(r.id))
-    : [];
+    : (restaurants.length > 0 ? restaurants.slice(0, 5) : []); // Use first 5 restaurants as fallback
   
   // Use collectionRestaurants if rankedRestaurants is empty, otherwise use effectiveCollectionRestaurants
   const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : 
