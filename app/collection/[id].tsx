@@ -481,6 +481,33 @@ export default function CollectionDetailScreen() {
     ? effectiveCollection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
     : [];
 
+  // Determine collection type
+  const isCollectionOwner = () => {
+    if (!user || !effectiveCollection) return false;
+    return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
+  };
+
+  const isCollectionMember = () => {
+    if (!user || !effectiveCollection) return false;
+    return collectionMembers.includes(user.id);
+  };
+
+  const getCollectionType = () => {
+    if (!effectiveCollection) return 'private';
+    
+    // Check if it's public
+    if (effectiveCollection.is_public) return 'public';
+    
+    // Check if it's shared (has multiple members)
+    if (collectionMembers.length > 1) return 'shared';
+    
+    // Otherwise it's private
+    return 'private';
+  };
+
+  const collectionType = getCollectionType();
+  const isSharedCollection = collectionType === 'shared';
+
   if (!effectiveCollection) {
     return (
       <View style={styles.errorContainer}>
@@ -489,11 +516,7 @@ export default function CollectionDetailScreen() {
     );
   }
 
-  // Check if user is the owner of the collection
-  const isCollectionOwner = () => {
-    if (!user || !collection) return false;
-    return collection.created_by === user.id || collection.creator_id === user.id;
-  };
+  // Check if user is the owner of the collection (using effectiveCollection)
 
   const handleDeleteCollection = () => {
     Alert.alert(
@@ -793,14 +816,16 @@ export default function CollectionDetailScreen() {
               Restaurants ({restaurantsWithVotingData.length})
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'insights' && styles.activeTab]}
-            onPress={() => setActiveTab('insights')}
-          >
-            <Text style={[styles.tabText, activeTab === 'insights' && styles.activeTabText]}>
-              Insights
-            </Text>
-          </TouchableOpacity>
+          {isSharedCollection && (
+            <TouchableOpacity 
+              style={[styles.tab, activeTab === 'insights' && styles.activeTab]}
+              onPress={() => setActiveTab('insights')}
+            >
+              <Text style={[styles.tabText, activeTab === 'insights' && styles.activeTabText]}>
+                Insights
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tab Content */}
@@ -816,30 +841,32 @@ export default function CollectionDetailScreen() {
                 const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
                 const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
                 
-                return (
-                  <View key={restaurant?.id || index} style={[
-                    styles.restaurantItem,
-                    meta?.rank === 1 && styles.winningRestaurantItem
-                  ]}>
-                    {/* Top Badges Row */}
-                    <View style={styles.badgesRow}>
-                      <View style={[
-                        styles.rankBadge,
-                        meta?.rank === 1 && styles.winnerRankBadge,
-                        meta?.rank === 2 && styles.silverRankBadge,
-                        meta?.rank === 3 && styles.bronzeRankBadge
-                      ]}>
-                        <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
-                      </View>
-                      
-                      {/* Top Choice Badge for Winner */}
-                      {meta?.rank === 1 && (
-                        <View style={styles.topChoiceBadge}>
-                          <Crown size={12} color="#FFFFFF" />
-                          <Text style={styles.topChoiceText}>TOP CHOICE</Text>
-                        </View>
-                      )}
-                    </View>
+                                 return (
+                   <View key={restaurant?.id || index} style={[
+                     styles.restaurantItem,
+                     isSharedCollection && meta?.rank === 1 && styles.winningRestaurantItem
+                   ]}>
+                     {/* Top Badges Row - Only for shared collections */}
+                     {isSharedCollection && (
+                       <View style={styles.badgesRow}>
+                         <View style={[
+                           styles.rankBadge,
+                           meta?.rank === 1 && styles.winnerRankBadge,
+                           meta?.rank === 2 && styles.silverRankBadge,
+                           meta?.rank === 3 && styles.bronzeRankBadge
+                         ]}>
+                           <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
+                         </View>
+                         
+                         {/* Top Choice Badge for Winner */}
+                         {meta?.rank === 1 && (
+                           <View style={styles.topChoiceBadge}>
+                             <Crown size={12} color="#FFFFFF" />
+                             <Text style={styles.topChoiceText}>TOP CHOICE</Text>
+                           </View>
+                         )}
+                       </View>
+                     )}
 
                     {/* Restaurant Info Section */}
                     <View style={styles.restaurantInfoSection}>
@@ -869,80 +896,93 @@ export default function CollectionDetailScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Approval Section */}
-                    <View style={styles.approvalSection}>
-                      <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                      <Text style={styles.voteBreakdown}>
-                        {meta.likes} likes • {meta.dislikes} dislikes
-                      </Text>
-                      {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
-                        <View style={styles.consensusBadge}>
-                          <Text style={styles.consensusBadgeText}>
-                            {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+                                         {/* Approval Section - Only for shared collections */}
+                     {isSharedCollection && (
+                       <View style={styles.approvalSection}>
+                         <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
+                         <Text style={styles.voteBreakdown}>
+                           {meta.likes} likes • {meta.dislikes} dislikes
+                         </Text>
+                         {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
+                           <View style={styles.consensusBadge}>
+                             <Text style={styles.consensusBadgeText}>
+                               {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
+                             </Text>
+                           </View>
+                         )}
+                       </View>
+                     )}
 
-                    {/* Vote Actions */}
-                    <View style={styles.voteActions}>
-                      <TouchableOpacity 
-                        style={[
-                          styles.voteButton, 
-                          styles.likeButton,
-                          userLiked && styles.likeButtonActive
-                        ]}
-                        onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
-                      >
-                        <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
-                        <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[
-                          styles.voteButton, 
-                          styles.dislikeButton,
-                          userDisliked && styles.dislikeButtonActive
-                        ]}
-                        onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
-                      >
-                        <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
-                        <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[styles.voteButton, styles.commentButton]}
-                        onPress={() => setShowDiscussionModal(restaurant.id)}
-                      >
-                        <MessageCircle size={16} color="#6B7280" />
-                        <Text style={styles.voteCount}>{meta.discussionCount}</Text>
-                      </TouchableOpacity>
-                    </View>
+                                         {/* Vote Actions - Only for shared collections */}
+                     {isSharedCollection && (
+                       <View style={styles.voteActions}>
+                         <TouchableOpacity 
+                           style={[
+                             styles.voteButton, 
+                             styles.likeButton,
+                             userLiked && styles.likeButtonActive
+                           ]}
+                           onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
+                         >
+                           <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
+                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
+                         </TouchableOpacity>
+                         
+                         <TouchableOpacity 
+                           style={[
+                             styles.voteButton, 
+                             styles.dislikeButton,
+                             userDisliked && styles.dislikeButtonActive
+                           ]}
+                           onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
+                         >
+                           <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
+                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
+                         </TouchableOpacity>
+                         
+                         <TouchableOpacity 
+                           style={[styles.voteButton, styles.commentButton]}
+                           onPress={() => setShowDiscussionModal(restaurant.id)}
+                         >
+                           <MessageCircle size={16} color="#6B7280" />
+                           <Text style={styles.voteCount}>{meta.discussionCount}</Text>
+                         </TouchableOpacity>
+                       </View>
+                     )}
 
-                    {/* Remove Button */}
-                    {user?.id === collection.created_by && (
-                      <TouchableOpacity 
-                        style={styles.removeButton}
-                        onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
-                      >
-                        <Text style={styles.removeButtonText}>Remove</Text>
-                      </TouchableOpacity>
-                    )}
+                                         {/* Remove Button - Only for collection owners */}
+                     {isCollectionOwner() && (
+                       <TouchableOpacity 
+                         style={styles.removeButton}
+                         onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
+                       >
+                         <Text style={styles.removeButtonText}>Remove</Text>
+                       </TouchableOpacity>
+                     )}
                   </View>
                 );
               })
             )}
           </View>
-        ) : (
-          <InsightsTab 
-            collection={collection}
-            rankedRestaurants={restaurantsWithVotingData}
-            discussions={effectiveDiscussions}
-            collectionMembers={collectionMembers}
-            styles={styles}
-            setShowCommentModal={setShowCommentModal}
-          />
-        )}
+                 ) : (
+           isSharedCollection ? (
+             <InsightsTab 
+               collection={collection}
+               rankedRestaurants={restaurantsWithVotingData}
+               discussions={effectiveDiscussions}
+               collectionMembers={collectionMembers}
+               styles={styles}
+               setShowCommentModal={setShowCommentModal}
+             />
+           ) : (
+             <View style={styles.insightsContainer}>
+               <Text style={styles.sectionTitle}>Insights</Text>
+               <Text style={styles.emptyText}>
+                 Insights and analytics are only available for shared collections with multiple members.
+               </Text>
+             </View>
+           )
+         )}
 
         <View style={{ height: 32 }} />
       </ScrollView>

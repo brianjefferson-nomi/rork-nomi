@@ -614,6 +614,39 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
     console.log('[getRankedRestaurants] Filtered restaurants:', planRestaurants.length);
 
+    // Check if this is a shared collection (multiple members)
+    const isSharedCollection = memberCount > 1;
+    
+    if (!isSharedCollection) {
+      console.log('[getRankedRestaurants] Not a shared collection, returning unranked restaurants');
+      // Return restaurants without ranking for private/public collections
+      return planRestaurants.map((restaurant, index) => ({
+        restaurant,
+        meta: {
+          restaurantId: restaurant.id,
+          netScore: 0,
+          likes: 0,
+          dislikes: 0,
+          likeRatio: 0,
+          engagementBoost: 0,
+          recencyBoost: 0,
+          distanceBoost: 0,
+          authorityApplied: false,
+          consensus: 'low' as const,
+          approvalPercent: 0,
+          rank: index + 1,
+          voteDetails: {
+            likeVoters: [],
+            dislikeVoters: [],
+            abstentions: [],
+            reasons: [],
+            timeline: []
+          },
+          discussionCount: 0
+        }
+      }));
+    }
+
     const votes = userVotes.filter(v => v.collectionId === planId);
     console.log('[getRankedRestaurants] Votes for plan:', votes.length);
 
