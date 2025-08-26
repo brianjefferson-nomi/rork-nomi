@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
 import { Database } from '@/services/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Collection = Database['public']['Tables']['collections']['Row'];
 
@@ -55,58 +56,67 @@ export function CollectionSelectorModal({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {restaurantName ? `Add "${restaurantName}" to collection` : 'Save to collection'}
-          </Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <X size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Collections Grid */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.collectionsGrid}>
-            {collections.map((collection) => (
-              <TouchableOpacity
-                key={collection.id}
-                style={styles.collectionCard}
-                onPress={() => onSelectCollection(collection)}
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={{ uri: getCollectionImage(collection) }}
-                  style={styles.collectionImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.collectionOverlay}>
-                  <Text style={styles.collectionName} numberOfLines={2}>
-                    {collection.name}
-                  </Text>
-                  <Text style={styles.savedCount}>
-                    {getSavedCount(collection)} saved
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          {/* Handle Bar */}
+          <View style={styles.handleBar} />
+          
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>
+              {restaurantName ? `Add "${restaurantName}" to collection` : 'Save to collection'}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <X size={20} color="#666" />
+            </TouchableOpacity>
           </View>
-        </ScrollView>
 
-        {/* Create Collection Button */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={onCreateCollection}
-            activeOpacity={0.8}
-          >
-            <Plus size={20} color="#FFF" />
-            <Text style={styles.createButtonText}>Create collection</Text>
-          </TouchableOpacity>
+          {/* Collections Grid */}
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.collectionsGrid}>
+              {collections.map((collection) => (
+                <TouchableOpacity
+                  key={collection.id}
+                  style={styles.collectionCard}
+                  onPress={() => onSelectCollection(collection)}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={{ uri: getCollectionImage(collection) }}
+                    style={styles.collectionImage}
+                    resizeMode="cover"
+                  />
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0, 0, 0, 0.8)']}
+                    style={styles.collectionOverlay}
+                  >
+                    <Text style={styles.collectionName} numberOfLines={2}>
+                      {collection.name}
+                    </Text>
+                    <Text style={styles.savedCount}>
+                      {getSavedCount(collection)} saved
+                    </Text>
+                  </LinearGradient>
+                  <View style={styles.cardShadow} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Create Collection Button */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={onCreateCollection}
+              activeOpacity={0.8}
+            >
+              <Plus size={18} color="#FFF" />
+              <Text style={styles.createButtonText}>Create collection</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -114,33 +124,60 @@ export function CollectionSelectorModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
     backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '60%',
+    minHeight: '50%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F5F5F5',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
     flex: 1,
     textAlign: 'center',
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8F8F8',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 20,
   },
   collectionsGrid: {
@@ -150,12 +187,13 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   collectionCard: {
-    width: (width - 60) / 2, // 2 columns with padding
-    height: 180,
+    width: (width - 72) / 2, // 2 columns with padding
+    height: 160,
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#F8F8F8',
+    position: 'relative',
   },
   collectionImage: {
     width: '100%',
@@ -166,34 +204,62 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 16,
   },
   collectionName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFF',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   savedCount: {
-    fontSize: 12,
-    color: '#CCC',
+    fontSize: 13,
+    color: '#E0E0E0',
+    fontWeight: '500',
+  },
+  cardShadow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#F5F5F5',
+    backgroundColor: '#FFF',
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#1A1A1A',
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   createButtonText: {
     fontSize: 16,
