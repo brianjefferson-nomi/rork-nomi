@@ -83,8 +83,8 @@ SELECT
   COUNT(*) FILTER (WHERE user_id IS NOT NULL) as votes_with_users,
   COUNT(*) FILTER (WHERE collection_id IS NOT NULL) as votes_with_collections,
   COUNT(*) FILTER (WHERE restaurant_id IS NOT NULL) as votes_with_restaurants,
-  COUNT(*) FILTER (WHERE vote = 'like') as total_likes,
-  COUNT(*) FILTER (WHERE vote = 'dislike') as total_dislikes
+  COUNT(*) FILTER (WHERE vote::text = 'like') as total_likes,
+  COUNT(*) FILTER (WHERE vote::text = 'dislike') as total_dislikes
 FROM restaurant_votes;
 
 -- Check restaurant discussions data
@@ -239,8 +239,8 @@ SELECT
   c.name as collection_name,
   c.collection_type,
   COUNT(rv.id) as total_votes,
-  COUNT(*) FILTER (WHERE rv.vote = 'like') as likes,
-  COUNT(*) FILTER (WHERE rv.vote = 'dislike') as dislikes,
+  COUNT(*) FILTER (WHERE rv.vote::text = 'like') as likes,
+  COUNT(*) FILTER (WHERE rv.vote::text = 'dislike') as dislikes,
   COUNT(DISTINCT rv.user_id) as unique_voters
 FROM collections c
 LEFT JOIN restaurant_votes rv ON c.id = rv.collection_id

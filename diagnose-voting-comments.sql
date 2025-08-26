@@ -7,8 +7,8 @@ SELECT '=== VOTES CHECK ===' as section;
 
 SELECT 
   COUNT(*) as total_votes,
-  COUNT(*) FILTER (WHERE vote = 'like') as total_likes,
-  COUNT(*) FILTER (WHERE vote = 'dislike') as total_dislikes,
+  COUNT(*) FILTER (WHERE vote::text = 'like') as total_likes,
+  COUNT(*) FILTER (WHERE vote::text = 'dislike') as total_dislikes,
   COUNT(DISTINCT user_id) as unique_voters,
   COUNT(DISTINCT collection_id) as collections_with_votes
 FROM restaurant_votes;
@@ -29,8 +29,8 @@ SELECT
   c.id as collection_id,
   c.name as collection_name,
   COUNT(rv.id) as total_votes,
-  COUNT(*) FILTER (WHERE rv.vote = 'like') as likes,
-  COUNT(*) FILTER (WHERE rv.vote = 'dislike') as dislikes,
+  COUNT(*) FILTER (WHERE rv.vote::text = 'like') as likes,
+  COUNT(*) FILTER (WHERE rv.vote::text = 'dislike') as dislikes,
   COUNT(DISTINCT rv.user_id) as unique_voters
 FROM collections c
 LEFT JOIN restaurant_votes rv ON c.id = rv.collection_id
@@ -112,8 +112,8 @@ SELECT
   r.id as restaurant_id,
   r.name as restaurant_name,
   COUNT(rv.id) as vote_count,
-  COUNT(*) FILTER (WHERE rv.vote = 'like') as likes,
-  COUNT(*) FILTER (WHERE rv.vote = 'dislike') as dislikes
+  COUNT(*) FILTER (WHERE rv.vote::text = 'like') as likes,
+  COUNT(*) FILTER (WHERE rv.vote::text = 'dislike') as dislikes
 FROM collections c
 CROSS JOIN LATERAL unnest(c.restaurant_ids) AS restaurant_id
 JOIN restaurants r ON r.id = restaurant_id::UUID

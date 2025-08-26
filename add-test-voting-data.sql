@@ -59,8 +59,8 @@ SELECT
   u.id as user_id,
   c.id as collection_id,
   CASE 
-    WHEN random() > 0.5 THEN 'like'::text
-    ELSE 'dislike'::text
+    WHEN random() > 0.5 THEN 'like'::vote_type
+    ELSE 'dislike'::vote_type
   END as vote,
   CASE 
     WHEN random() > 0.5 THEN 'Great food!'::text

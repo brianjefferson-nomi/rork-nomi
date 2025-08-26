@@ -164,8 +164,8 @@ BEGIN
         IF test_collection_id IS NOT NULL AND test_user_id IS NOT NULL AND test_restaurant_id IS NOT NULL THEN
             INSERT INTO restaurant_votes (restaurant_id, user_id, collection_id, vote, reason, created_at)
             VALUES 
-                (test_restaurant_id, test_user_id, test_collection_id, 'like', 'Great food and atmosphere!', NOW() - INTERVAL '2 days'),
-                (test_restaurant_id, test_user_id, test_collection_id, 'dislike', 'Not my favorite', NOW() - INTERVAL '1 day');
+                (test_restaurant_id, test_user_id, test_collection_id, 'like'::vote_type, 'Great food and atmosphere!', NOW() - INTERVAL '2 days'),
+                (test_restaurant_id, test_user_id, test_collection_id, 'dislike'::vote_type, 'Not my favorite', NOW() - INTERVAL '1 day');
             
             -- Add test discussions
             INSERT INTO restaurant_discussions (restaurant_id, user_id, collection_id, message, created_at)
@@ -208,8 +208,8 @@ ORDER BY c.collection_type, member_count;
 SELECT 
   'Voting Data After Fix' as check_type,
   COUNT(*) as total_votes,
-  COUNT(*) FILTER (WHERE vote = 'like') as likes,
-  COUNT(*) FILTER (WHERE vote = 'dislike') as dislikes,
+  COUNT(*) FILTER (WHERE vote::text = 'like') as likes,
+  COUNT(*) FILTER (WHERE vote::text = 'dislike') as dislikes,
   COUNT(DISTINCT collection_id) as collections_with_votes,
   COUNT(DISTINCT user_id) as unique_voters
 FROM restaurant_votes;
