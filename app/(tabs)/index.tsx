@@ -37,6 +37,10 @@ export default function HomeScreen() {
           console.log('[HomeScreen] Loaded', transformedNearby.length, 'nearby restaurants');
         } catch (error) {
           console.error('[HomeScreen] Error fetching nearby restaurants:', error);
+          // Check if it's an authentication error
+          if (error.message && error.message.includes('authentication failed')) {
+            console.log('[HomeScreen] Foursquare API authentication failed - nearby restaurants disabled');
+          }
           setNearbyRestaurants([]);
         } finally {
           setNearbyLoading(false);

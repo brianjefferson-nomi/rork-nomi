@@ -1964,11 +1964,15 @@ export const searchFoursquareAutocomplete = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        console.error('[Foursquare] Authentication failed - check API key');
+        throw new Error('Foursquare API authentication failed - please check your API key');
+      }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
     }
     
@@ -2015,12 +2019,16 @@ export const searchFoursquareRestaurants = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        console.error('[Foursquare] Authentication failed - check API key');
+        return [];
+      }
       // Return empty array instead of throwing to prevent app crashes
       return [];
     }
@@ -2095,12 +2103,16 @@ export const getFoursquareNearbyRestaurants = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] Nearby API error: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        console.error('[Foursquare] Authentication failed - check API key');
+        throw new Error('Foursquare API authentication failed - please check your API key');
+      }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
     }
     
@@ -2127,12 +2139,16 @@ export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        console.error('[Foursquare] Authentication failed - check API key');
+        throw new Error('Foursquare API authentication failed - please check your API key');
+      }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
     }
     
@@ -2183,11 +2199,15 @@ export const getFoursquareRestaurantTips = async (fsqId: string, limit: number =
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        console.error('[Foursquare] Authentication failed - check API key');
+        throw new Error('Foursquare API authentication failed - please check your API key');
+      }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
     }
     

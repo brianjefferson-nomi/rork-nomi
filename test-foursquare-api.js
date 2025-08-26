@@ -40,7 +40,7 @@ async function testFoursquareAPI() {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
 
@@ -78,7 +78,7 @@ async function testFoursquareAPI() {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Authorization': FOURSQUARE_API_KEY
+            'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
           }
         });
 
@@ -121,7 +121,7 @@ async function testFoursquareAPI() {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Authorization': FOURSQUARE_API_KEY
+            'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
           }
         });
 
@@ -156,7 +156,7 @@ async function testFoursquareAPI() {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Authorization': FOURSQUARE_API_KEY
+            'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
           }
         });
 
@@ -180,7 +180,7 @@ async function testFoursquareAPI() {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': FOURSQUARE_API_KEY
+        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
       }
     });
 
