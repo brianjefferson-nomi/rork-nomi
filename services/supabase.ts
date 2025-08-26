@@ -508,8 +508,27 @@ export const dbHelpers = {
       console.log(`[getUserPlans] Found ${uniqueCollections.length} total collections for user ${userId}`);
       console.log(`[getUserPlans] Created: ${createdCollections?.length || 0}, Members: ${memberCollectionData.length}, Public: ${publicCollections?.length || 0}`);
       
+      // For each collection, get its members to populate the collaborators field
+      const collectionsWithMembers = await Promise.all(
+        uniqueCollections.map(async (collection) => {
+          try {
+            const members = await dbHelpers.getCollectionMembers(collection.id);
+            return {
+              ...collection,
+              collaborators: members.map((member: any) => member._internalUserId || member.userId || member.id)
+            };
+          } catch (error) {
+            console.error(`[getUserPlans] Error fetching members for collection ${collection.id}:`, error);
+            return {
+              ...collection,
+              collaborators: []
+            };
+          }
+        })
+      );
+      
       // Sort by created_at descending
-      return uniqueCollections.sort((a, b) => 
+      return collectionsWithMembers.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     } catch (error) {
@@ -527,7 +546,27 @@ export const dbHelpers = {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data;
+    
+    // For each collection, get its members to populate the collaborators field
+    const collectionsWithMembers = await Promise.all(
+      (data || []).map(async (collection) => {
+        try {
+          const members = await dbHelpers.getCollectionMembers(collection.id);
+          return {
+            ...collection,
+            collaborators: members.map((member: any) => member._internalUserId || member.userId || member.id)
+          };
+        } catch (error) {
+          console.error(`[getAllCollections] Error fetching members for collection ${collection.id}:`, error);
+          return {
+            ...collection,
+            collaborators: []
+          };
+        }
+      })
+    );
+    
+    return collectionsWithMembers;
   },
 
   async getAllRestaurants() {
@@ -942,7 +981,14 @@ export const dbHelpers = {
     try {
       let query = supabase
         .from('restaurant_discussions')
-        .select('*')
+        .select(`
+          *,
+          users:user_id (
+            id,
+            name,
+            email
+          )
+        `)
         .eq('collection_id', collectionId);
       
       if (restaurantId) {
@@ -952,11 +998,22 @@ export const dbHelpers = {
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
+        console.error('[getCollectionDiscussions] Error:', error);
         return [];
       }
       
-      return data || [];
+      // Transform the data to match the expected frontend structure
+      const transformedData = (data || []).map(discussion => ({
+        ...discussion,
+        userName: discussion.users?.name || 'Unknown User',
+        timestamp: discussion.created_at,
+        // Keep the original message field
+        message: discussion.message
+      }));
+      
+      return transformedData;
     } catch (error) {
+      console.error('[getCollectionDiscussions] Exception:', error);
       return [];
     }
   },
@@ -965,17 +1022,35 @@ export const dbHelpers = {
     try {
       const { data, error } = await supabase
         .from('restaurant_discussions')
-        .select('*')
+        .select(`
+          *,
+          users:user_id (
+            id,
+            name,
+            email
+          )
+        `)
         .eq('collection_id', collectionId)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
       
       if (error) {
+        console.error('[getRestaurantComments] Error:', error);
         return [];
       }
       
-      return data || [];
+      // Transform the data to match the expected frontend structure
+      const transformedData = (data || []).map(discussion => ({
+        ...discussion,
+        userName: discussion.users?.name || 'Unknown User',
+        timestamp: discussion.created_at,
+        // Keep the original message field
+        message: discussion.message
+      }));
+      
+      return transformedData;
     } catch (error) {
+      console.error('[getRestaurantComments] Exception:', error);
       return [];
     }
   },
