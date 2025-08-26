@@ -9,13 +9,31 @@ import { ContributorCard } from '@/components/ContributorCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
-import { getFoursquareNearbyRestaurants, transformFoursquareRestaurant } from '@/services/api';
+
 
 export default function HomeScreen() {
   const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  // Ensure collections is always an array
+  const safeCollections = Array.isArray(collections) ? collections : [];
+
+  const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
+  
+  // Filter restaurants by location with better matching
+  const cityRestaurants = restaurants.filter(r => {
+    const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
+    if (city === 'Los Angeles') {
+      return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
+    } else {
+      return /new york|manhattan|brooklyn|queens|bronx|soho|east village|upper east side|midtown|ny|nyc/i.test(address);
+    }
+  });
+  
+  // Use city-specific restaurants when available, otherwise show all
+  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
 
   // Show local restaurants
   useEffect(() => {
@@ -53,23 +71,6 @@ export default function HomeScreen() {
     );
   }
 
-  // Ensure collections is always an array
-  const safeCollections = Array.isArray(collections) ? collections : [];
-
-  const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
-  
-  // Filter restaurants by location with better matching
-  const cityRestaurants = restaurants.filter(r => {
-    const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
-    if (city === 'Los Angeles') {
-      return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
-    } else {
-      return /new york|manhattan|brooklyn|queens|bronx|soho|east village|upper east side|midtown|ny|nyc/i.test(address);
-    }
-  });
-  
-  // Use city-specific restaurants when available, otherwise show all
-  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
   const trendingRestaurants = availableRestaurants.slice(0, 6);
   // No mock collections - only show real data from database
   
