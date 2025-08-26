@@ -99,7 +99,7 @@ SELECT
   c.is_public,
   c.collection_type,
   cm.role,
-  cm.created_at as joined_at
+  c.created_at as joined_at
 FROM collection_members cm
 JOIN collections c ON cm.collection_id = c.id
 WHERE cm.user_id = (SELECT id FROM users ORDER BY created_at DESC LIMIT 1)

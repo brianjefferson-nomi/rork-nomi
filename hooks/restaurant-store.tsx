@@ -303,18 +303,23 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         // If no user ID, try to get all public collections as fallback
         if (!user?.id) {
           console.log('[RestaurantStore] No user ID, loading public collections as fallback');
-          const publicCollections = await dbHelpers.getAllCollections();
-          console.log('[RestaurantStore] Public collections from fallback:', publicCollections?.length || 0);
-          return publicCollections.map((plan: any) => ({
-            ...plan,
-            collaborators: plan.collaborators || [],
-            settings: {
-              voteVisibility: plan.vote_visibility || 'public',
-              discussionEnabled: plan.discussion_enabled !== false,
-              autoRankingEnabled: plan.auto_ranking_enabled !== false,
-              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-            }
-          }));
+          try {
+            const publicCollections = await dbHelpers.getAllCollections();
+            console.log('[RestaurantStore] Public collections from fallback:', publicCollections?.length || 0);
+            return publicCollections.map((plan: any) => ({
+              ...plan,
+              collaborators: plan.collaborators || [],
+              settings: {
+                voteVisibility: plan.vote_visibility || 'public',
+                discussionEnabled: plan.discussion_enabled !== false,
+                autoRankingEnabled: plan.auto_ranking_enabled !== false,
+                consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+              }
+            }));
+          } catch (error) {
+            console.error('[RestaurantStore] Error loading public collections:', error);
+            return [];
+          }
         }
         
         console.log('[RestaurantStore] Loading plans for user:', user.id);
@@ -380,7 +385,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         }
       }
     },
-    enabled: !!user?.id, // Only enabled when user is authenticated
+    enabled: true, // Always enabled to ensure collections load even without user
     retry: 3,
     retryDelay: 1000,
     staleTime: 1 * 60 * 1000, // 1 minute - shorter to get fresh data
