@@ -258,6 +258,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[RestaurantStore] useEffect - restaurants.length:', restaurants.length);
     console.log('[RestaurantStore] useEffect - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length);
     console.log('[RestaurantStore] useEffect - restaurantsQuery.data:', restaurantsQuery.data?.length);
+    console.log('[RestaurantStore] useEffect - user ID:', user?.id);
     
     if (restaurants.length === 0 && dataQuery.data?.restaurants) {
       console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
@@ -269,7 +270,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       console.log('[RestaurantStore] Setting restaurants from mockRestaurants');
       setRestaurants(mockRestaurants);
     }
-  }, [restaurants.length, dataQuery.data, restaurantsQuery.data]);
+  }, [restaurants.length, dataQuery.data, restaurantsQuery.data, user?.id]);
 
   // Ensure other data is available
   useEffect(() => {
@@ -367,6 +368,16 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000 // 5 minutes
   });
+
+  // Debug plans data
+  useEffect(() => {
+    console.log('[RestaurantStore] Plans data updated:', plansQuery.data?.length || 0);
+    if (plansQuery.data && plansQuery.data.length > 0) {
+      plansQuery.data.forEach((plan, index) => {
+        console.log(`[RestaurantStore] Plan ${index}: ${plan.name} - ${plan.restaurant_ids?.length || 0} restaurants`);
+      });
+    }
+  }, [plansQuery.data]);
 
   // Load all public collections for discovery
   const allCollectionsQuery = useQuery({

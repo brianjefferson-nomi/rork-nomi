@@ -344,6 +344,8 @@ export default function CollectionDetailScreen() {
   console.log('[CollectionDetail] Collection:', collection?.name);
   console.log('[CollectionDetail] Collection restaurants (simple):', collectionRestaurants.length);
   console.log('[CollectionDetail] Ranked restaurants:', rankedRestaurants.length);
+  console.log('[CollectionDetail] User ID:', user?.id);
+  console.log('[CollectionDetail] Is authenticated:', !!user);
   
   // Use collectionRestaurants if rankedRestaurants is empty
   const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : collectionRestaurants.map(r => ({ 
@@ -362,6 +364,11 @@ export default function CollectionDetailScreen() {
   }));
   
   console.log('[CollectionDetail] Display restaurants:', displayRestaurants.length);
+  console.log('[CollectionDetail] Display restaurants details:', displayRestaurants.map(dr => ({
+    name: dr.restaurant.name,
+    id: dr.restaurant.id,
+    cuisine: dr.restaurant.cuisine
+  })));
   const recommendations = collection ? getGroupRecommendations(id) : [];
   
   // Load discussions asynchronously
