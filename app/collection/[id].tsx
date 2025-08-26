@@ -367,6 +367,60 @@ export default function CollectionDetailScreen() {
             discussionCount: 0
           } 
         })));
+
+  // Fetch voting data for restaurants
+  const [restaurantVotingData, setRestaurantVotingData] = useState<{[key: string]: any}>({});
+
+  // Load voting data for restaurants
+  useEffect(() => {
+    const loadVotingData = async () => {
+      if (!id || displayRestaurants.length === 0) return;
+      
+      try {
+        const votingData: {[key: string]: any} = {};
+        
+        for (const { restaurant } of displayRestaurants) {
+          // Get votes for this restaurant in this collection
+          const { data: votes, error } = await supabase
+            .from('restaurant_votes')
+            .select('*')
+            .eq('restaurant_id', restaurant.id)
+            .eq('collection_id', id);
+          
+          if (!error && votes) {
+            const likes = votes.filter(v => v.vote === 'like');
+            const dislikes = votes.filter(v => v.vote === 'dislike');
+            const approvalPercent = votes.length > 0 ? Math.round((likes.length / votes.length) * 100) : 0;
+            
+            votingData[restaurant.id] = {
+              likes: likes.length,
+              dislikes: dislikes.length,
+              approvalPercent,
+              voteDetails: {
+                likeVoters: likes.map(v => ({ userId: v.user_id, name: 'User' })),
+                dislikeVoters: dislikes.map(v => ({ userId: v.user_id, name: 'User' }))
+              }
+            };
+          }
+        }
+        
+        setRestaurantVotingData(votingData);
+      } catch (error) {
+        console.error('[CollectionDetail] Error loading voting data:', error);
+      }
+    };
+    
+    loadVotingData();
+  }, [id, displayRestaurants]);
+
+  // Update display restaurants with voting data
+  const restaurantsWithVotingData = displayRestaurants.map(({ restaurant, meta }) => ({
+    restaurant,
+    meta: {
+      ...meta,
+      ...restaurantVotingData[restaurant.id]
+    }
+  }));
   
   const recommendations = effectiveCollection ? getGroupRecommendations(id) : [];
   
@@ -388,6 +442,39 @@ export default function CollectionDetailScreen() {
         });
     }
   }, [id, getCollectionDiscussions]);
+
+  // Fetch real discussion data from database
+  const [realDiscussions, setRealDiscussions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadRealDiscussions = async () => {
+      if (!id) return;
+      
+      try {
+        const { data: discussionsData, error } = await supabase
+          .from('restaurant_discussions')
+          .select('*')
+          .eq('collection_id', id)
+          .order('created_at', { ascending: false });
+        
+        if (!error && discussionsData) {
+          console.log('[CollectionDetail] Loaded real discussions:', discussionsData.length);
+          setRealDiscussions(discussionsData);
+        } else {
+          console.error('[CollectionDetail] Error loading real discussions:', error);
+          setRealDiscussions([]);
+        }
+      } catch (error) {
+        console.error('[CollectionDetail] Exception loading real discussions:', error);
+        setRealDiscussions([]);
+      }
+    };
+    
+    loadRealDiscussions();
+  }, [id]);
+
+  // Use real discussions if available, otherwise fall back to stored discussions
+  const effectiveDiscussions = realDiscussions.length > 0 ? realDiscussions : discussions;
 
   // Calculate collection members for privacy filtering
   const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
@@ -703,7 +790,7 @@ export default function CollectionDetailScreen() {
             onPress={() => setActiveTab('restaurants')}
           >
             <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>
-              Restaurants ({displayRestaurants.length})
+              Restaurants ({restaurantsWithVotingData.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -719,12 +806,12 @@ export default function CollectionDetailScreen() {
         {/* Tab Content */}
         {activeTab === 'restaurants' ? (
           <View style={styles.restaurantsList}>
-            {displayRestaurants.length === 0 ? (
+            {restaurantsWithVotingData.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
               </View>
             ) : (
-              displayRestaurants.map(({ restaurant, meta }, index) => {
+              restaurantsWithVotingData.map(({ restaurant, meta }, index) => {
                 const isFavorite = favoriteRestaurants.includes(restaurant.id);
                 const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
                 const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
@@ -849,8 +936,8 @@ export default function CollectionDetailScreen() {
         ) : (
           <InsightsTab 
             collection={collection}
-            rankedRestaurants={rankedRestaurants}
-            discussions={discussions}
+            rankedRestaurants={restaurantsWithVotingData}
+            discussions={effectiveDiscussions}
             collectionMembers={collectionMembers}
             styles={styles}
             setShowCommentModal={setShowCommentModal}

@@ -276,67 +276,12 @@ export const mockRestaurants: Restaurant[] = [
 
 // No mock collections - only use real data from database
 
-// Mock vote data for collaborative features
+// Mock vote data for collaborative features (removed - use real data from database)
 export const mockVotes = [
-  // Birthday collection votes
-  { restaurantId: '1', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-16T10:00:00Z', reason: 'Perfect for special occasions' },
-  { restaurantId: '1', userId: 'user2', collectionId: 'c1', vote: 'like', timestamp: '2024-01-16T11:00:00Z', reason: 'Amazing food quality' },
-  { restaurantId: '1', userId: 'user3', collectionId: 'c1', vote: 'dislike', timestamp: '2024-01-16T12:00:00Z', reason: 'Too expensive for our group' },
-  
-  { restaurantId: '3', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T10:00:00Z', reason: 'Great atmosphere' },
-  { restaurantId: '3', userId: 'user2', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T11:00:00Z', reason: 'Good for groups' },
-  { restaurantId: '3', userId: 'user3', collectionId: 'c1', vote: 'like', timestamp: '2024-01-17T12:00:00Z', reason: 'Reliable choice' },
-  
-  { restaurantId: '5', userId: 'user1', collectionId: 'c1', vote: 'like', timestamp: '2024-01-18T10:00:00Z', reason: 'Impressive for celebrations' },
-  { restaurantId: '5', userId: 'user2', collectionId: 'c1', vote: 'dislike', timestamp: '2024-01-18T11:00:00Z', reason: 'Hard to get reservations' },
-  { restaurantId: '5', userId: 'user3', collectionId: 'c1', vote: 'like', timestamp: '2024-01-18T12:00:00Z', reason: 'Worth the splurge' },
-  
-  // Cheap & Cheerful collection votes
-  { restaurantId: '2', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-26T10:00:00Z', reason: 'Classic NYC experience' },
-  { restaurantId: '2', userId: 'user2', collectionId: 'c3', vote: 'like', timestamp: '2024-01-26T11:00:00Z', reason: 'Great value' },
-  
-  { restaurantId: '4', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-27T10:00:00Z', reason: 'Authentic and affordable' },
-  { restaurantId: '4', userId: 'user2', collectionId: 'c3', vote: 'dislike', timestamp: '2024-01-27T11:00:00Z', reason: 'Too spicy for me' },
-  
-  { restaurantId: '6', userId: 'user1', collectionId: 'c3', vote: 'like', timestamp: '2024-01-28T10:00:00Z', reason: 'Best cookies in the city' },
-  { restaurantId: '6', userId: 'user2', collectionId: 'c3', vote: 'like', timestamp: '2024-01-28T11:00:00Z', reason: 'Perfect sweet treat' }
+  // Empty array - use real data from database instead
 ];
 
-// Mock discussion data
+// Mock discussion data (removed - use real data from database)
 export const mockDiscussions = [
-  {
-    id: 'd1',
-    restaurantId: '1',
-    collectionId: 'c1',
-    userId: 'user2',
-    userName: 'Sarah Johnson',
-    userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-    message: 'Has anyone been here recently? I heard they changed their menu.',
-    timestamp: new Date('2024-01-16T15:00:00Z'),
-    likes: 2,
-    replies: [
-      {
-        id: 'd1r1',
-        restaurantId: '1',
-        collectionId: 'c1',
-        userId: 'user1',
-        userName: 'Alex Chen',
-        userAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
-        message: 'Yes! The tasting menu is even better now. Definitely worth it for a birthday.',
-        timestamp: new Date('2024-01-16T16:00:00Z'),
-        likes: 1
-      }
-    ]
-  },
-  {
-    id: 'd2',
-    restaurantId: '5',
-    collectionId: 'c1',
-    userId: 'user3',
-    userName: 'Mike Rodriguez',
-    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    message: 'I can help with getting a reservation here if needed. I know someone who works there.',
-    timestamp: new Date('2024-01-18T14:00:00Z'),
-    likes: 3
-  }
+  // Empty array - use real data from database instead
 ];

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
-import { mockRestaurants, mockVotes, mockDiscussions } from '@/mocks/restaurants';
+// Removed mock data imports - only use real data from database
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
 import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI } from '@/services/api';
 import { dbHelpers, Database, supabase } from '@/services/supabase';
@@ -81,16 +81,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
-  // Fallback mechanism to prevent infinite loading
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (restaurants.length === 0) {
-        setRestaurants(mockRestaurants);
-      }
-    }, 5000); // 5 second timeout
-
-    return () => clearTimeout(timeout);
-  }, [restaurants.length]);
+  // Remove mock data fallback - only use real data from database
 
   // Helper function to map database restaurant format to component format
   const mapDatabaseRestaurant = useCallback((dbRestaurant: any): Restaurant => ({
@@ -136,14 +127,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           console.log('[RestaurantStore] All restaurant IDs from database:', mappedRestaurants.map(r => r.id));
           return mappedRestaurants;
         } else {
-          console.log('[RestaurantStore] No restaurants in database, using mock data');
-          // Fallback to mock data if no restaurants in database
-          return mockRestaurants;
+          console.log('[RestaurantStore] No restaurants in database');
+          return [];
         }
       } catch (error) {
         console.error('[RestaurantStore] Error loading restaurants from database:', error);
-        // Fallback to mock data if database fails
-        return mockRestaurants;
+        return [];
       }
     },
     retry: 2,
@@ -169,9 +158,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           createdAt: vote.created_at
         }));
       } catch (error) {
-        // Fallback to AsyncStorage
+        // Fallback to AsyncStorage only
         const storedVotes = await AsyncStorage.getItem('userVotes');
-        return storedVotes ? JSON.parse(storedVotes) : mockVotes;
+        return storedVotes ? JSON.parse(storedVotes) : [];
       }
     },
     enabled: true, // Always enabled to maintain hook order
@@ -234,15 +223,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       ]);
 
       const notes = storedNotes ? JSON.parse(storedNotes) : {};
-      const restaurantsWithNotes = (restaurantsQuery.data || mockRestaurants).map((r: any) => ({
+      const restaurantsWithNotes = (restaurantsQuery.data || []).map((r: any) => ({
         ...r,
         userNotes: notes[r.id] || r.userNotes
       }));
 
       return {
         restaurants: restaurantsWithNotes,
-        userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : mockVotes),
-        discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : mockDiscussions),
+        userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : []),
+        discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : []),
         favoriteRestaurants: favoritesQuery.data || [],
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
@@ -269,8 +258,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
       setRestaurants(restaurantsQuery.data);
     } else if (restaurants.length === 0) {
-      console.log('[RestaurantStore] Setting restaurants from mockRestaurants');
-      setRestaurants(mockRestaurants);
+      console.log('[RestaurantStore] No restaurants available from any source');
+      setRestaurants([]);
     }
   }, [restaurants.length, dataQuery.data, restaurantsQuery.data, user?.id]);
 
