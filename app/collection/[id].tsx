@@ -336,7 +336,7 @@ export default function CollectionDetailScreen() {
   const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
   
   // Get restaurants for this collection using the simpler function
-  const collectionRestaurants = getCollectionRestaurants(id);
+  const collectionRestaurants = getCollectionRestaurants(id || '');
   const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
   
   // Debug logging for both approaches

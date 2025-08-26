@@ -628,10 +628,23 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     console.log('[getCollectionRestaurants] Getting restaurants for collection:', collectionId);
     console.log('[getCollectionRestaurants] Available restaurants:', restaurants.length);
+    console.log('[getCollectionRestaurants] Available plans:', plansQuery.data?.length || 0);
 
-    const collection = plansQuery.data?.find((p: any) => p.id === collectionId);
+    // First try to find the collection in plansQuery.data
+    let collection = plansQuery.data?.find((p: any) => p.id === collectionId);
+    
+    // If not found in plansQuery.data, try to find it in allCollections
+    if (!collection && allCollectionsQuery.data) {
+      collection = allCollectionsQuery.data.find((c: any) => c.id === collectionId);
+      if (collection) {
+        console.log('[getCollectionRestaurants] Found collection in allCollections:', collection.name);
+      }
+    }
+
     if (!collection) {
-      console.log('[getCollectionRestaurants] Collection not found');
+      console.log('[getCollectionRestaurants] Collection not found in any query data');
+      console.log('[getCollectionRestaurants] Available collection IDs in plansQuery:', plansQuery.data?.map(p => p.id) || []);
+      console.log('[getCollectionRestaurants] Available collection IDs in allCollections:', allCollectionsQuery.data?.map(c => c.id) || []);
       return [];
     }
 
@@ -650,7 +663,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     });
 
     return collectionRestaurants;
-  }, [plansQuery.data, restaurants]);
+  }, [plansQuery.data, allCollectionsQuery.data, restaurants]);
 
   const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
     return discussions.filter(d => 
