@@ -15,29 +15,53 @@ interface CollectionCardProps {
 export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   const restaurants = useCollectionRestaurants(collection.id);
   
+  // Enhanced data validation and fallbacks
+  const restaurantCount = restaurants && Array.isArray(restaurants) ? restaurants.length : 0;
+  const collaboratorCount = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
+  const totalMembers = collaboratorCount + 1; // +1 for the creator
+  const likeCount = collection.likes || 0;
+  
+  // Determine collection type for display
+  const getCollectionType = () => {
+    if (collection.is_public) return 'Public';
+    if (collaboratorCount > 0) return 'Shared';
+    return 'Private';
+  };
+  
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
-      <Image source={{ uri: collection.cover_image || collection.coverImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }} style={styles.image} />
+      <Image 
+        source={{ 
+          uri: collection.cover_image || collection.coverImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' 
+        }} 
+        style={styles.image} 
+      />
       <View style={styles.overlay} />
+      
+      {/* Collection type badge */}
+      <View style={styles.typeBadge}>
+        <Text style={styles.typeText}>{getCollectionType()}</Text>
+      </View>
       
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{collection.name}</Text>
-        <Text style={styles.count}>{restaurants && Array.isArray(restaurants) ? restaurants.length : 0} places</Text>
+        <Text style={styles.count}>{restaurantCount} places</Text>
+        {collection.description && (
+          <Text style={styles.description} numberOfLines={1}>
+            {collection.description}
+          </Text>
+        )}
       </View>
       
       <View style={styles.footer}>
         <View style={styles.stat}>
           <Heart size={14} color="#FFF" fill="#FFF" />
-          <Text style={styles.statText}>{collection.likes || 0}</Text>
+          <Text style={styles.statText}>{likeCount}</Text>
         </View>
-        {collection.collaborators && collection.collaborators.length > 0 && (
-          <View style={styles.stat}>
-            <Users size={14} color="#FFF" />
-            <Text style={styles.statText}>
-              {collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length + 1 : 1}
-            </Text>
-          </View>
-        )}
+        <View style={styles.stat}>
+          <Users size={14} color="#FFF" />
+          <Text style={styles.statText}>{totalMembers}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -95,5 +119,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFF',
     fontWeight: '600',
+  },
+  // Enhanced styles
+  typeBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  typeText: {
+    fontSize: 10,
+    color: '#FFF',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  description: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
   },
 });

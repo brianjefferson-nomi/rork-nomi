@@ -291,105 +291,149 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, [dataQuery.data]);
 
-  // Load user plans/collections
+  // Enhanced user plans/collections query with better error handling and data validation
   const plansQuery = useQuery({
-    queryKey: ['userPlans', user?.id],
+    queryKey: ['userPlans', user?.id, 'enhanced'],
     queryFn: async () => {
       try {
-        console.log('[RestaurantStore] Loading plans for user:', user?.id);
-        console.log('[RestaurantStore] User authenticated:', !!user?.id);
-        console.log('[RestaurantStore] User object:', user);
+        console.log('[RestaurantStore] 🚀 Starting enhanced plans query for user:', user?.id);
+        console.log('[RestaurantStore] 📊 User authentication status:', !!user?.id);
+        console.log('[RestaurantStore] 👤 User object:', user);
         
-        // If no user ID, try to get all public collections as fallback
+        // Data validation function
+        const validateCollection = (collection: any) => {
+          if (!collection || typeof collection !== 'object') {
+            console.warn('[RestaurantStore] ⚠️ Invalid collection object:', collection);
+            return false;
+          }
+          if (!collection.id || !collection.name) {
+            console.warn('[RestaurantStore] ⚠️ Collection missing required fields:', { id: collection.id, name: collection.name });
+            return false;
+          }
+          return true;
+        };
+        
+        // Enhanced data mapping function
+        const mapCollectionData = (collection: any) => {
+          if (!validateCollection(collection)) {
+            return null;
+          }
+          
+          console.log('[RestaurantStore] 📋 Mapping collection:', collection.name, 'with restaurant_ids:', collection.restaurant_ids?.length || 0);
+          
+          return {
+            ...collection,
+            // Ensure restaurant_ids is always an array
+            restaurant_ids: Array.isArray(collection.restaurant_ids) ? collection.restaurant_ids : [],
+            // Ensure collaborators is always an array
+            collaborators: Array.isArray(collection.collaborators) ? collection.collaborators : [],
+            // Enhanced settings with defaults
+            settings: {
+              voteVisibility: collection.vote_visibility || 'public',
+              discussionEnabled: collection.discussion_enabled !== false,
+              autoRankingEnabled: collection.auto_ranking_enabled !== false,
+              consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
+            },
+            // Add computed fields
+            restaurantCount: Array.isArray(collection.restaurant_ids) ? collection.restaurant_ids.length : 0,
+            memberCount: Array.isArray(collection.collaborators) ? collection.collaborators.length : 0,
+            isOwner: collection.created_by === user?.id,
+            isMember: Array.isArray(collection.collaborators) && collection.collaborators.includes(user?.id)
+          };
+        };
+        
+        // If no user ID, load public collections as fallback
         if (!user?.id) {
-          console.log('[RestaurantStore] No user ID, loading public collections as fallback');
+          console.log('[RestaurantStore] 🔓 No user ID, loading public collections as fallback');
           try {
             const publicCollections = await dbHelpers.getAllCollections();
-            console.log('[RestaurantStore] Public collections from fallback:', publicCollections?.length || 0);
-            return publicCollections.map((plan: any) => ({
+            console.log('[RestaurantStore] 📊 Public collections loaded:', publicCollections?.length || 0);
+            
+            const mappedCollections = (publicCollections || [])
+              .map(mapCollectionData)
+              .filter(Boolean); // Remove invalid collections
+            
+            console.log('[RestaurantStore] ✅ Mapped public collections:', mappedCollections.length);
+            return mappedCollections;
+          } catch (error) {
+            console.error('[RestaurantStore] ❌ Error loading public collections:', error);
+            throw new Error(`Failed to load public collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+        
+        // Load user-specific collections
+        console.log('[RestaurantStore] 🔍 Loading plans for authenticated user:', user.id);
+        const plans = await dbHelpers.getUserPlans(user.id);
+        console.log('[RestaurantStore] 📊 Raw plans data received:', plans?.length || 0);
+        
+        if (!plans || plans.length === 0) {
+          console.log('[RestaurantStore] ⚠️ No plans found for user, falling back to public collections');
+          const publicCollections = await dbHelpers.getAllCollections();
+          const mappedCollections = (publicCollections || [])
+            .map(mapCollectionData)
+            .filter(Boolean);
+          
+          console.log('[RestaurantStore] ✅ Fallback collections loaded:', mappedCollections.length);
+          return mappedCollections;
+        }
+        
+        // Map and validate all collections
+        const mappedPlans = plans
+          .map(mapCollectionData)
+          .filter(Boolean); // Remove invalid collections
+        
+        console.log('[RestaurantStore] ✅ Successfully mapped plans:', mappedPlans.length);
+        console.log('[RestaurantStore] 📋 Final mapped plans:', mappedPlans.map(p => ({ 
+          id: p.id, 
+          name: p.name, 
+          created_by: p.created_by, 
+          is_public: p.is_public,
+          restaurantCount: p.restaurantCount,
+          memberCount: p.memberCount
+        })));
+        
+        return mappedPlans;
+      } catch (error) {
+        console.error('[RestaurantStore] ❌ Critical error in plans query:', error);
+        
+        // Enhanced error handling with fallback
+        try {
+          console.log('[RestaurantStore] 🔄 Attempting enhanced fallback to public collections');
+          const publicCollections = await dbHelpers.getAllCollections();
+          const mappedCollections = (publicCollections || [])
+            .map((plan: any) => ({
               ...plan,
-              collaborators: plan.collaborators || [],
+              restaurant_ids: Array.isArray(plan.restaurant_ids) ? plan.restaurant_ids : [],
+              collaborators: Array.isArray(plan.collaborators) ? plan.collaborators : [],
               settings: {
                 voteVisibility: plan.vote_visibility || 'public',
                 discussionEnabled: plan.discussion_enabled !== false,
                 autoRankingEnabled: plan.auto_ranking_enabled !== false,
                 consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-              }
-            }));
-          } catch (error) {
-            console.error('[RestaurantStore] Error loading public collections:', error);
-            return [];
-          }
-        }
-        
-        console.log('[RestaurantStore] Loading plans for user:', user.id);
-        const plans = await dbHelpers.getUserPlans(user.id);
-        console.log('[RestaurantStore] Raw plans data:', plans?.length || 0);
-        console.log('[RestaurantStore] Plans data details:', plans?.map(p => ({ id: p.id, name: p.name, created_by: p.created_by, is_public: p.is_public })));
-        
-        // If no plans found for user, fallback to public collections
-        if (!plans || plans.length === 0) {
-          console.log('[RestaurantStore] No plans found for user, loading public collections');
-          const publicCollections = await dbHelpers.getAllCollections();
-          return publicCollections.map((plan: any) => ({
-            ...plan,
-            collaborators: plan.collaborators || [],
-            settings: {
-              voteVisibility: plan.vote_visibility || 'public',
-              discussionEnabled: plan.discussion_enabled !== false,
-              autoRankingEnabled: plan.auto_ranking_enabled !== false,
-              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-            }
-          }));
-        }
-        
-        const mappedPlans = plans.map((plan: any) => {
-          console.log('[RestaurantStore] Mapping plan:', plan.name, 'with restaurant_ids:', plan.restaurant_ids?.length || 0);
-          return {
-            ...plan,
-            collaborators: plan.collaborators || [],
-            settings: {
-              voteVisibility: plan.vote_visibility || 'public',
-              discussionEnabled: plan.discussion_enabled !== false,
-              autoRankingEnabled: plan.auto_ranking_enabled !== false,
-              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-            }
-          };
-        });
-        
-        console.log('[RestaurantStore] Mapped plans:', mappedPlans.length);
-        console.log('[RestaurantStore] Final mapped plans:', mappedPlans?.map(p => ({ id: p.id, name: p.name, created_by: p.created_by, is_public: p.is_public })));
-        
-        return mappedPlans;
-      } catch (error) {
-        console.error('[RestaurantStore] Error loading plans:', error);
-        // Fallback to public collections on error
-        try {
-          console.log('[RestaurantStore] Attempting fallback to public collections');
-          const publicCollections = await dbHelpers.getAllCollections();
-          console.log('[RestaurantStore] Fallback successful, found:', publicCollections?.length || 0, 'public collections');
-          return publicCollections.map((plan: any) => ({
-            ...plan,
-            collaborators: plan.collaborators || [],
-            settings: {
-              voteVisibility: plan.vote_visibility || 'public',
-              discussionEnabled: plan.discussion_enabled !== false,
-              autoRankingEnabled: plan.auto_ranking_enabled !== false,
-              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-            }
-          }));
+              },
+              restaurantCount: Array.isArray(plan.restaurant_ids) ? plan.restaurant_ids.length : 0,
+              memberCount: Array.isArray(plan.collaborators) ? plan.collaborators.length : 0,
+              isOwner: plan.created_by === user?.id,
+              isMember: Array.isArray(plan.collaborators) && plan.collaborators.includes(user?.id)
+            }))
+            .filter(Boolean);
+          
+          console.log('[RestaurantStore] ✅ Enhanced fallback successful, found:', mappedCollections.length, 'collections');
+          return mappedCollections;
         } catch (fallbackError) {
-          console.error('[RestaurantStore] Fallback also failed:', fallbackError);
-          console.log('[RestaurantStore] Returning empty array as last resort');
+          console.error('[RestaurantStore] ❌ Enhanced fallback also failed:', fallbackError);
+          console.log('[RestaurantStore] 🚨 Returning empty array as last resort');
           return [];
         }
       }
     },
-    enabled: true, // Always enabled to ensure collections load even without user
+    enabled: true, // Always enabled to ensure collections load
     retry: 3,
     retryDelay: 1000,
-    staleTime: 1 * 60 * 1000, // 1 minute - shorter to get fresh data
-    gcTime: 5 * 60 * 1000 // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - shorter for more responsive updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true, // Refetch when app comes back to focus
+    refetchOnReconnect: true // Refetch when network reconnects
   });
 
   // Debug plans data

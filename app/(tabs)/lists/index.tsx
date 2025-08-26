@@ -13,7 +13,13 @@ type SortType = 'recent' | 'rating' | 'price' | 'distance';
 type ViewType = 'grid' | 'list';
 
 export default function ListsScreen() {
-  const { collections, restaurants, favoriteRestaurants, deleteCollection, leaveCollection } = useRestaurants();
+  const { 
+    collections, 
+    restaurants, 
+    favoriteRestaurants, 
+    deleteCollection, 
+    leaveCollection
+  } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
@@ -21,11 +27,14 @@ export default function ListsScreen() {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'private' | 'shared' | 'public'>('all');
 
-  // Debug logging for collections
-  console.log('[ListsScreen] User authenticated:', isAuthenticated);
-  console.log('[ListsScreen] User ID:', user?.id);
-  console.log('[ListsScreen] Collections count:', collections?.length || 0);
-  console.log('[ListsScreen] Collections data:', collections?.map(c => ({
+  // Enhanced debug logging for collections
+  console.log('[ListsScreen] 🚀 Component initialized');
+  console.log('[ListsScreen] 👤 User authenticated:', isAuthenticated);
+  console.log('[ListsScreen] 🆔 User ID:', user?.id);
+  console.log('[ListsScreen] 📊 Collections count:', collections?.length || 0);
+  console.log('[ListsScreen] 🔄 Collections loading state:', !collections);
+  console.log('[ListsScreen] ❌ Collections error state:', collections === null);
+  console.log('[ListsScreen] 📋 Collections data:', collections?.map(c => ({
     id: c.id,
     name: c.name,
     created_by: c.created_by,
@@ -278,7 +287,24 @@ export default function ListsScreen() {
       )}
 
       {activeTab === 'collections' ? (
-        (filteredCollections || []).length === 0 ? (
+        // Enhanced loading and error states
+        collections === undefined ? (
+          <View style={styles.loadingState}>
+            <View style={styles.loadingSpinner} />
+            <Text style={styles.loadingText}>Loading your collections...</Text>
+          </View>
+        ) : collections === null ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorTitle}>Failed to load collections</Text>
+            <Text style={styles.errorText}>Please check your connection and try again</Text>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={() => window.location.reload()}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (filteredCollections || []).length === 0 ? (
           <View style={styles.emptyState}>
             <BookOpen size={48} color="#CCC" />
             <Text style={styles.emptyTitle}>No plans yet</Text>
@@ -680,6 +706,57 @@ const styles = StyleSheet.create({
   },
   activeCollectionTypeText: {
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  // Enhanced loading and error states
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  loadingSpinner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    borderTopColor: '#FF6B6B',
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  errorState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  retryButtonText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
