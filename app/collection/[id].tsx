@@ -359,8 +359,6 @@ export default function CollectionDetailScreen() {
   const effectiveRankedRestaurants = rankedRestaurantsWithAllVotesQuery.data?.restaurants || rankedRestaurants;
   const effectiveParticipationData = rankedRestaurantsWithAllVotesQuery.data?.participationData || participationData;
   
-  console.log('[CollectionDetail] Participation data:', participationData);
-  
   // Fetch restaurants directly from database as a fallback
   const directRestaurantsQuery = useQuery({
     queryKey: ['directCollectionRestaurants', id],
@@ -381,91 +379,41 @@ export default function CollectionDetailScreen() {
     retryDelay: 1000
   });
   
-  // Use direct restaurants from database if available, otherwise fall back to other sources
-  const displayRestaurants = directRestaurantsQuery.data && directRestaurantsQuery.data.length > 0 
-    ? directRestaurantsQuery.data.map(r => ({ 
-        restaurant: r, 
-        meta: { 
-          likes: 0, 
-          dislikes: 0, 
-          rank: 1,
-          voteDetails: {
-            likeVoters: [],
-            dislikeVoters: []
-          },
-          approvalPercent: 0,
-          discussionCount: 0
-        } 
-      }))
-    : (effectiveRankedRestaurants.length > 0 ? effectiveRankedRestaurants : 
-        (collectionRestaurants.length > 0 ? collectionRestaurants : []).map(r => ({ 
-          restaurant: r, 
-          meta: { 
-            likes: 0, 
-            dislikes: 0, 
-            rank: 1,
-            voteDetails: {
-              likeVoters: [],
-              dislikeVoters: []
-            },
-            approvalPercent: 0,
-            discussionCount: 0
-          } 
-        })));
-
-  // Fetch voting data for restaurants
-  const [restaurantVotingData, setRestaurantVotingData] = useState<{[key: string]: any}>({});
-
-  // Load voting data for restaurants
-  useEffect(() => {
-    const loadVotingData = async () => {
-      if (!id || displayRestaurants.length === 0) return;
-      
-      try {
-        const votingData: {[key: string]: any} = {};
-        
-        for (const { restaurant } of displayRestaurants) {
-          // Get votes for this restaurant in this collection
-          const { data: votes, error } = await supabase
-            .from('restaurant_votes')
-            .select('*')
-            .eq('restaurant_id', restaurant.id)
-            .eq('collection_id', id);
-          
-          if (!error && votes) {
-            const likes = votes.filter(v => v.vote === 'like');
-            const dislikes = votes.filter(v => v.vote === 'dislike');
-            const approvalPercent = votes.length > 0 ? Math.round((likes.length / votes.length) * 100) : 0;
-            
-            votingData[restaurant.id] = {
-              likes: likes.length,
-              dislikes: dislikes.length,
-              approvalPercent,
+  // Use ranked restaurants with all votes if available, otherwise fall back to direct restaurants
+  const displayRestaurants = effectiveRankedRestaurants.length > 0 
+    ? effectiveRankedRestaurants 
+    : (directRestaurantsQuery.data && directRestaurantsQuery.data.length > 0 
+        ? directRestaurantsQuery.data.map(r => ({ 
+            restaurant: r, 
+            meta: { 
+              likes: 0, 
+              dislikes: 0, 
+              rank: 1,
               voteDetails: {
-                likeVoters: likes.map(v => ({ userId: v.user_id, name: 'User' })),
-                dislikeVoters: dislikes.map(v => ({ userId: v.user_id, name: 'User' }))
-              }
-            };
-          }
-        }
-        
-        setRestaurantVotingData(votingData);
-      } catch (error) {
-        console.error('[CollectionDetail] Error loading voting data:', error);
-      }
-    };
-    
-    loadVotingData();
-  }, [id, displayRestaurants]);
+                likeVoters: [],
+                dislikeVoters: []
+              },
+              approvalPercent: 0,
+              discussionCount: 0
+            } 
+          }))
+        : (collectionRestaurants.length > 0 ? collectionRestaurants : []).map(r => ({ 
+            restaurant: r, 
+            meta: { 
+              likes: 0, 
+              dislikes: 0, 
+              rank: 1,
+              voteDetails: {
+                likeVoters: [],
+                dislikeVoters: []
+              },
+              approvalPercent: 0,
+              discussionCount: 0
+            } 
+          })));
 
-  // Update display restaurants with voting data
-  const restaurantsWithVotingData = displayRestaurants.map(({ restaurant, meta }) => ({
-    restaurant,
-    meta: {
-      ...meta,
-      ...restaurantVotingData[restaurant.id]
-    }
-  }));
+  // Use display restaurants directly since they should already have proper voting data
+  const restaurantsWithVotingData = displayRestaurants;
   
   const recommendations = effectiveCollection ? getGroupRecommendations(id) : [];
   
@@ -552,6 +500,11 @@ export default function CollectionDetailScreen() {
 
   const collectionType = getCollectionType();
   const isSharedCollection = collectionType === 'shared';
+  
+  console.log('[CollectionDetail] Effective ranked restaurants:', effectiveRankedRestaurants.length);
+  console.log('[CollectionDetail] Effective participation data:', effectiveParticipationData);
+  console.log('[CollectionDetail] Is shared collection:', isSharedCollection);
+  console.log('[CollectionDetail] Collection members:', collectionMembers.length);
 
   if (!effectiveCollection) {
     return (
@@ -1017,7 +970,7 @@ export default function CollectionDetailScreen() {
                  ) : (
            isSharedCollection ? (
              <InsightsTab 
-               collection={collection}
+               collection={effectiveCollection}
                rankedRestaurants={effectiveRankedRestaurants}
                discussions={effectiveDiscussions}
                collectionMembers={collectionMembers}
