@@ -388,6 +388,9 @@ export const dbHelpers = {
   }) {
     const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Determine is_public based on collection_type
+    const isPublic = planData.collection_type === 'public' || (planData.isPublic ?? true);
+    
     const { data, error } = await supabase
       .from('collections')
       .insert({
@@ -395,7 +398,8 @@ export const dbHelpers = {
         description: planData.description || '',
         created_by: planData.userId || 'current-user-id', // Use provided userId or fallback
         collection_code: collectionCode,
-        is_public: planData.isPublic ?? true,
+        collection_type: planData.collection_type || 'public',
+        is_public: isPublic, // Keep for backward compatibility
         occasion: planData.occasion || 'general',
         equal_voting: true,
         minimum_participation: 1,
@@ -971,50 +975,81 @@ export const dbHelpers = {
   // Collection management operations
   async getCollectionsByType(userId: string, collectionType?: 'public' | 'private' | 'shared') {
     try {
-      let query;
+      console.log('[getCollectionsByType] Fetching collections for user:', userId, 'type:', collectionType);
       
       if (collectionType === 'private') {
-        // Private collections: only collections created by the user that are not public
-        query = supabase
+        // Private collections: collections created by the user with collection_type = 'private'
+        const { data, error } = await supabase
           .from('collections')
           .select('*')
           .eq('created_by', userId)
-          .eq('is_public', false);
+          .eq('collection_type', 'private')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('[getCollectionsByType] Error fetching private collections:', error);
+          return [];
+        }
+        
+        console.log('[getCollectionsByType] Found private collections:', data?.length || 0);
+        return data || [];
+        
       } else if (collectionType === 'shared') {
-        // Shared collections: collections not created by the user but where user is a member
-        // First get collections where user is a member
+        // Shared collections: collections where user is a member and collection_type = 'shared'
         const { data: memberCollections, error: memberError } = await supabase
           .from('collection_members')
           .select('collection_id')
           .eq('user_id', userId);
         
-        if (memberError) return [];
+        if (memberError) {
+          console.error('[getCollectionsByType] Error fetching member collections:', memberError);
+          return [];
+        }
         
         if (memberCollections && memberCollections.length > 0) {
           const collectionIds = memberCollections.map(m => m.collection_id);
-          query = supabase
+          const { data, error } = await supabase
             .from('collections')
             .select('*')
             .in('id', collectionIds)
-            .eq('is_public', false);
+            .eq('collection_type', 'shared')
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('[getCollectionsByType] Error fetching shared collections:', error);
+            return [];
+          }
+          
+          console.log('[getCollectionsByType] Found shared collections:', data?.length || 0);
+          return data || [];
         } else {
+          console.log('[getCollectionsByType] No member collections found');
           return [];
         }
+        
       } else {
-        // Public collections: all public collections OR collections created by the user
+        // Public collections: all collections with collection_type = 'public' OR collections created by the user
         const { data: publicCollections, error: publicError } = await supabase
           .from('collections')
           .select('*')
-          .eq('is_public', true);
+          .eq('collection_type', 'public')
+          .order('created_at', { ascending: false });
         
-        if (publicError) return [];
+        if (publicError) {
+          console.error('[getCollectionsByType] Error fetching public collections:', publicError);
+          return [];
+        }
         
         const { data: userCollections, error: userError } = await supabase
           .from('collections')
           .select('*')
-          .eq('created_by', userId);
+          .eq('created_by', userId)
+          .order('created_at', { ascending: false });
         
-        if (userError) return [];
+        if (userError) {
+          console.error('[getCollectionsByType] Error fetching user collections:', userError);
+          return [];
+        }
         
         // Combine and deduplicate
         const allCollections = [...(publicCollections || []), ...(userCollections || [])];
@@ -1022,19 +1057,11 @@ export const dbHelpers = {
           index === self.findIndex(c => c.id === collection.id)
         );
         
+        console.log('[getCollectionsByType] Found public collections:', uniqueCollections.length);
         return uniqueCollections.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('[getCollectionsByType] Error:', error);
-        return [];
-      }
-      
-      return data || [];
     } catch (error) {
       console.error('[getCollectionsByType] Exception:', error);
       return [];
@@ -1072,16 +1099,75 @@ export const dbHelpers = {
   },
 
   async updateCollectionType(collectionId: string, collectionType: 'public' | 'private' | 'shared') {
+    console.log('[updateCollectionType] Updating collection:', collectionId, 'to type:', collectionType);
+    
+    // Update both collection_type and is_public for consistency
     const isPublic = collectionType === 'public';
     
     const { data, error } = await supabase
       .from('collections')
-      .update({ is_public: isPublic })
+      .update({ 
+        collection_type: collectionType,
+        is_public: isPublic // Keep for backward compatibility
+      })
       .eq('id', collectionId)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[updateCollectionType] Error:', error);
+      throw error;
+    }
+    
+    console.log('[updateCollectionType] Successfully updated collection:', data.name);
     return data;
+  },
+
+  async migrateCollectionTypes() {
+    console.log('[migrateCollectionTypes] Starting migration of collection types');
+    
+    try {
+      // Update collections based on is_public and membership
+      const { data: collections, error } = await supabase
+        .from('collections')
+        .select('*');
+      
+      if (error) {
+        console.error('[migrateCollectionTypes] Error fetching collections:', error);
+        return;
+      }
+      
+      console.log('[migrateCollectionTypes] Found collections to migrate:', collections?.length || 0);
+      
+      for (const collection of collections || []) {
+        let newType = 'public'; // default
+        
+        if (collection.is_public === false) {
+          // Check if this collection has members (shared)
+          const { data: members, error: memberError } = await supabase
+            .from('collection_members')
+            .select('user_id')
+            .eq('collection_id', collection.id);
+          
+          if (!memberError && members && members.length > 0) {
+            newType = 'shared';
+          } else {
+            newType = 'private';
+          }
+        }
+        
+        // Update the collection type
+        await supabase
+          .from('collections')
+          .update({ collection_type: newType })
+          .eq('id', collection.id);
+        
+        console.log(`[migrateCollectionTypes] Updated collection ${collection.name} to type: ${newType}`);
+      }
+      
+      console.log('[migrateCollectionTypes] Migration completed successfully');
+    } catch (error) {
+      console.error('[migrateCollectionTypes] Migration failed:', error);
+    }
   }
 };
