@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
 
 // Use environment variables for API keys (more secure)
 const AI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -490,7 +491,7 @@ export const generateTopPicks = async (menuItems: string[], reviews: string[], r
   }
 };
 
-// Enhanced Google Places API with better error handling and photo support
+// Enhanced Google Places API with robust error handling
 export const searchGooglePlaces = async (query: string, location: string): Promise<any[]> => {
   try {
     // Restrict to NYC and LA only for MVP
@@ -515,6 +516,12 @@ export const searchGooglePlaces = async (query: string, location: string): Promi
       }
     );
 
+    if (response.status === 403) {
+      console.log(`[GooglePlaces] Access forbidden (403) - API key may not have access to this service`);
+      console.log(`[GooglePlaces] This is expected with current RapidAPI subscription level`);
+      return [];
+    }
+
     if (response.status === 429) {
       console.log('[GooglePlaces] Rate limited, waiting and retrying...');
       await new Promise(resolve => setTimeout(resolve, 5000));
@@ -522,14 +529,15 @@ export const searchGooglePlaces = async (query: string, location: string): Promi
     }
 
     if (!response.ok) {
-      throw new Error(`Google Places API error: ${response.status}`);
+      console.log(`[GooglePlaces] API error: ${response.status} ${response.statusText}`);
+      return [];
     }
 
     const data = await response.json();
     console.log(`[GooglePlaces] Found ${data.results?.length || 0} results`);
     return data.results || [];
   } catch (error) {
-    console.error('Error searching Google Places:', error);
+    console.error('[GooglePlaces] Error searching Google Places:', error);
     return [];
   }
 };
@@ -548,7 +556,7 @@ export const searchGoogleMapsExtractor = async (query: string, lat: number, lng:
   }
 };
 
-// New Local Business Data API for comprehensive business information
+// New Local Business Data API with robust error handling
 export const searchLocalBusinessData = async (query: string, lat: number, lng: number, radius: number = 5000): Promise<any[]> => {
   try {
     console.log(`[LocalBusinessData] Searching for: ${query} near ${lat}, ${lng}`);
@@ -564,15 +572,22 @@ export const searchLocalBusinessData = async (query: string, lat: number, lng: n
       }
     );
 
+    if (response.status === 403) {
+      console.log(`[LocalBusinessData] Access forbidden (403) - API key may not have access to this service`);
+      console.log(`[LocalBusinessData] This is expected with current RapidAPI subscription level`);
+      return [];
+    }
+
     if (!response.ok) {
-      throw new Error(`Local Business Data API error: ${response.status}`);
+      console.log(`[LocalBusinessData] API error: ${response.status} ${response.statusText}`);
+      return [];
     }
 
     const data = await response.json();
     console.log(`[LocalBusinessData] Found ${data.data?.length || 0} results`);
     return data.data || [];
   } catch (error) {
-    console.error('Error searching Local Business Data:', error);
+    console.error('[LocalBusinessData] Error searching Local Business Data:', error);
     return [];
   }
 };
@@ -676,7 +691,7 @@ export const getYelpDetails = async (businessId: string) => {
   }
 };
 
-// TripAdvisor API (RapidAPI search) with new API key
+// TripAdvisor API (RapidAPI search) with robust error handling
 export const searchTripAdvisor = async (query: string, location: string) => {
   try {
     console.log(`[TripAdvisor] Searching for: ${query} in ${location}`);
@@ -691,8 +706,14 @@ export const searchTripAdvisor = async (query: string, location: string) => {
       }
     );
     
+    if (response.status === 403) {
+      console.log(`[TripAdvisor] Access forbidden (403) - API key may not have access to this service`);
+      console.log(`[TripAdvisor] This is expected with current RapidAPI subscription level`);
+      return [];
+    }
+    
     if (!response.ok) {
-      console.log(`[TripAdvisor] API error: ${response.status}`);
+      console.log(`[TripAdvisor] API error: ${response.status} ${response.statusText}`);
       return [];
     }
     
@@ -700,7 +721,7 @@ export const searchTripAdvisor = async (query: string, location: string) => {
     console.log(`[TripAdvisor] Found ${data.data?.data?.length || 0} results`);
     return data.data?.data || [];
   } catch (error) {
-    console.error('Error searching TripAdvisor:', error);
+    console.error('[TripAdvisor] Error searching TripAdvisor:', error);
     return [];
   }
 };
@@ -1277,8 +1298,43 @@ export const aggregateRestaurantData = async (query: string, location: string, u
     }
 
     if (allResults.length === 0) {
-      console.log('[API] Using mock data as fallback');
-      allResults = generateMockSearchResults(query, userLocation.city);
+      console.log('[API] All external APIs failed, using robust fallback system');
+      console.log('[API] This is expected with current API subscription levels');
+      
+      // Try to get restaurants from database first
+      try {
+        const { data: dbRestaurants } = await supabase
+          .from('restaurants')
+          .select('*')
+          .ilike('name', `%${query}%`)
+          .limit(10);
+        
+        if (dbRestaurants && dbRestaurants.length > 0) {
+          console.log(`[API] Found ${dbRestaurants.length} restaurants from database as fallback`);
+          allResults = dbRestaurants.map((restaurant: any) => ({
+            id: restaurant.id,
+            name: restaurant.name,
+            cuisine: restaurant.cuisine,
+            rating: restaurant.rating,
+            priceLevel: restaurant.price_level,
+            address: restaurant.address,
+            neighborhood: restaurant.neighborhood,
+            phone: restaurant.phone,
+            website: restaurant.website,
+            photos: restaurant.images || [],
+            reviews: restaurant.reviews || [],
+            hours: restaurant.hours,
+            description: restaurant.description,
+            source: 'database'
+          }));
+        } else {
+          console.log('[API] No database restaurants found, using mock data');
+          allResults = generateMockSearchResults(query, userLocation.city);
+        }
+      } catch (error) {
+        console.log('[API] Database fallback failed, using mock data');
+        allResults = generateMockSearchResults(query, userLocation.city);
+      }
     }
 
     // Sort results by proximity to user location
