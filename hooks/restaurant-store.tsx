@@ -120,18 +120,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['restaurants'],
     queryFn: async () => {
       try {
+        console.log('[RestaurantStore] Loading restaurants from database...');
         // Fetch restaurants from database instead of external APIs
         const restaurantsData = await dbHelpers.getAllRestaurants();
+        console.log('[RestaurantStore] Raw restaurant data:', restaurantsData?.length || 0);
+        
         if (!restaurantsData) throw new Error('No restaurants data returned');
         
         if (restaurantsData && restaurantsData.length > 0) {
-          return restaurantsData.map(mapDatabaseRestaurant);
+          const mappedRestaurants = restaurantsData.map(mapDatabaseRestaurant);
+          console.log('[RestaurantStore] Mapped restaurants:', mappedRestaurants.length);
+          console.log('[RestaurantStore] Sample restaurant IDs:', mappedRestaurants.slice(0, 3).map(r => r.id));
+          return mappedRestaurants;
         } else {
+          console.log('[RestaurantStore] No restaurants in database, using mock data');
           // Fallback to mock data if no restaurants in database
           return mockRestaurants;
         }
       } catch (error) {
-        console.error('Error loading restaurants from database:', error);
+        console.error('[RestaurantStore] Error loading restaurants from database:', error);
         // Fallback to mock data if database fails
         return mockRestaurants;
       }
@@ -247,11 +254,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Ensure restaurants are always available
   useEffect(() => {
+    console.log('[RestaurantStore] useEffect - restaurants.length:', restaurants.length);
+    console.log('[RestaurantStore] useEffect - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length);
+    console.log('[RestaurantStore] useEffect - restaurantsQuery.data:', restaurantsQuery.data?.length);
+    
     if (restaurants.length === 0 && dataQuery.data?.restaurants) {
+      console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
       setRestaurants(dataQuery.data.restaurants);
     } else if (restaurants.length === 0 && restaurantsQuery.data) {
+      console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
       setRestaurants(restaurantsQuery.data);
     } else if (restaurants.length === 0) {
+      console.log('[RestaurantStore] Setting restaurants from mockRestaurants');
       setRestaurants(mockRestaurants);
     }
   }, [restaurants.length, dataQuery.data, restaurantsQuery.data]);
@@ -272,9 +286,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userPlans', user?.id],
     queryFn: async () => {
       try {
-        if (!user?.id) return [];
+        if (!user?.id) {
+          console.log('[RestaurantStore] No user ID, returning empty plans');
+          return [];
+        }
+        console.log('[RestaurantStore] Loading plans for user:', user.id);
         const plans = await dbHelpers.getUserPlans(user.id);
-        return plans.map((plan: any) => ({
+        console.log('[RestaurantStore] Raw plans data:', plans?.length || 0);
+        
+        const mappedPlans = plans.map((plan: any) => ({
           ...plan,
           collaborators: plan.collaborators || [],
           settings: {
@@ -284,7 +304,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
             consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
           }
         }));
+        
+        console.log('[RestaurantStore] Mapped plans:', mappedPlans.length);
+        mappedPlans.forEach((plan, i) => {
+          console.log(`[RestaurantStore] Plan ${i}: ${plan.name} - restaurant_ids: ${plan.restaurant_ids?.length || 0}`);
+        });
+        
+        return mappedPlans;
       } catch (error) {
+        console.error('[RestaurantStore] Error loading plans:', error);
         return [];
       }
     },
@@ -621,6 +649,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, []);
 
+  // Debug logging for return values
+  console.log('[RestaurantStore] Return values:');
+  console.log('  - restaurants:', restaurants.length);
+  console.log('  - plans:', plansQuery.data?.length || 0);
+  console.log('  - allCollections:', allCollectionsQuery.data?.length || 0);
+  console.log('  - isLoading:', restaurantsQuery.isLoading || plansQuery.isLoading || allCollectionsQuery.isLoading);
+  
   return {
     restaurants,
     plans: plansQuery.data || [],
