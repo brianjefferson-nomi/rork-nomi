@@ -79,14 +79,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
-  // Add timeout mechanism to prevent infinite loading
+  // Fallback mechanism to prevent infinite loading
   useEffect(() => {
-    console.log('[RestaurantStore] Setting up timeout mechanism, restaurants.length:', restaurants.length);
     const timeout = setTimeout(() => {
-      console.log('[RestaurantStore] Loading timeout reached, forcing data display');
-      // Force the app to show data even if queries are still loading
       if (restaurants.length === 0) {
-        console.log('[RestaurantStore] Setting mock restaurants due to timeout');
         setRestaurants(mockRestaurants);
       }
     }, 5000); // 5 second timeout
@@ -99,247 +95,64 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     id: dbRestaurant.id,
     name: dbRestaurant.name,
     cuisine: dbRestaurant.cuisine,
-    priceRange: (dbRestaurant.price_range || dbRestaurant.price_level === 1 ? '$' : dbRestaurant.price_level === 2 ? '$$' : dbRestaurant.price_level === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
-    imageUrl: dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-    images: (dbRestaurant.images || [dbRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter((img: string) => img && img.trim().length > 0),
+    priceRange: dbRestaurant.price_range,
+    imageUrl: dbRestaurant.image_url,
+    images: dbRestaurant.images || [],
     address: dbRestaurant.address,
     neighborhood: dbRestaurant.neighborhood,
-    hours: dbRestaurant.hours || 'Hours vary',
-    vibe: dbRestaurant.vibe_tags || [],
-    description: dbRestaurant.description || 'A great dining experience awaits.',
-    menuHighlights: dbRestaurant.top_picks || [],
-    rating: dbRestaurant.rating || 0,
+    hours: dbRestaurant.hours,
+    vibe: dbRestaurant.vibe || [],
+    description: dbRestaurant.description,
+    menuHighlights: dbRestaurant.menu_highlights || [],
+    rating: dbRestaurant.rating,
     reviews: dbRestaurant.reviews || [],
     aiDescription: dbRestaurant.ai_description,
     aiVibes: dbRestaurant.ai_vibes || [],
     aiTopPicks: dbRestaurant.ai_top_picks || [],
-    contributors: [],
-    commentsCount: 0,
-    savesCount: 0,
-    sharesCount: 0,
-    averageGroupStars: dbRestaurant.rating || 0,
-    userNotes: dbRestaurant.userNotes || null
+    phone: dbRestaurant.phone,
+    website: dbRestaurant.website,
+    priceLevel: dbRestaurant.price_level,
+    userNotes: dbRestaurant.userNotes || []
   }), []);
 
-  // Load user plans from database
-  const plansQuery = useQuery({
-    queryKey: ['userPlans', user?.id],
-    queryFn: async () => {
-      if (!user?.id) {
-        console.log('[RestaurantStore] No user ID, returning empty plans');
-        return [];
-      }
-      
-      try {
-        console.log('[RestaurantStore] Loading plans for user:', user.id);
-        const plans = await dbHelpers.getUserPlans(user.id);
-        console.log('[RestaurantStore] Loaded plans:', plans?.length || 0);
-        return plans || [];
-      } catch (error) {
-        console.error('[RestaurantStore] Error loading plans:', error);
-        // Return empty array instead of throwing error to prevent app crashes
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-    retry: 1,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
-  });
-
-  // Load restaurants from database
+  // Load restaurants from API
   const restaurantsQuery = useQuery({
     queryKey: ['restaurants'],
     queryFn: async () => {
       try {
-        console.log('[RestaurantStore] Starting restaurant loading...');
-        // Try to load from database first
-        const dbRestaurants = await dbHelpers.getAllRestaurants();
-        console.log('[RestaurantStore] Database restaurants result:', dbRestaurants?.length || 0, dbRestaurants);
-        
-        if (dbRestaurants && dbRestaurants.length > 0) {
-          console.log('[RestaurantStore] Loaded', dbRestaurants.length, 'restaurants from database');
-          const mappedRestaurants = dbRestaurants.map(mapDatabaseRestaurant);
-          console.log('[RestaurantStore] Mapped restaurants:', mappedRestaurants.length, mappedRestaurants.map(r => ({ id: r.id, name: r.name })));
-          return mappedRestaurants;
-        }
-        
-        // If no restaurants in database, try to populate with real data
-        console.log('[RestaurantStore] No restaurants in database, populating with real data...');
-        const realRestaurants = await populateDatabaseWithRealRestaurants();
-        if (realRestaurants && realRestaurants.length > 0) {
-          console.log('[RestaurantStore] Populated database with', realRestaurants.length, 'restaurants');
-          return realRestaurants;
-        }
+        const restaurantsData = await aggregateRestaurantData('', 'New York', 40.7128, -74.0060);
+        return restaurantsData.map(mapDatabaseRestaurant);
       } catch (error) {
-        console.error('[RestaurantStore] Error loading restaurants:', error);
+        // Fallback to mock data if API fails
+        return mockRestaurants;
       }
-      
-      // Fallback to mock data
-      console.log('[RestaurantStore] Using mock data as fallback');
-      console.log('[RestaurantStore] Mock restaurants:', mockRestaurants.length, mockRestaurants.map(r => ({ id: r.id, name: r.name })));
-      return mockRestaurants;
     },
-    retry: 1,
+    retry: 2,
     retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000 // 30 minutes
   });
 
-  // Manual RLS fix function
-  const applyRLSFix = useMutation({
-    mutationFn: async () => {
-      console.log('[RestaurantStore] Applying RLS fix...');
-      const result = await dbHelpers.applyRLSFix();
-      console.log('[RestaurantStore] RLS fix result:', result);
-      return result;
-    },
-    onSuccess: (data) => {
-      console.log('[RestaurantStore] RLS fix completed:', data);
-      // Refetch data after fix
-      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
-    },
-    onError: (error) => {
-      console.error('[RestaurantStore] RLS fix failed:', error);
-    }
-  });
-
-  // Temporary RLS disable function for testing
-  const disableRLSTemporarily = useMutation({
-    mutationFn: async () => {
-      console.log('[RestaurantStore] Temporarily disabling RLS...');
-      const result = await dbHelpers.disableRLSTemporarily();
-      console.log('[RestaurantStore] RLS disable result:', result);
-      return result;
-    },
-    onSuccess: (data) => {
-      console.log('[RestaurantStore] RLS disabled successfully:', data);
-      // Refetch data after fix
-      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
-    },
-    onError: (error) => {
-      console.error('[RestaurantStore] RLS disable failed:', error);
-    }
-  });
-
-  // Comprehensive RLS fix function
-  const applyComprehensiveRLSFix = useMutation({
-    mutationFn: async () => {
-      console.log('[RestaurantStore] Applying comprehensive RLS fix...');
-      const result = await dbHelpers.applyComprehensiveRLSFix();
-      console.log('[RestaurantStore] Comprehensive RLS fix result:', result);
-      return result;
-    },
-    onSuccess: (data) => {
-      console.log('[RestaurantStore] Comprehensive RLS fix completed:', data);
-      // Refetch data after fix
-      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
-      queryClient.invalidateQueries({ queryKey: ['collectionMembers'] });
-    },
-    onError: (error) => {
-      console.error('[RestaurantStore] Comprehensive RLS fix failed:', error);
-    }
-  });
-
-  // Test database connection on startup
-  const dbTestQuery = useQuery({
-    queryKey: ['dbTest'],
-    queryFn: async () => {
-      try {
-        console.log('[RestaurantStore] Testing database connection...');
-        const result = await dbHelpers.testDatabaseConnection();
-        console.log('[RestaurantStore] Database test result:', result);
-        return result;
-      } catch (error) {
-        console.error('[RestaurantStore] Database test error:', {
-          error: JSON.stringify(error, null, 2),
-          message: error instanceof Error ? error.message : String(error)
-        });
-        return { success: false, error };
-      }
-    },
-    retry: 1,
-    retryDelay: 2000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
-  });
-
-  // Load votes from database
+  // Load user votes from database
   const votesQuery = useQuery({
     queryKey: ['userVotes', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
       try {
-        console.log('[RestaurantStore] Loading votes from database for user:', user.id);
+        if (!user?.id) return [];
         const votes = await dbHelpers.getUserVotes(user.id);
-        console.log('[RestaurantStore] Loaded votes from database:', votes.length);
         return votes.map((vote: any) => ({
+          id: vote.id,
           restaurantId: vote.restaurant_id,
           userId: vote.user_id,
           collectionId: vote.collection_id,
-          vote: vote.vote,
+          vote: vote.vote as 'like' | 'dislike',
           reason: vote.reason,
-          timestamp: vote.created_at,
-          authority: 'regular',
-          weight: 1
+          createdAt: vote.created_at
         }));
       } catch (error) {
-        console.error('[RestaurantStore] Error loading votes from database:', {
-          error: JSON.stringify(error, null, 2),
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          userId: user?.id
-        });
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-    retry: 1,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
-  });
-
-  // Load all votes for collections (to see other users' activity)
-  const allVotesQuery = useQuery({
-    queryKey: ['allVotes'],
-    queryFn: async () => {
-      try {
-        console.log('[RestaurantStore] Loading all votes from database');
-        // Get all collections the user has access to
-        const plans = await dbHelpers.getUserPlans(user?.id || '');
-        const allVotes: any[] = [];
-        
-        // Fetch votes for each collection
-        for (const plan of plans) {
-          try {
-            const collectionVotes = await dbHelpers.getCollectionVotes(plan.id);
-            allVotes.push(...collectionVotes.map((vote: any) => ({
-              restaurantId: vote.restaurant_id,
-              userId: vote.user_id,
-              collectionId: vote.collection_id,
-              vote: vote.vote,
-              reason: vote.reason,
-              timestamp: vote.created_at,
-              authority: 'regular',
-              weight: 1,
-              userName: vote.users?.name || 'Unknown User'
-            })));
-          } catch (collectionError) {
-            console.error('[RestaurantStore] Error loading votes for collection:', plan.id, collectionError);
-            // Continue with other collections instead of failing completely
-          }
-        }
-        
-        console.log('[RestaurantStore] Loaded all votes from database:', allVotes.length);
-        return allVotes;
-      } catch (error) {
-        console.error('[RestaurantStore] Error loading all votes from database:', error);
-        // Return empty array instead of throwing error to prevent app crashes
-        return [];
+        // Fallback to AsyncStorage
+        const storedVotes = await AsyncStorage.getItem('userVotes');
+        return storedVotes ? JSON.parse(storedVotes) : mockVotes;
       }
     },
     enabled: !!user?.id,
@@ -354,12 +167,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userFavorites', user?.id],
     queryFn: async () => {
       try {
-        console.log('[RestaurantStore] Loading favorites from database');
         const favorites = await dbHelpers.getUserFavorites(user?.id || '');
-        console.log('[RestaurantStore] Loaded favorites from database:', favorites);
         return favorites;
       } catch (error) {
-        console.error('[RestaurantStore] Error loading favorites from database:', error);
         // Fallback to AsyncStorage
         const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
         return storedFavorites ? JSON.parse(storedFavorites) : [];
@@ -377,15 +187,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['discussions'],
     queryFn: async () => {
       try {
-        console.log('[RestaurantStore] Loading discussions from database');
         // For now, we'll use the existing discussions from AsyncStorage
         // In the future, we can implement a function to get all discussions across collections
         const storedDiscussions = await AsyncStorage.getItem('discussions');
         const discussions = storedDiscussions ? JSON.parse(storedDiscussions) : [];
-        console.log('[RestaurantStore] Loaded discussions from storage:', discussions.length);
         return discussions;
       } catch (error) {
-        console.error('[RestaurantStore] Error loading discussions from storage:', error);
         return [];
       }
     },
@@ -432,112 +239,17 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   // Ensure restaurants are always available
   useEffect(() => {
     if (restaurants.length === 0 && dataQuery.data?.restaurants) {
-      console.log('[RestaurantStore] Setting restaurants from dataQuery');
       setRestaurants(dataQuery.data.restaurants);
     } else if (restaurants.length === 0 && restaurantsQuery.data) {
-      console.log('[RestaurantStore] Setting restaurants from restaurantsQuery');
       setRestaurants(restaurantsQuery.data);
     } else if (restaurants.length === 0) {
-      console.log('[RestaurantStore] No restaurants available, setting mock data');
       setRestaurants(mockRestaurants);
     }
   }, [restaurants.length, dataQuery.data, restaurantsQuery.data]);
 
-  // Populate database with real restaurant data from multiple APIs
-  const populateDatabaseWithRealRestaurants = useCallback(async (): Promise<Restaurant[]> => {
-    try {
-      console.log('[RestaurantStore] Populating database with real restaurant data...');
-      
-      // Get user location for proximity-based search
-      const userLocation = await getUserLocation();
-      if (!userLocation) {
-        console.log('[RestaurantStore] Could not get user location, using default');
-        return [];
-      }
-
-      const popularCuisines = ['Italian', 'Sushi', 'Pizza', 'Burgers', 'Thai', 'Mexican', 'Chinese', 'Indian'];
-      const allRestaurants: Restaurant[] = [];
-      
-      // Search for restaurants by cuisine type near user location
-      for (const cuisine of popularCuisines) {
-        try {
-          console.log(`[RestaurantStore] Searching for ${cuisine} restaurants near ${userLocation.city}...`);
-          
-          // Use the new location-based API with user coordinates
-          const results = await aggregateRestaurantData(
-            cuisine, 
-            userLocation.city, 
-            userLocation.lat, 
-            userLocation.lng
-          );
-          
-          if (results && results.length > 0) {
-            // Take top 3 results per cuisine for variety
-            const topResults = results.slice(0, 3);
-            
-            for (const result of topResults) {
-              try {
-                // Save to database
-                const restaurantData = {
-                  restaurant_code: `rest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                  name: result.name,
-                  cuisine: result.cuisine,
-                  price_range: result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$',
-                  image_url: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-                  images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
-                  address: result.address,
-                  neighborhood: userLocation.city,
-                  hours: result.hours,
-                  vibe_tags: result.vibeTags,
-                  description: result.description,
-                  top_picks: result.topPicks,
-                  rating: result.rating,
-                  reviews: result.reviews,
-                  phone: result.phone,
-                  website: result.website,
-                  price_level: result.priceLevel,
-                  vibe: result.vibeTags,
-                  menu_highlights: result.topPicks,
-                  ai_description: result.description,
-                  ai_vibes: result.vibeTags,
-                  ai_top_picks: result.topPicks,
-                  latitude: result.location?.lat,
-                  longitude: result.location?.lng
-                };
-                
-                await dbHelpers.createRestaurant(restaurantData);
-                console.log(`[RestaurantStore] Saved ${result.name} to database`);
-                
-                // Map to Restaurant format for return
-                const mappedRestaurant = mapDatabaseRestaurant(restaurantData);
-                allRestaurants.push(mappedRestaurant);
-                
-              } catch (error) {
-                console.error(`[RestaurantStore] Error saving ${result.name}:`, error);
-              }
-            }
-          }
-          
-          // Add delay between API calls to respect rate limits
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-        } catch (error) {
-          console.error(`[RestaurantStore] Error searching for ${cuisine} restaurants:`, error);
-        }
-      }
-      
-      console.log(`[RestaurantStore] Successfully populated database with ${allRestaurants.length} restaurants`);
-      return allRestaurants;
-      
-    } catch (error) {
-      console.error('[RestaurantStore] Error populating database with real restaurants:', error);
-      return [];
-    }
-  }, []);
-
+  // Ensure other data is available
   useEffect(() => {
     if (dataQuery.data) {
-      setRestaurants(dataQuery.data.restaurants);
       setUserVotes(dataQuery.data.userVotes);
       setDiscussions(dataQuery.data.discussions);
       setFavoriteRestaurants(dataQuery.data.favoriteRestaurants);
@@ -546,1007 +258,339 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, [dataQuery.data]);
 
-  // Persist votes
-  const persistVotes = useMutation({
-    mutationFn: async (newVotes: RestaurantVote[]) => {
-      await AsyncStorage.setItem('userVotes', JSON.stringify(newVotes));
-      return newVotes;
-    },
-    onSuccess: (data) => {
-      setUserVotes(data);
-    }
-  });
-
-  // Persist discussions
-  const persistDiscussions = useMutation({
-    mutationFn: async (newDiscussions: RestaurantDiscussion[]) => {
-      await AsyncStorage.setItem('discussions', JSON.stringify(newDiscussions));
-      return newDiscussions;
-    },
-    onSuccess: (data) => {
-      setDiscussions(data);
-    }
-  });
-
-  // Persist favorites
-  const { mutate: mutateFavorites } = useMutation({
-    mutationFn: async (newFavorites: string[]) => {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      console.log('[RestaurantStore] Saving favorites to database:', newFavorites);
-      
-      // Save to database
-      await dbHelpers.updateUserFavorites(user.id, newFavorites);
-      
-      // Also save to AsyncStorage for offline access
-      await AsyncStorage.setItem('favoriteRestaurants', JSON.stringify(newFavorites));
-      
-      return newFavorites;
-    },
-    onSuccess: (data) => {
-      setFavoriteRestaurants(data);
-    }
-  });
-
-  // Persist notes
-  const { mutate: mutateNotes } = useMutation({
-    mutationFn: async ({ restaurantId, note }: { restaurantId: string; note: string }) => {
-      const stored = await AsyncStorage.getItem('restaurantNotes');
-      const notes = stored ? JSON.parse(stored) : {};
-      notes[restaurantId] = note;
-      await AsyncStorage.setItem('restaurantNotes', JSON.stringify(notes));
-      return { restaurantId, note };
-    },
-    onSuccess: ({ restaurantId, note }) => {
-      setRestaurants(prev => prev.map(r => 
-        r.id === restaurantId ? { ...r, userNotes: note } : r
-      ));
-    }
-  });
-
-  // Persist search history
-  const { mutate: mutateSearchHistory } = useMutation({
-    mutationFn: async (history: string[]) => {
-      await AsyncStorage.setItem('searchHistory', JSON.stringify(history.slice(0, 10)));
-      return history.slice(0, 10);
-    },
-    onSuccess: (data) => setSearchHistory(data)
-  });
-
-  // Plan operations
-  const addRestaurantToPlan = useCallback(async (planId: string, restaurantId: string) => {
-    if (!user?.id) return;
-    
-    const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan) return;
-
-    const updatedRestaurantIds = [...new Set([...plan.restaurant_ids, restaurantId])];
-    await dbHelpers.updatePlan(planId, {
-      restaurant_ids: updatedRestaurantIds,
-      updated_at: new Date().toISOString()
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-  }, [user?.id, plansQuery.data, queryClient]);
-
-  const removeRestaurantFromPlan = useCallback(async (planId: string, restaurantId: string) => {
-    if (!user?.id) return;
-    
-    const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan) return;
-
-    const updatedRestaurantIds = plan.restaurant_ids.filter((id: string) => id !== restaurantId);
-    await dbHelpers.updatePlan(planId, {
-      restaurant_ids: updatedRestaurantIds,
-      updated_at: new Date().toISOString()
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-  }, [user?.id, plansQuery.data, queryClient]);
-
-    const createPlan = useCallback(async (planData: { 
-      name: string; 
-      description?: string; 
-      plannedDate?: string; 
-      isPublic?: boolean; 
-      occasion?: string;
-      collection_type?: 'public' | 'private' | 'shared';
-    }) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for plan creation');
-      throw new Error('User not authenticated');
-    }
-    
-    console.log('[RestaurantStore] Creating plan:', planData);
-    
-    try {
-      // Get cover image
-      let coverImage: string;
+  // Load user plans/collections
+  const plansQuery = useQuery({
+    queryKey: ['userPlans', user?.id],
+    queryFn: async () => {
       try {
-        coverImage = await getUnsplashCollectionCoverImage(planData.occasion || 'General');
+        if (!user?.id) return [];
+        const plans = await dbHelpers.getUserPlans(user.id);
+        return plans.map((plan: any) => ({
+          ...plan,
+          collaborators: plan.collaborators || [],
+          settings: {
+            voteVisibility: plan.vote_visibility || 'public',
+            discussionEnabled: plan.discussion_enabled !== false,
+            autoRankingEnabled: plan.auto_ranking_enabled !== false,
+            consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+          }
+        }));
       } catch (error) {
-        console.warn('[RestaurantStore] Unsplash API failed, using fallback image:', error);
-        coverImage = getCollectionCoverImageFallback(planData.occasion || 'General');
+        return [];
       }
-      
-      // Determine collection type
-      const collectionType = planData.collection_type || (planData.isPublic ? 'public' : 'private');
-      
-      const planInsertData = {
-        name: planData.name,
-        description: planData.description,
-        created_by: user.id,
-        creator_id: user.id,
-        occasion: planData.occasion,
-        collection_type: collectionType,
-        is_public: collectionType === 'public',
-        cover_image: coverImage,
-        likes: 0,
-        equal_voting: true,
-        admin_weighted: false,
-        expertise_weighted: false,
-        minimum_participation: 1,
-        allow_vote_changes: true,
-        anonymous_voting: false,
-        vote_visibility: 'public' as const,
-        discussion_enabled: true,
-        auto_ranking_enabled: true,
-        consensus_threshold: 50,
-        restaurant_ids: [],
-        collaborators: []
-      };
+    },
+    enabled: !!user?.id,
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000 // 5 minutes
+  });
 
-      // Only add planned_date if it's provided
-      if (planData.plannedDate) {
-        (planInsertData as any).planned_date = planData.plannedDate;
-      }
-
-      console.log('[RestaurantStore] Plan insert data:', planInsertData);
-      
-      const newPlan = await dbHelpers.createPlan(planInsertData);
-      
-      console.log('[RestaurantStore] Plan created successfully:', newPlan);
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-    } catch (error) {
-      console.error('[RestaurantStore] Error creating plan:', error);
-      if (error instanceof Error) {
-        throw new Error(`Failed to create plan: ${error.message}`);
-      } else {
-        throw new Error('Failed to create plan: Unknown error occurred');
-      }
+  // Mutations
+  const createPlanMutation = useMutation({
+    mutationFn: async (planData: any) => {
+      return await dbHelpers.createPlan(planData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
     }
-  }, [user?.id, queryClient]);
+  });
 
-  const deletePlan = useCallback(async (planId: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for plan deletion');
-      throw new Error('User not authenticated');
+  const deletePlanMutation = useMutation({
+    mutationFn: async ({ planId, userId }: { planId: string; userId: string }) => {
+      return await dbHelpers.deletePlan(planId, userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
     }
-    
+  });
+
+  const voteRestaurantMutation = useMutation({
+    mutationFn: async (voteData: any) => {
+      return await dbHelpers.voteRestaurant(voteData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+    }
+  });
+
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async ({ userId, favoriteRestaurants }: { userId: string; favoriteRestaurants: string[] }) => {
+      return await dbHelpers.updateUserFavorites(userId, favoriteRestaurants);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userFavorites'] });
+    }
+  });
+
+  const addDiscussionMutation = useMutation({
+    mutationFn: async (discussionData: any) => {
+      return await dbHelpers.createDiscussion(discussionData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['discussions'] });
+    }
+  });
+
+  // Helper functions
+  const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
     try {
-      console.log('[RestaurantStore] Deleting plan:', planId);
-      await dbHelpers.deletePlan(planId, user.id);
-      console.log('[RestaurantStore] Plan deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
+      const results = await searchRestaurantsWithAPI(query, userLocation?.city || 'New York');
+      setSearchResults(results);
+      return results;
     } catch (error) {
-      console.error('[RestaurantStore] Error deleting plan:', error);
-      if (error instanceof Error) {
-        throw new Error(`Failed to delete plan: ${error.message}`);
-      } else {
-        throw new Error('Failed to delete plan: Unknown error occurred');
-      }
-    }
-  }, [user?.id, queryClient]);
-
-  const inviteToPlan = useCallback(async (planId: string, email: string, message?: string) => {
-    if (!user?.id) return;
-
-    await dbHelpers.createInvitation({
-      plan_id: planId,
-      inviter_id: user.id,
-      invitee_email: email,
-      message,
-      status: 'pending'
-    });
-  }, [user?.id]);
-
-  const updatePlanSettings = useCallback(async (planId: string, settings: Partial<Plan>) => {
-    if (!user?.id) return;
-    
-    await dbHelpers.updatePlan(planId, {
-      ...settings,
-      updated_at: new Date().toISOString()
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-  }, [user?.id, queryClient]);
-
-  const shareablePlanUrl = useCallback((planId: string) => {
-    const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan) return '';
-    return `https://yourapp.com/join/${plan.unique_code}`;
-  }, [plansQuery.data]);
-
-  // Collection operations (aliases for backward compatibility)
-  const addRestaurantToCollection = useCallback(async (collectionId: string, restaurantId: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for adding restaurant to collection');
-      return;
-    }
-    try {
-      await dbHelpers.addRestaurantToCollection(collectionId, restaurantId, user.id);
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-    } catch (error) {
-      console.error('[RestaurantStore] Error adding restaurant to collection:', error);
-      throw error;
-    }
-  }, [user?.id, queryClient]);
-  
-  const removeRestaurantFromCollection = useCallback((collectionId: string, restaurantId: string) => {
-    return removeRestaurantFromPlan(collectionId, restaurantId);
-  }, [removeRestaurantFromPlan]);
-  
-  const deleteCollection = useCallback(async (collectionId: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for collection deletion');
-      throw new Error('User not authenticated');
-    }
-    
-    try {
-      console.log('[RestaurantStore] Deleting collection:', collectionId);
-      await dbHelpers.deletePlan(collectionId, user.id);
-      console.log('[RestaurantStore] Collection deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-    } catch (error) {
-      console.error('[RestaurantStore] Error deleting collection:', error);
-      if (error instanceof Error) {
-        throw new Error(`Failed to delete collection: ${error.message}`);
-      } else {
-        throw new Error('Failed to delete collection: Unknown error occurred');
-      }
-    }
-  }, [user?.id, queryClient]);
-
-  const leaveCollection = useCallback(async (collectionId: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for leaving collection');
-      throw new Error('User not authenticated');
-    }
-    
-    try {
-      console.log('[RestaurantStore] Leaving collection:', collectionId);
-      await dbHelpers.leaveCollection(collectionId, user.id);
-      console.log('[RestaurantStore] Successfully left collection');
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user.id] });
-    } catch (error) {
-      console.error('[RestaurantStore] Error leaving collection:', error);
-      if (error instanceof Error) {
-        throw new Error(`Failed to leave collection: ${error.message}`);
-      } else {
-        throw new Error('Failed to leave collection: Unknown error occurred');
-      }
-    }
-  }, [user?.id, queryClient]);
-
-  const isCollectionOwner = useCallback(async (collectionId: string): Promise<boolean> => {
-    if (!user?.id) {
-      return false;
-    }
-    
-    try {
-      return await dbHelpers.isCollectionOwner(collectionId, user.id);
-    } catch (error) {
-      console.error('[RestaurantStore] Error checking collection ownership:', error);
-      return false;
-    }
-  }, [user?.id]);
-
-  const isCollectionMember = useCallback(async (collectionId: string): Promise<boolean> => {
-    if (!user?.id) {
-      return false;
-    }
-    
-    try {
-      return await dbHelpers.isCollectionMember(collectionId, user.id);
-    } catch (error) {
-      console.error('[RestaurantStore] Error checking collection membership:', error);
-      return false;
-    }
-  }, [user?.id]);
-  const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
-    try {
-      console.log('[RestaurantStore] Loading discussions and comments for collection:', collectionId, 'restaurant:', restaurantId);
-      
-      // Get both restaurant discussions and user activity comments
-      const [discussions, comments] = await Promise.all([
-        dbHelpers.getCollectionDiscussions(collectionId, restaurantId),
-        dbHelpers.getRestaurantComments(collectionId, restaurantId)
-      ]);
-
-      console.log('[RestaurantStore] Loaded discussions:', discussions?.length || 0, discussions);
-      console.log('[RestaurantStore] Loaded comments:', comments?.length || 0, comments);
-
-      // Combine and format the data
-      const combinedData = [
-        // Format discussions from restaurant_discussions table
-        ...discussions.map((discussion: any) => ({
-          id: discussion.id,
-          restaurantId: discussion.restaurant_id,
-          userId: discussion.user_id,
-          userName: discussion.users?.name || 'Unknown',
-          message: discussion.message,
-          timestamp: discussion.created_at,
-          type: 'discussion'
-        })),
-        // Format comments from user_activities table
-        ...comments.map((comment: any) => ({
-          id: comment.id,
-          restaurantId: comment.restaurant_id,
-          userId: comment.user_id,
-          userName: comment.user_name || 'Unknown',
-          message: comment.comment_text,
-          timestamp: comment.created_at,
-          type: 'comment'
-        }))
-      ];
-
-      console.log('[RestaurantStore] Combined data:', combinedData?.length || 0, combinedData);
-
-      // Sort by timestamp (newest first)
-      const sortedData = combinedData.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      // Fallback to local search
+      const filtered = restaurants.filter(restaurant =>
+        restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
+        restaurant.cuisine.toLowerCase().includes(query.toLowerCase()) ||
+        restaurant.neighborhood.toLowerCase().includes(query.toLowerCase())
       );
-
-      console.log('[RestaurantStore] Final sorted data:', sortedData?.length || 0, sortedData);
-      return sortedData;
-    } catch (error) {
-      console.error('[RestaurantStore] Error loading discussions and comments:', error);
-      // Fallback to just discussions if comments fail
-      return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+      setSearchResults(filtered);
+      return filtered;
     }
-  }, []);
-  const inviteToCollection = useCallback(async (collectionId: string, email: string, message?: string) => {
-    if (!user?.id) return;
-    return await dbHelpers.inviteToCollection(collectionId, user.id, email, message);
-  }, [user?.id]);
-  const updateCollectionSettings = useCallback(async (collectionId: string, settings: any) => {
-    return await dbHelpers.updateCollectionSettings(collectionId, settings);
-  }, []);
-
-  // Other operations
-  const toggleFavorite = useCallback((restaurantId: string) => {
-    console.log('[RestaurantStore] toggleFavorite called for:', restaurantId);
-    console.log('[RestaurantStore] Current favoriteRestaurants:', favoriteRestaurants);
-    
-    const updated = favoriteRestaurants.includes(restaurantId)
-      ? favoriteRestaurants.filter((id: string) => id !== restaurantId)
-      : [...favoriteRestaurants, restaurantId];
-    
-    console.log('[RestaurantStore] Updated favoriteRestaurants:', updated);
-    setFavoriteRestaurants(updated);
-    mutateFavorites(updated);
-  }, [favoriteRestaurants, mutateFavorites]);
-
-  const voteRestaurant = useCallback(async (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for voting');
-      return;
-    }
-    
-    try {
-      console.log('[RestaurantStore] Voting on restaurant:', restaurantId, 'vote:', vote, 'collection:', planId, 'reason:', reason);
-      console.log('[RestaurantStore] Current user:', user.id);
-      console.log('[RestaurantStore] Current userVotes count:', userVotes.length);
-      console.log('[RestaurantStore] Current userVotes:', userVotes);
-      
-      // Save vote to database
-      const voteData = {
-        restaurant_id: restaurantId,
-        user_id: user.id,
-        collection_id: planId,
-        vote: vote as 'like' | 'dislike',
-        reason: reason || undefined,
-        authority: 'regular' as const,
-        weight: 1
-      };
-      
-      console.log('[RestaurantStore] Attempting to save vote data:', voteData);
-      
-      try {
-        const savedVote = await dbHelpers.createRestaurantVote(voteData);
-        console.log('[RestaurantStore] Vote saved to database successfully:', savedVote);
-      } catch (dbError) {
-        console.error('[RestaurantStore] Database error details:', {
-          error: dbError,
-          message: dbError instanceof Error ? dbError.message : 'Unknown error',
-          voteData
-        });
-        throw dbError;
-      }
-      
-      // Update local state immediately for better UX
-      const existingVoteIndex = userVotes.findIndex((v: any) => 
-        v.restaurantId === restaurantId && 
-        v.userId === user.id && 
-        v.collectionId === planId
-      );
-      
-      console.log('[RestaurantStore] Existing vote index:', existingVoteIndex);
-      console.log('[RestaurantStore] Existing vote:', existingVoteIndex >= 0 ? userVotes[existingVoteIndex] : 'None');
-      
-      let updated: RestaurantVote[];
-      const now = new Date().toISOString();
-      const base: Omit<RestaurantVote, 'vote'> = { 
-        restaurantId, 
-        userId: user.id, 
-        collectionId: planId,
-        timestamp: now, 
-        authority: 'regular', 
-        weight: 1,
-        reason
-      };
-
-      if (existingVoteIndex >= 0) {
-        if (userVotes[existingVoteIndex].vote === vote) {
-          // Remove vote if same vote is clicked again
-          updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
-          console.log('[RestaurantStore] Removing existing vote');
-        } else {
-          // Update existing vote
-          updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
-          console.log('[RestaurantStore] Updating existing vote');
-        }
-      } else {
-        // Add new vote
-        updated = [...userVotes, { ...base, vote }];
-        console.log('[RestaurantStore] Adding new vote');
-      }
-
-      console.log('[RestaurantStore] Updated votes:', updated);
-      console.log('[RestaurantStore] Updating local state with votes:', updated.length);
-      
-      // Update local state immediately
-      setUserVotes(updated);
-      persistVotes.mutate(updated);
-      
-      // Refresh data from database
-      console.log('[RestaurantStore] Invalidating queries to refresh data');
-      queryClient.invalidateQueries({ queryKey: ['userVotes', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['allVotes'] });
-      
-    } catch (error) {
-      console.error('[RestaurantStore] Error saving vote to database:', error);
-      // Still update local state for immediate feedback
-      const existingVoteIndex = userVotes.findIndex((v: any) => 
-        v.restaurantId === restaurantId && 
-        v.userId === user.id && 
-        v.collectionId === planId
-      );
-      
-      let updated: RestaurantVote[];
-      const now = new Date().toISOString();
-      const base: Omit<RestaurantVote, 'vote'> = { 
-        restaurantId, 
-        userId: user.id, 
-        collectionId: planId,
-        timestamp: now, 
-        authority: 'regular', 
-        weight: 1,
-        reason
-      };
-
-      if (existingVoteIndex >= 0) {
-        if (userVotes[existingVoteIndex].vote === vote) {
-          updated = userVotes.filter((_: any, i: number) => i !== existingVoteIndex);
-        } else {
-          updated = userVotes.map((v: any, i: number) => (i === existingVoteIndex ? { ...v, vote, timestamp: now, reason } : v));
-        }
-      } else {
-        updated = [...userVotes, { ...base, vote }];
-      }
-      
-      // Update local state even if database fails
-      setUserVotes(updated);
-      persistVotes.mutate(updated);
-    }
-  }, [user, userVotes, persistVotes.mutate, queryClient]);
-
-  const addUserNote = useCallback((restaurantId: string, note: string) => {
-    mutateNotes({ restaurantId, note });
-  }, [mutateNotes]);
+  }, [restaurants, userLocation]);
 
   const addSearchQuery = useCallback((query: string) => {
-    const q = query.trim();
-    if (!q) return;
-    const updated = [q, ...searchHistory.filter((item: string) => item.toLowerCase() !== q.toLowerCase())];
-    mutateSearchHistory(updated);
-  }, [searchHistory, mutateSearchHistory]);
+    setSearchHistory(prev => {
+      const newHistory = [query, ...prev.filter(q => q !== query)].slice(0, 10);
+      AsyncStorage.setItem('searchHistory', JSON.stringify(newHistory));
+      return newHistory;
+    });
+  }, []);
 
   const clearSearchHistory = useCallback(() => {
-    mutateSearchHistory([]);
-  }, [mutateSearchHistory]);
-
-
+    setSearchHistory([]);
+    AsyncStorage.removeItem('searchHistory');
+  }, []);
 
   const getQuickSuggestions = useCallback(() => {
-    const locationSuggestions = userLocation?.city === 'New York' 
-      ? ['Italian in Manhattan', 'Sushi in SoHo', 'Brunch in Brooklyn', 'Pizza in Queens']
-      : ['Tacos in Hollywood', 'Sushi in Beverly Hills', 'Brunch in Santa Monica', 'Korean BBQ in Koreatown'];
-    
-    const cuisines = restaurants.map((r: any) => r.cuisine?.split(/[,&]/)[0]?.trim() || r.cuisine || 'Unknown');
-    const neighborhoods = restaurants.map((r: any) => r.neighborhood || 'Unknown');
-    const popular = [...cuisines, ...neighborhoods]
-      .reduce<Record<string, number>>((acc: any, cur: string) => {
-        acc[cur] = (acc[cur] ?? 0) + 1;
-        return acc;
-      }, {});
-    const sorted = Object.entries(popular)
-      .sort((a: any, b: any) => b[1] - a[1])
-      .map(([k]: any) => k);
-    
-    return [...searchHistory, ...locationSuggestions, ...sorted].slice(0, 8);
-  }, [restaurants, searchHistory, userLocation]);
+    return [
+      'Pizza',
+      'Sushi',
+      'Burgers',
+      'Italian',
+      'Mexican',
+      'Thai',
+      'Indian',
+      'Chinese',
+      'Japanese',
+      'Mediterranean'
+    ];
+  }, []);
+
+  const addRestaurantToPlan = useCallback(async (planId: string, restaurantId: string) => {
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
+    if (!plan) return;
+
+    const updatedRestaurantIds = [...(plan.restaurant_ids || []), restaurantId];
+    await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
+    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+  }, [plansQuery.data, queryClient]);
+
+  const removeRestaurantFromPlan = useCallback(async (planId: string, restaurantId: string) => {
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
+    if (!plan) return;
+
+    const updatedRestaurantIds = (plan.restaurant_ids || []).filter((id: string) => id !== restaurantId);
+    await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
+    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+  }, [plansQuery.data, queryClient]);
+
+  const createPlan = useCallback(async (planData: any) => {
+    await createPlanMutation.mutateAsync(planData);
+  }, [createPlanMutation]);
+
+  const deletePlan = useCallback(async (planId: string) => {
+    if (!user?.id) return;
+    await deletePlanMutation.mutateAsync({ planId, userId: user.id });
+  }, [deletePlanMutation, user?.id]);
+
+  const toggleFavorite = useCallback((restaurantId: string) => {
+    if (!user?.id) return;
+
+    const newFavorites = favoriteRestaurants.includes(restaurantId)
+      ? favoriteRestaurants.filter(id => id !== restaurantId)
+      : [...favoriteRestaurants, restaurantId];
+
+    setFavoriteRestaurants(newFavorites);
+    toggleFavoriteMutation.mutate({ userId: user.id, favoriteRestaurants: newFavorites });
+  }, [favoriteRestaurants, user?.id, toggleFavoriteMutation]);
+
+  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
+    if (!user?.id) return;
+
+    voteRestaurantMutation.mutate({
+      restaurant_id: restaurantId,
+      user_id: user.id,
+      collection_id: planId || 'default',
+      vote,
+      reason
+    });
+  }, [user?.id, voteRestaurantMutation]);
+
+  const addUserNote = useCallback(async (restaurantId: string, note: string) => {
+    if (!user?.id) return;
+
+    await dbHelpers.createUserNote({
+      user_id: user.id,
+      restaurant_id: restaurantId,
+      note_text: note
+    });
+
+    // Update local state
+    setRestaurants(prev => prev.map(restaurant => 
+      restaurant.id === restaurantId
+        ? { ...restaurant, userNotes: restaurant.userNotes ? `${restaurant.userNotes}\n${note}` : note }
+        : restaurant
+    ));
+  }, [user?.id]);
 
   const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for adding discussion');
-      return;
-    }
-    
-    try {
-      console.log('[RestaurantStore] Adding discussion for restaurant:', restaurantId, 'collection:', planId);
-      
-      // Save discussion to database
-      const discussionData = {
-        restaurant_id: restaurantId,
-        user_id: user.id,
-        collection_id: planId,
-        message
-      };
-      
-      await dbHelpers.createDiscussion(discussionData);
-      console.log('[RestaurantStore] Discussion saved to database successfully');
-      
-      // Update local state
-      const newDiscussion: RestaurantDiscussion = {
-        id: `d${Date.now()}`,
-        restaurantId,
-        collectionId: planId,
-        userId: user.id,
-        userName: user.name || 'You',
-        userAvatar: user.avatar_url || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
-        message,
-        timestamp: new Date(),
-        likes: 0
-      };
-      persistDiscussions.mutate([...discussions, newDiscussion]);
-      
-      // Refresh data from database
-      queryClient.invalidateQueries({ queryKey: ['discussions', planId] });
-      
-    } catch (error) {
-      console.error('[RestaurantStore] Error saving discussion to database:', error);
-      // Still update local state for immediate feedback
-      const newDiscussion: RestaurantDiscussion = {
-        id: `d${Date.now()}`,
-        restaurantId,
-        collectionId: planId,
-        userId: user.id,
-        userName: user.name || 'You',
-        userAvatar: user.avatar_url || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
-        message,
-        timestamp: new Date(),
-        likes: 0
-      };
-      persistDiscussions.mutate([...discussions, newDiscussion]);
-    }
-  }, [discussions, persistDiscussions.mutate, user, queryClient]);
+    if (!user?.id) return;
 
-  const addRestaurantComment = useCallback(async (restaurantId: string, collectionId: string, commentText: string) => {
-    if (!user?.id) {
-      console.error('[RestaurantStore] No user ID available for adding comment');
-      return;
-    }
-    
-    try {
-      console.log('[RestaurantStore] Adding comment for restaurant:', restaurantId, 'collection:', collectionId);
-      
-      // Save comment to database using the RPC function
-      await dbHelpers.addRestaurantComment(restaurantId, collectionId, commentText);
-      console.log('[RestaurantStore] Comment saved to database successfully');
-      
-      // Refresh data from database
-      queryClient.invalidateQueries({ queryKey: ['discussions', collectionId] });
-      
-    } catch (error) {
-      console.error('[RestaurantStore] Error saving comment to database:', error);
-      throw error;
-    }
-  }, [user, queryClient]);
+    await addDiscussionMutation.mutateAsync({
+      restaurant_id: restaurantId,
+      collection_id: planId,
+      user_id: user.id,
+      message
+    });
+  }, [user?.id, addDiscussionMutation]);
 
-  const getRankedRestaurants = useCallback((planId?: string, memberCount?: number) => {
-    console.log('[RestaurantStore] getRankedRestaurants called with:', { planId, memberCount });
-    console.log('[RestaurantStore] Current data state:', {
-      plansQueryData: plansQuery.data?.length || 0,
-      restaurants: restaurants.length,
-      userVotes: userVotes.length,
-      allVotesQueryData: allVotesQuery.data?.length || 0,
-      discussions: discussions.length
-    });
+  const getRankedRestaurants = useCallback((planId?: string, memberCount: number = 1) => {
+    if (!planId) return [];
 
-    const plan = planId ? plansQuery.data?.find((p: any) => p.id === planId) : undefined;
-    console.log('[RestaurantStore] Found plan:', plan ? { id: plan.id, name: plan.name } : 'No plan found');
-    
-    const pool = planId
-      ? restaurants.filter((r: any) => (plan?.restaurant_ids ?? []).includes(r.id))
-      : restaurants;
-    
-    console.log('[RestaurantStore] Restaurant pool:', pool.length, pool.map(r => ({ id: r.id, name: r.name })));
-    
-    // Combine local userVotes with allVotesQuery.data for immediate updates
-    const localVotes = userVotes.filter((v: any) => !planId || v.collectionId === planId);
-    const remoteVotes = planId 
-      ? (allVotesQuery.data?.filter((v: any) => v.collectionId === planId) || [])
-      : (allVotesQuery.data || []);
-    
-    // Merge votes, prioritizing local votes for the current user
-    const currentUserId = user?.id;
-    const otherUserVotes = remoteVotes.filter((v: any) => v.userId !== currentUserId);
-    const planVotes = [...localVotes, ...otherUserVotes];
-    
-    console.log('[RestaurantStore] Vote breakdown:', {
-      localVotes: localVotes.length,
-      remoteVotes: remoteVotes.length,
-      otherUserVotes: otherUserVotes.length,
-      finalPlanVotes: planVotes.length,
-      currentUserId
-    });
-    
-    console.log('[RestaurantStore] Plan votes:', planVotes.map(v => ({ 
-      restaurantId: v.restaurantId, 
-      vote: v.vote, 
-      userId: v.userId,
-      isLocal: localVotes.includes(v)
-    })));
-    
-    const discussionCounts = discussions
-      .filter((d: any) => !planId || d.collectionId === planId)
-      .reduce<Record<string, number>>((acc: any, d: any) => {
-        acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
-        return acc;
-      }, {});
-    
-    console.log('[RestaurantStore] Discussion counts:', discussionCounts);
-    
-    // Pass the collection data so voter names can be properly displayed
-    console.log('[RestaurantStore] Plan data being passed to ranking:', {
-      planId: plan?.id,
-      planName: plan?.name,
-      hasSettings: !!plan?.settings,
-      settingsKeys: plan?.settings ? Object.keys(plan.settings) : [],
-      consensusThreshold: plan?.consensus_threshold,
-      planKeys: plan ? Object.keys(plan) : []
-    });
-    
-    console.log('[RestaurantStore] Using votes for ranking:', {
-      totalVotes: planVotes.length,
-      userVotes: localVotes.length,
-      allVotes: planVotes.length
-    });
-    
-    const result = computeRankings(pool, planVotes, { 
-      memberCount, 
-      collection: plan, // ✅ Pass the collection data
-      discussions: discussionCounts 
-    });
-    
-    console.log('[RestaurantStore] Ranking result:', result.length, result.map(r => ({ 
-      restaurantId: r.restaurant.id, 
-      name: r.restaurant.name, 
-      rank: r.meta.rank,
-      likes: r.meta.likes,
-      dislikes: r.meta.dislikes
-    })));
-    
-    return result;
-  }, [plansQuery.data, restaurants, userVotes, allVotesQuery.data, discussions, user?.id]);
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
+    if (!plan || !plan.restaurant_ids) return [];
+
+    const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    const votes = userVotes.filter(v => v.collectionId === planId);
+
+    return computeRankings(planRestaurants, votes, { memberCount });
+  }, [plansQuery.data, restaurants, userVotes]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
-    const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan) return [];
-    
-    const pool = restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
-    const planVotes = userVotes.filter((v: any) => v.collectionId === planId);
-    const discussionCounts = discussions
-      .filter((d: any) => d.collectionId === planId)
-      .reduce<Record<string, number>>((acc: any, d: any) => {
-        acc[d.restaurantId] = (acc[d.restaurantId] || 0) + 1;
-        return acc;
-      }, {});
-    
-    // For now, use simplified ranking without collection compatibility
-    const rankedRestaurants = computeRankings(pool, planVotes, { 
-      memberCount: plan.collaborators.length, 
-      collection: undefined,
-      discussions: discussionCounts 
-    });
-    
-    // Return empty recommendations for now - will be implemented later
-    return [];
-  }, [plansQuery.data, restaurants, userVotes, discussions]);
+    const rankedRestaurants = getRankedRestaurants(planId);
+    return []; // Simplified for now
+  }, [getRankedRestaurants]);
 
   const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
-    return discussions.filter((d: any) => 
+    return discussions.filter(d => 
       d.collectionId === planId && 
       (!restaurantId || d.restaurantId === restaurantId)
-    ).sort((a: any, b: any) => {
-      const timestampA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-      const timestampB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-      return timestampB.getTime() - timestampA.getTime();
-    });
+    );
   }, [discussions]);
 
-  // Get detailed voting information for a restaurant in a collection
-  const getRestaurantVotingDetails = useCallback((restaurantId: string, planId: string) => {
-    const planVotes = userVotes.filter((v: any) => 
-      v.restaurantId === restaurantId && v.collectionId === planId
-    );
-    
-    const planDiscussions = discussions.filter((d: any) => 
-      d.restaurantId === restaurantId && d.collectionId === planId
-    );
-    
-    const likes = planVotes.filter((v: any) => v.vote === 'like');
-    const dislikes = planVotes.filter((v: any) => v.vote === 'dislike');
-    
-    // Group votes by user for detailed breakdown
-    const voteBreakdown = planVotes.reduce((acc: any, vote: any) => {
-      const userId = vote.userId;
-      if (!acc[userId]) {
-        acc[userId] = {
-          userId,
-          userName: vote.userName || 'Unknown User',
-          votes: []
-        };
-      }
-      acc[userId].votes.push({
-        vote: vote.vote,
-        reason: vote.reason,
-        timestamp: vote.timestamp
-      });
-      return acc;
-    }, {});
-    
-    // Group discussions by user
-    const discussionBreakdown = planDiscussions.reduce((acc: any, discussion: any) => {
-      const userId = discussion.userId;
-      if (!acc[userId]) {
-        acc[userId] = {
-          userId,
-          userName: discussion.userName || 'Unknown User',
-          comments: []
-        };
-      }
-      acc[userId].comments.push({
-        message: discussion.message,
-        timestamp: discussion.timestamp,
-        likes: discussion.likes || 0
-      });
-      return acc;
-    }, {});
-    
-    return {
-      totalVotes: planVotes.length,
-      likes: likes.length,
-      dislikes: dislikes.length,
-      totalComments: planDiscussions.length,
-      voteBreakdown: Object.values(voteBreakdown),
-      discussionBreakdown: Object.values(discussionBreakdown),
-      approvalRate: planVotes.length > 0 ? (likes.length / planVotes.length) * 100 : 0
-    };
-  }, [userVotes, discussions]);
-
-  // Search restaurants with location-based results
-  const searchRestaurants = useCallback(async (query: string, userLat?: number, userLng?: number): Promise<Restaurant[]> => {
-    try {
-      console.log(`[RestaurantStore] Searching for: ${query}`);
-      
-      // Get user location if not provided
-      let location = userLocation;
-      if (userLat && userLng) {
-        location = { city: userLocation?.city || 'New York', lat: userLat, lng: userLng };
-      }
-      
-      if (!location) {
-        console.log('[RestaurantStore] No location available, using default search');
-        return restaurants.filter(r => 
-          r.name.toLowerCase().includes(query.toLowerCase()) ||
-          r.cuisine.toLowerCase().includes(query.toLowerCase()) ||
-          r.neighborhood.toLowerCase().includes(query.toLowerCase())
-        );
-      }
-      
-      // Use the enhanced location-based API
-      const results = await aggregateRestaurantData(query, location.city, location.lat, location.lng);
-      
-      // Save search results to database and convert to Restaurant format
-      const mappedResults = await Promise.all(results.map(async (result) => {
-        try {
-          // Check if restaurant already exists in database
-          const existingRestaurant = restaurants.find(r => r.id === result.id);
-          if (existingRestaurant) {
-            console.log(`[RestaurantStore] Restaurant ${result.name} already exists in database`);
-            return existingRestaurant;
-          }
-          
-          // Save new restaurant to database
-          const restaurantData = {
-            restaurant_code: result.id, // Use Google Place ID as restaurant_code
-            name: result.name,
-            cuisine: result.cuisine,
-            price_range: result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$',
-            image_url: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-            images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
-            address: result.address,
-            neighborhood: result.neighborhood || location.city,
-            hours: result.hours,
-            vibe_tags: result.vibeTags || [],
-            description: result.description,
-            menu_highlights: result.topPicks || [],
-            rating: result.rating,
-            reviews: result.reviews || [],
-            phone: result.phone,
-            website: result.website,
-            ai_description: result.description,
-            ai_vibes: result.vibeTags,
-            ai_top_picks: result.topPicks,
-            latitude: result.location?.lat,
-            longitude: result.location?.lng
-          };
-          
-          await dbHelpers.createRestaurant(restaurantData);
-          console.log(`[RestaurantStore] Saved ${result.name} to database`);
-          
-          // Map to Restaurant format for return
-          const mappedRestaurant = mapDatabaseRestaurant(restaurantData);
-          return mappedRestaurant;
-          
-        } catch (error) {
-          console.error(`[RestaurantStore] Error saving ${result.name}:`, error);
-          // Return a basic restaurant object if saving fails
-          return {
-            id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate temporary ID
-            name: result.name,
-            cuisine: result.cuisine,
-            priceRange: (result.priceLevel === 1 ? '$' : result.priceLevel === 2 ? '$$' : result.priceLevel === 3 ? '$$$' : '$$$$') as '$' | '$$' | '$$$' | '$$$$',
-            imageUrl: result.photos?.[0] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-            images: result.photos || ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'],
-            address: result.address,
-            neighborhood: result.neighborhood || location.city,
-            hours: result.hours,
-            vibe: result.vibeTags || [],
-            description: result.description,
-            menuHighlights: result.topPicks || [],
-            rating: result.rating,
-            reviews: result.reviews || [],
-            phone: result.phone,
-            website: result.website,
-            userNotes: undefined,
-            isFavorite: false,
-            distance: result.distance,
-            proximity: result.proximity
-          };
-        }
-      }));
-      
-      console.log(`[RestaurantStore] Found ${mappedResults.length} location-based results`);
-      // Store search results in global state
-      setSearchResults(mappedResults);
-      return mappedResults;
-      
-    } catch (error) {
-      console.error('[RestaurantStore] Search error:', error);
-      // Fallback to local search
-      const fallbackResults = restaurants.filter(r => 
-        r.name.toLowerCase().includes(query.toLowerCase()) ||
-        r.cuisine.toLowerCase().includes(query.toLowerCase()) ||
-        r.neighborhood.toLowerCase().includes(query.toLowerCase())
-      );
-      setSearchResults(fallbackResults);
-      return fallbackResults;
-    }
-  }, [restaurants, userLocation, mapDatabaseRestaurant]);
-
   const refreshLocation = useCallback(async () => {
-    try {
-      const location = await getUserLocation();
-      setUserLocation(location);
-    } catch (error) {
-      console.error('Error refreshing location:', error);
-    }
+    const location = await getUserLocation();
+    setUserLocation(location);
   }, []);
+
+  const inviteToPlan = useCallback(async (planId: string, email: string, message?: string) => {
+    // Implementation for inviting users to plans
+    // This would typically involve sending an email or creating an invitation record
+  }, []);
+
+  const updatePlanSettings = useCallback(async (planId: string, settings: Partial<Plan>) => {
+    await dbHelpers.updatePlan(planId, settings);
+    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+  }, [queryClient]);
 
   const switchToCity = useCallback((city: 'New York' | 'Los Angeles') => {
-    const coordinates = city === 'New York' 
-      ? { city: 'New York', lat: 40.7128, lng: -74.0060 }
-      : { city: 'Los Angeles', lat: 34.0522, lng: -118.2437 };
-    
-    setUserLocation(coordinates);
-    console.log(`[Location] Switched to ${city}`);
+    setUserLocation(prev => prev ? { ...prev, city } : { city, lat: 0, lng: 0 });
   }, []);
 
-  // Collection type operations
-  const getCollectionsByType = useCallback(async (userId: string, collectionType?: 'public' | 'private' | 'shared') => {
+  const shareablePlanUrl = useCallback((planId: string) => {
+    return `https://yourapp.com/plan/${planId}`;
+  }, []);
+
+  // Collection operations (aliases for backward compatibility)
+  const addRestaurantToCollection = addRestaurantToPlan;
+  const removeRestaurantFromCollection = removeRestaurantFromPlan;
+  const deleteCollection = deletePlan;
+  const leaveCollection = useCallback(async (collectionId: string) => {
+    if (!user?.id) return;
+    await dbHelpers.leaveCollection(collectionId, user.id);
+    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+  }, [user?.id, queryClient]);
+
+  const isCollectionOwner = useCallback(async (collectionId: string) => {
+    const plan = plansQuery.data?.find((p: any) => p.id === collectionId);
+    return plan?.created_by === user?.id;
+  }, [plansQuery.data, user?.id]);
+
+  const isCollectionMember = useCallback(async (collectionId: string) => {
+    const plan = plansQuery.data?.find((p: any) => p.id === collectionId);
+    return plan?.created_by === user?.id;
+  }, [plansQuery.data, user?.id]);
+
+  const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
     try {
-      console.log('[RestaurantStore] Getting collections by type:', { userId, collectionType });
-      const collections = await dbHelpers.getCollectionsByType(userId, collectionType);
-      console.log('[RestaurantStore] Collections retrieved:', collections.length);
-      return collections;
+      return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
     } catch (error) {
-      console.error('[RestaurantStore] Error getting collections by type:', error);
       return [];
     }
   }, []);
 
-  const addMemberToCollection = useCallback(async (collectionId: string, userId: string, role: 'member' | 'admin' = 'member') => {
+  const inviteToCollection = inviteToPlan;
+  const updateCollectionSettings = updatePlanSettings;
+
+  const getRestaurantVotingDetails = useCallback((restaurantId: string, planId: string) => {
+    const votes = userVotes.filter(v => 
+      v.restaurantId === restaurantId && v.collectionId === planId
+    );
+    
+    return {
+      likes: votes.filter(v => v.vote === 'like').length,
+      dislikes: votes.filter(v => v.vote === 'dislike').length,
+      userVote: votes.find(v => v.userId === user?.id)?.vote,
+      totalVotes: votes.length
+    };
+  }, [userVotes, user?.id]);
+
+  const addRestaurantComment = useCallback(async (restaurantId: string, collectionId: string, commentText: string) => {
+    await addDiscussion(restaurantId, collectionId, commentText);
+  }, [addDiscussion]);
+
+  const getCollectionsByType = useCallback(async (userId: string, collectionType?: 'public' | 'private' | 'shared') => {
     try {
-      console.log('[RestaurantStore] Adding member to collection:', { collectionId, userId, role });
-      const result = await dbHelpers.addMemberToCollection(collectionId, userId, role);
-      console.log('[RestaurantStore] Member added successfully:', result);
-      
-      // Refresh collections data
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
-      
-      return result;
+      return await dbHelpers.getCollectionsByType(userId, collectionType);
     } catch (error) {
-      console.error('[RestaurantStore] Error adding member to collection:', error);
+      return [];
+    }
+  }, []);
+
+  const addMemberToCollection = useCallback(async (collectionId: string, userId: string, role?: 'member' | 'admin') => {
+    try {
+      return await dbHelpers.addMemberToCollection(collectionId, userId, role);
+    } catch (error) {
       throw error;
     }
-  }, [user?.id, queryClient]);
+  }, []);
 
   const removeMemberFromCollection = useCallback(async (collectionId: string, userId: string) => {
     try {
-      console.log('[RestaurantStore] Removing member from collection:', { collectionId, userId });
       await dbHelpers.removeMemberFromCollection(collectionId, userId);
-      console.log('[RestaurantStore] Member removed successfully');
-      
-      // Refresh collections data
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
     } catch (error) {
-      console.error('[RestaurantStore] Error removing member from collection:', error);
       throw error;
     }
-  }, [user?.id, queryClient]);
+  }, []);
 
   const updateCollectionType = useCallback(async (collectionId: string, collectionType: 'public' | 'private' | 'shared') => {
     try {
-      console.log('[RestaurantStore] Updating collection type:', { collectionId, collectionType });
-      const result = await dbHelpers.updateCollectionType(collectionId, collectionType);
-      console.log('[RestaurantStore] Collection type updated successfully:', result);
-      
-      // Refresh collections data
-      queryClient.invalidateQueries({ queryKey: ['userPlans', user?.id] });
-      
-      return result;
+      return await dbHelpers.updateCollectionType(collectionId, collectionType);
     } catch (error) {
-      console.error('[RestaurantStore] Error updating collection type:', error);
       throw error;
     }
-  }, [user?.id, queryClient]);
+  }, []);
 
-  // Memoize the store value to prevent unnecessary re-renders
-  const storeValue = useMemo(() => ({
+  return {
     restaurants,
     plans: plansQuery.data || [],
-    collections: plansQuery.data || [], // Alias for backward compatibility
+    collections: plansQuery.data || [], // Alias for plans
     userVotes,
-    allVotes: allVotesQuery.data || [], // All votes for collections (to see other users' activity)
     discussions,
     favoriteRestaurants,
-    isLoading: (dataQuery.isLoading || plansQuery.isLoading || restaurantsQuery.isLoading) && !dataQuery.data && restaurants.length === 0,
+    isLoading: restaurantsQuery.isLoading || plansQuery.isLoading,
     searchHistory,
     searchResults,
     userLocation,
@@ -1585,92 +629,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getCollectionsByType,
     addMemberToCollection,
     removeMemberFromCollection,
-    updateCollectionType,
-    applyRLSFix, // Add the new function to the memoized value
-    disableRLSTemporarily, // Add the RLS disable function
-    applyComprehensiveRLSFix, // Add the comprehensive RLS fix function
-  }), [
-    restaurants,
-    plansQuery.data,
-    userVotes,
-    allVotesQuery.data,
-    discussions,
-    favoriteRestaurants,
-    dataQuery.isLoading,
-    plansQuery.isLoading,
-    searchHistory,
-    searchResults,
-    userLocation,
-    searchRestaurants,
-    addSearchQuery,
-    clearSearchHistory,
-    getQuickSuggestions,
-    addRestaurantToPlan,
-    removeRestaurantFromPlan,
-    createPlan,
-    deletePlan,
-    toggleFavorite,
-    voteRestaurant,
-    addUserNote,
-    addDiscussion,
-    getRankedRestaurants,
-    getGroupRecommendations,
-    getPlanDiscussions,
-    refreshLocation,
-    inviteToPlan,
-    updatePlanSettings,
-    switchToCity,
-    shareablePlanUrl,
-    // Collection operations
-    addRestaurantToCollection,
-    removeRestaurantFromCollection,
-    deleteCollection,
-    leaveCollection,
-    isCollectionOwner,
-    isCollectionMember,
-    getCollectionDiscussions,
-    inviteToCollection,
-    updateCollectionSettings,
-    getRestaurantVotingDetails,
-    addRestaurantComment,
-    getCollectionsByType,
-    addMemberToCollection,
-    removeMemberFromCollection,
-    updateCollectionType,
-    applyRLSFix, // Add the new function to the memoized value
-  ]);
-
-  return storeValue;
+    updateCollectionType
+  };
 });
 
-// Helper hooks
-export function useRestaurantById(id: string) {
-  const { restaurants, searchResults } = useRestaurants();
-  
-  // First try to find in the current restaurants list
-  let restaurant = restaurants.find((r: any) => r.id === id);
-  
-  // If not found, check search results
-  if (!restaurant) {
-    restaurant = searchResults.find((r: any) => r.id === id);
-  }
-  
-  // If still not found, log for debugging
-  if (!restaurant) {
-    console.log(`Restaurant with ID ${id} not found in current restaurants list or search results`);
-  }
-  
-  return restaurant;
-}
-
+// Helper hooks for specific use cases
 export function usePlanById(id: string) {
   const { plans } = useRestaurants();
-  return plans.find((p: any) => p.id === id);
+  return useMemo(() => plans.find((p: any) => p.id === id), [plans, id]);
 }
 
-export function usePlanRestaurants(planId: string) {
+export function usePlanRestaurants(plan: any) {
   const { restaurants } = useRestaurants();
-  const plan = usePlanById(planId);
   
   return useMemo(() => {
     if (!plan) return [];
@@ -1719,16 +689,9 @@ export function useCollectionById(id: string) {
     queryFn: async () => {
       if (!id) return [];
       try {
-        console.log('[RestaurantStore] Fetching collection members for:', id);
         const members = await dbHelpers.getCollectionMembers(id);
-        console.log('[RestaurantStore] Fetched collection members:', members.length);
         return members;
       } catch (error) {
-        console.error('[RestaurantStore] Error fetching collection members:', {
-          error: JSON.stringify(error, null, 2),
-          message: error instanceof Error ? error.message : String(error),
-          collectionId: id
-        });
         return [];
       }
     },
@@ -1745,28 +708,10 @@ export function useCollectionById(id: string) {
     // Enhanced collection with proper member data
     return {
       ...collection,
-      // Use fetched members data instead of raw collaborators
+      // Use fetched members data
       collaborators: membersQuery.data && Array.isArray(membersQuery.data) && membersQuery.data.length > 0 
         ? membersQuery.data
-        : collection.collaborators && Array.isArray(collection.collaborators) 
-          ? collection.collaborators.map((member: any) => {
-              // If member is already an object with name, return as is
-              if (typeof member === 'object' && member.name) {
-                return member;
-              }
-              // If member is a string (UUID), create a proper member object
-              if (typeof member === 'string') {
-                return {
-                  memberId: `member_${member.substring(0, 8)}`, // Use truncated ID for privacy
-                  name: member.length > 10 ? `Member ${member.substring(0, 8)}` : member,
-                  role: 'member',
-                  isVerified: false,
-                  _internalUserId: member // Keep for internal operations only
-                };
-              }
-              return member;
-            })
-          : [],
+        : [],
       // Add loading state for members
       membersLoading: membersQuery.isLoading
     };
