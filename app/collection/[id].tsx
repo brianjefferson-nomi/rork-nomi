@@ -322,7 +322,11 @@ export default function CollectionDetailScreen() {
   
   console.log('[CollectionDetail] Member count for ranking:', memberCount);
   
-  const rankedRestaurants = getRankedRestaurants(id, memberCount) || [];
+  const rankedResult = getRankedRestaurants(id, memberCount);
+  const rankedRestaurants = rankedResult?.restaurants || [];
+  const participationData = rankedResult?.participationData;
+  
+  console.log('[CollectionDetail] Participation data:', participationData);
   
   // Fetch restaurants directly from database as a fallback
   const directRestaurantsQuery = useQuery({
@@ -849,25 +853,30 @@ export default function CollectionDetailScreen() {
                 const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
                 const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
                 
-                                 return (
+                                 // Only show winning styles if there's 75% participation and this is the top-ranked restaurant
+                const shouldShowWinningStyles = isSharedCollection && 
+                  participationData?.has75PercentParticipation && 
+                  meta?.rank === 1;
+                
+                return (
                    <View key={restaurant?.id || index} style={[
                      styles.restaurantItem,
-                     isSharedCollection && meta?.rank === 1 && styles.winningRestaurantItem
+                     shouldShowWinningStyles && styles.winningRestaurantItem
                    ]}>
                      {/* Top Badges Row - Only for shared collections */}
                      {isSharedCollection && (
                        <View style={styles.badgesRow}>
                          <View style={[
                            styles.rankBadge,
-                           meta?.rank === 1 && styles.winnerRankBadge,
+                           shouldShowWinningStyles && styles.winnerRankBadge,
                            meta?.rank === 2 && styles.silverRankBadge,
                            meta?.rank === 3 && styles.bronzeRankBadge
                          ]}>
                            <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
                          </View>
                          
-                         {/* Top Choice Badge for Winner */}
-                         {meta?.rank === 1 && (
+                         {/* Top Choice Badge for Winner - Only with 75% participation */}
+                         {shouldShowWinningStyles && (
                            <View style={styles.topChoiceBadge}>
                              <Crown size={12} color="#FFFFFF" />
                              <Text style={styles.topChoiceText}>TOP CHOICE</Text>

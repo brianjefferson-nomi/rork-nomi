@@ -112,7 +112,16 @@ export function computeRankings(
   restaurants: Restaurant[],
   votes: RestaurantVote[],
   options?: ComputeOptions
-): { restaurant: Restaurant; meta: RankedRestaurantMeta }[] {
+): { 
+  restaurant: Restaurant; 
+  meta: RankedRestaurantMeta;
+  participationData?: {
+    totalMembers: number;
+    totalVotes: number;
+    participationRate: number;
+    has75PercentParticipation: boolean;
+  };
+}[] {
   try {
     console.log('[ranking] Starting computeRankings with:', {
       restaurantCount: restaurants.length,
@@ -129,6 +138,19 @@ export function computeRankings(
     
     const now = Date.now();
     const totalMembers = options?.memberCount || 1;
+
+    // Calculate overall participation data
+    const uniqueVoters = new Set(votes.map(v => v.userId));
+    const totalVotes = uniqueVoters.size;
+    const participationRate = totalMembers > 0 ? totalVotes / totalMembers : 0;
+    const has75PercentParticipation = participationRate >= 0.75;
+
+    console.log(`[ranking] Participation data:`, {
+      totalMembers,
+      totalVotes,
+      participationRate: participationRate.toFixed(2),
+      has75PercentParticipation
+    });
 
     const results = restaurants.map((restaurant, index) => {
       const rvotes = votes.filter((v) => v.restaurantId === restaurant.id);
@@ -347,7 +369,16 @@ export function computeRankings(
         
         console.log(`[ranking] Final rank ${r.meta.rank}: ${r.restaurant.name} (score: ${r.composite.toFixed(2)}, likes: ${r.meta.likes}, dislikes: ${r.meta.dislikes})`);
         
-        return { restaurant: r.restaurant, meta: r.meta };
+        return { 
+          restaurant: r.restaurant, 
+          meta: r.meta,
+          participationData: {
+            totalMembers,
+            totalVotes,
+            participationRate,
+            has75PercentParticipation
+          }
+        };
       });
 
     console.log('[ranking] computed rankings', sorted.length);

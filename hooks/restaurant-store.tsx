@@ -41,7 +41,15 @@ interface RestaurantStore {
   voteRestaurant: (restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => void;
   addUserNote: (restaurantId: string, note: string) => void;
   addDiscussion: (restaurantId: string, planId: string, message: string) => void;
-  getRankedRestaurants: (planId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
+  getRankedRestaurants: (planId?: string, memberCount?: number) => { 
+    restaurants: { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
+    participationData?: {
+      totalMembers: number;
+      totalVotes: number;
+      participationRate: number;
+      has75PercentParticipation: boolean;
+    } | null;
+  };
   getGroupRecommendations: (planId: string) => GroupRecommendation[];
   getCollectionRestaurants: (collectionId: string) => Restaurant[];
   getCollectionRestaurantsFromDatabase: (collectionId: string) => Promise<Restaurant[]>;
@@ -590,7 +598,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const getRankedRestaurants = useCallback((planId?: string, memberCount: number = 1) => {
     if (!planId) {
       console.log('[getRankedRestaurants] No planId provided');
-      return [];
+      return { restaurants: [], participationData: null };
     }
 
     console.log('[getRankedRestaurants] Looking for plan:', planId);
@@ -600,7 +608,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     const plan = plansQuery.data?.find((p: any) => p.id === planId);
     if (!plan) {
       console.log('[getRankedRestaurants] Plan not found');
-      return [];
+      return { restaurants: [], participationData: null };
     }
 
     console.log('[getRankedRestaurants] Found plan:', plan.name);
@@ -608,7 +616,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     if (!plan.restaurant_ids || plan.restaurant_ids.length === 0) {
       console.log('[getRankedRestaurants] No restaurant_ids in plan');
-      return [];
+      return { restaurants: [], participationData: null };
     }
 
     const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
@@ -620,31 +628,34 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     if (!isSharedCollection) {
       console.log('[getRankedRestaurants] Not a shared collection, returning unranked restaurants');
       // Return restaurants without ranking for private/public collections
-      return planRestaurants.map((restaurant, index) => ({
-        restaurant,
-        meta: {
-          restaurantId: restaurant.id,
-          netScore: 0,
-          likes: 0,
-          dislikes: 0,
-          likeRatio: 0,
-          engagementBoost: 0,
-          recencyBoost: 0,
-          distanceBoost: 0,
-          authorityApplied: false,
-          consensus: 'low' as const,
-          approvalPercent: 0,
-          rank: index + 1,
-          voteDetails: {
-            likeVoters: [],
-            dislikeVoters: [],
-            abstentions: [],
-            reasons: [],
-            timeline: []
-          },
-          discussionCount: 0
-        }
-      }));
+      return {
+        restaurants: planRestaurants.map((restaurant, index) => ({
+          restaurant,
+          meta: {
+            restaurantId: restaurant.id,
+            netScore: 0,
+            likes: 0,
+            dislikes: 0,
+            likeRatio: 0,
+            engagementBoost: 0,
+            recencyBoost: 0,
+            distanceBoost: 0,
+            authorityApplied: false,
+            consensus: 'low' as const,
+            approvalPercent: 0,
+            rank: index + 1,
+            voteDetails: {
+              likeVoters: [],
+              dislikeVoters: [],
+              abstentions: [],
+              reasons: [],
+              timeline: []
+            },
+            discussionCount: 0
+          }
+        })),
+        participationData: null
+      };
     }
 
     const votes = userVotes.filter(v => v.collectionId === planId);
@@ -653,7 +664,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     const rankings = computeRankings(planRestaurants, votes, { memberCount });
     console.log('[getRankedRestaurants] Computed rankings:', rankings.length);
 
-    return rankings;
+    // Extract participation data from the first result (all results have the same participation data)
+    const participationData = rankings.length > 0 ? rankings[0].participationData : null;
+    const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
+
+    return { restaurants: rankedRestaurants, participationData };
   }, [plansQuery.data, restaurants, userVotes]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
