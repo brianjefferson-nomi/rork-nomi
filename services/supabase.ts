@@ -813,6 +813,39 @@ export const dbHelpers = {
     }
   },
 
+  async getCollectionVotesWithUsers(collectionId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('restaurant_votes')
+        .select(`
+          *,
+          users:user_id (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('collection_id', collectionId);
+      
+      if (error) {
+        console.error('[getCollectionVotesWithUsers] Error:', error);
+        return [];
+      }
+      
+      // Transform the data to include user names
+      const votesWithUsers = (data || []).map(vote => ({
+        ...vote,
+        userName: vote.users?.name || 'Unknown User',
+        userEmail: vote.users?.email || ''
+      }));
+      
+      return votesWithUsers;
+    } catch (error) {
+      console.error('[getCollectionVotesWithUsers] Exception:', error);
+      return [];
+    }
+  },
+
   async voteRestaurant(voteData: {
     restaurant_id: string;
     user_id: string;

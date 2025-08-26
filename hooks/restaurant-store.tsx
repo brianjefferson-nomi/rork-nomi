@@ -50,6 +50,15 @@ interface RestaurantStore {
       has75PercentParticipation: boolean;
     } | null;
   };
+  getRankedRestaurantsWithAllVotes: (planId?: string, memberCount?: number) => Promise<{ 
+    restaurants: { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
+    participationData?: {
+      totalMembers: number;
+      totalVotes: number;
+      participationRate: number;
+      has75PercentParticipation: boolean;
+    } | null;
+  }>;
   getGroupRecommendations: (planId: string) => GroupRecommendation[];
   getCollectionRestaurants: (collectionId: string) => Restaurant[];
   getCollectionRestaurantsFromDatabase: (collectionId: string) => Promise<Restaurant[]>;
@@ -718,6 +727,127 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     return { restaurants: rankedRestaurants, participationData };
   }, [plansQuery.data, restaurants, userVotes]);
 
+  // New function to get ranked restaurants with all collection votes (including user names)
+  const getRankedRestaurantsWithAllVotes = useCallback(async (planId?: string, memberCount: number = 1) => {
+    if (!planId) {
+      console.log('[getRankedRestaurantsWithAllVotes] No planId provided');
+      return { restaurants: [], participationData: null };
+    }
+
+    console.log('[getRankedRestaurantsWithAllVotes] Looking for plan:', planId);
+
+    const plan = plansQuery.data?.find((p: any) => p.id === planId);
+    if (!plan) {
+      console.log('[getRankedRestaurantsWithAllVotes] Plan not found');
+      return { restaurants: [], participationData: null };
+    }
+
+    if (!plan.restaurant_ids || plan.restaurant_ids.length === 0) {
+      console.log('[getRankedRestaurantsWithAllVotes] No restaurant_ids in plan');
+      return { restaurants: [], participationData: null };
+    }
+
+    const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    console.log('[getRankedRestaurantsWithAllVotes] Filtered restaurants:', planRestaurants.length);
+
+    // Check if this is a shared collection (multiple members)
+    const isSharedCollection = memberCount > 1;
+    
+    if (!isSharedCollection) {
+      console.log('[getRankedRestaurantsWithAllVotes] Not a shared collection, returning unranked restaurants');
+      // Return restaurants without ranking for private/public collections
+      return {
+        restaurants: planRestaurants.map((restaurant, index) => ({
+          restaurant,
+          meta: {
+            restaurantId: restaurant.id,
+            netScore: 0,
+            likes: 0,
+            dislikes: 0,
+            likeRatio: 0,
+            engagementBoost: 0,
+            recencyBoost: 0,
+            distanceBoost: 0,
+            authorityApplied: false,
+            consensus: 'low' as const,
+            approvalPercent: 0,
+            rank: index + 1,
+            voteDetails: {
+              likeVoters: [],
+              dislikeVoters: [],
+              abstentions: [],
+              reasons: [],
+              timeline: []
+            },
+            discussionCount: 0
+          }
+        })),
+        participationData: null
+      };
+    }
+
+    try {
+      // Fetch all votes for this collection with user names
+      const allVotes = await dbHelpers.getCollectionVotesWithUsers(planId);
+      console.log('[getRankedRestaurantsWithAllVotes] All votes for collection:', allVotes.length);
+
+      // Transform votes to match the expected format and include user names
+      const transformedVotes = allVotes.map(vote => ({
+        id: vote.id,
+        restaurantId: vote.restaurant_id,
+        userId: vote.user_id,
+        collectionId: vote.collection_id,
+        vote: vote.vote as 'like' | 'dislike',
+        reason: vote.reason,
+        createdAt: vote.created_at,
+        timestamp: vote.created_at,
+        userName: vote.userName
+      }));
+
+      // Update the plan's collaborators to include user names from votes
+      const updatedPlan = {
+        ...plan,
+        collaborators: plan.collaborators || []
+      };
+
+      // Add any users from votes who aren't in collaborators
+      const voteUserIds = new Set(transformedVotes.map(v => v.userId));
+      const existingCollaboratorIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
+      
+      voteUserIds.forEach(userId => {
+        if (!existingCollaboratorIds.has(userId)) {
+          const vote = transformedVotes.find(v => v.userId === userId);
+          if (vote) {
+            updatedPlan.collaborators.push({
+              userId: userId,
+              name: vote.userName,
+              avatar: '',
+              isVerified: false,
+              voteWeight: 1
+            });
+          }
+        }
+      });
+
+      const rankings = computeRankings(planRestaurants, transformedVotes, { memberCount, collection: updatedPlan });
+      console.log('[getRankedRestaurantsWithAllVotes] Computed rankings:', rankings.length);
+
+      // Extract participation data from the first result (all results have the same participation data)
+      const participationData = rankings.length > 0 ? rankings[0].participationData : null;
+      const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
+
+      return { restaurants: rankedRestaurants, participationData };
+    } catch (error) {
+      console.error('[getRankedRestaurantsWithAllVotes] Error fetching votes:', error);
+      // Fallback to using only current user's votes
+      const votes = userVotes.filter(v => v.collectionId === planId);
+      const rankings = computeRankings(planRestaurants, votes, { memberCount });
+      const participationData = rankings.length > 0 ? rankings[0].participationData : null;
+      const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
+      return { restaurants: rankedRestaurants, participationData };
+    }
+  }, [plansQuery.data, restaurants, userVotes]);
+
   const getGroupRecommendations = useCallback((planId: string) => {
     const rankedRestaurants = getRankedRestaurants(planId);
     return []; // Simplified for now
@@ -989,6 +1119,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addUserNote,
     addDiscussion,
     getRankedRestaurants,
+    getRankedRestaurantsWithAllVotes,
     getGroupRecommendations,
     getCollectionRestaurants,
     getCollectionRestaurantsFromDatabase,

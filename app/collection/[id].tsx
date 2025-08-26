@@ -255,6 +255,7 @@ export default function CollectionDetailScreen() {
     addDiscussion: originalAddDiscussion, 
     addRestaurantComment,
     getRankedRestaurants, 
+    getRankedRestaurantsWithAllVotes,
     getGroupRecommendations,
     getCollectionRestaurants,
     getCollectionRestaurantsFromDatabase,
@@ -342,10 +343,21 @@ export default function CollectionDetailScreen() {
   const rankedRestaurants = rankedResult?.restaurants || [];
   const participationData = rankedResult?.participationData;
   
-  // Force re-calculation when rankingUpdateTrigger changes
-  const effectiveRankedRestaurants = useMemo(() => {
-    return rankedRestaurants;
-  }, [rankedRestaurants, rankingUpdateTrigger]);
+  // Query to get ranked restaurants with all votes (including user names)
+  const rankedRestaurantsWithAllVotesQuery = useQuery({
+    queryKey: ['rankedRestaurantsWithAllVotes', id, memberCount, rankingUpdateTrigger],
+    queryFn: async () => {
+      if (!id) return { restaurants: [], participationData: null };
+      return await getRankedRestaurantsWithAllVotes(id, memberCount);
+    },
+    enabled: !!id,
+    retry: 1,
+    retryDelay: 1000
+  });
+  
+  // Use the ranked restaurants with all votes if available, otherwise fall back to the basic ranking
+  const effectiveRankedRestaurants = rankedRestaurantsWithAllVotesQuery.data?.restaurants || rankedRestaurants;
+  const effectiveParticipationData = rankedRestaurantsWithAllVotesQuery.data?.participationData || participationData;
   
   console.log('[CollectionDetail] Participation data:', participationData);
   
