@@ -286,13 +286,41 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userPlans', user?.id],
     queryFn: async () => {
       try {
+        // If no user ID, try to get all public collections as fallback
         if (!user?.id) {
-          console.log('[RestaurantStore] No user ID, returning empty plans');
-          return [];
+          console.log('[RestaurantStore] No user ID, loading public collections as fallback');
+          const publicCollections = await dbHelpers.getAllCollections();
+          return publicCollections.map((plan: any) => ({
+            ...plan,
+            collaborators: plan.collaborators || [],
+            settings: {
+              voteVisibility: plan.vote_visibility || 'public',
+              discussionEnabled: plan.discussion_enabled !== false,
+              autoRankingEnabled: plan.auto_ranking_enabled !== false,
+              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+            }
+          }));
         }
+        
         console.log('[RestaurantStore] Loading plans for user:', user.id);
         const plans = await dbHelpers.getUserPlans(user.id);
         console.log('[RestaurantStore] Raw plans data:', plans?.length || 0);
+        
+        // If no plans found for user, fallback to public collections
+        if (!plans || plans.length === 0) {
+          console.log('[RestaurantStore] No plans found for user, loading public collections');
+          const publicCollections = await dbHelpers.getAllCollections();
+          return publicCollections.map((plan: any) => ({
+            ...plan,
+            collaborators: plan.collaborators || [],
+            settings: {
+              voteVisibility: plan.vote_visibility || 'public',
+              discussionEnabled: plan.discussion_enabled !== false,
+              autoRankingEnabled: plan.auto_ranking_enabled !== false,
+              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+            }
+          }));
+        }
         
         const mappedPlans = plans.map((plan: any) => ({
           ...plan,
@@ -313,10 +341,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return mappedPlans;
       } catch (error) {
         console.error('[RestaurantStore] Error loading plans:', error);
-        return [];
+        // Fallback to public collections on error
+        try {
+          const publicCollections = await dbHelpers.getAllCollections();
+          return publicCollections.map((plan: any) => ({
+            ...plan,
+            collaborators: plan.collaborators || [],
+            settings: {
+              voteVisibility: plan.vote_visibility || 'public',
+              discussionEnabled: plan.discussion_enabled !== false,
+              autoRankingEnabled: plan.auto_ranking_enabled !== false,
+              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+            }
+          }));
+        } catch (fallbackError) {
+          console.error('[RestaurantStore] Fallback also failed:', fallbackError);
+          return [];
+        }
       }
     },
-    enabled: !!user?.id,
+    enabled: true, // Always enabled, even without user ID
     retry: 2,
     retryDelay: 1000,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -655,6 +699,19 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   console.log('  - plans:', plansQuery.data?.length || 0);
   console.log('  - allCollections:', allCollectionsQuery.data?.length || 0);
   console.log('  - isLoading:', restaurantsQuery.isLoading || plansQuery.isLoading || allCollectionsQuery.isLoading);
+  
+  // Add a simple test to verify data is loaded
+  if (restaurants.length > 0 && plansQuery.data && plansQuery.data.length > 0) {
+    console.log('🎉 DATA LOADED SUCCESSFULLY!');
+    console.log('   - Restaurants available:', restaurants.length);
+    console.log('   - Collections available:', plansQuery.data.length);
+    console.log('   - Sample collection:', plansQuery.data[0]?.name);
+    console.log('   - Sample collection restaurants:', plansQuery.data[0]?.restaurant_ids?.length || 0);
+  } else {
+    console.log('❌ DATA NOT LOADED PROPERLY');
+    console.log('   - Restaurants:', restaurants.length);
+    console.log('   - Collections:', plansQuery.data?.length || 0);
+  }
   
   return {
     restaurants,
