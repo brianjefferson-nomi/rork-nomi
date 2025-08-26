@@ -332,7 +332,8 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   action_type TEXT NOT NULL, -- 'vote', 'comment', 'create_collection', etc.
   request_count INTEGER DEFAULT 1,
   window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, action_type, window_start)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
@@ -348,18 +349,22 @@ CREATE OR REPLACE FUNCTION check_rate_limit(
 RETURNS BOOLEAN AS $$
 DECLARE
   v_current_count INTEGER;
+  v_window_start TIMESTAMP WITH TIME ZONE;
 BEGIN
-  -- Clean old entries
-  DELETE FROM rate_limits 
-  WHERE window_start < NOW() - INTERVAL '1 hour' * p_window_minutes;
+  -- Set window start to current time rounded to the minute
+  v_window_start := date_trunc('minute', NOW());
   
-  -- Get current count
+  -- Clean old entries (older than the window)
+  DELETE FROM rate_limits 
+  WHERE window_start < NOW() - INTERVAL '1 minute' * p_window_minutes;
+  
+  -- Get current count for this window
   SELECT COALESCE(SUM(request_count), 0)
   INTO v_current_count
   FROM rate_limits
   WHERE user_id = p_user_id 
     AND action_type = p_action_type
-    AND window_start > NOW() - INTERVAL '1 minute' * p_window_minutes;
+    AND window_start >= v_window_start - INTERVAL '1 minute' * p_window_minutes;
   
   -- Check if limit exceeded
   IF v_current_count >= p_max_requests THEN
@@ -367,12 +372,16 @@ BEGIN
   END IF;
   
   -- Record this request
-  INSERT INTO rate_limits (user_id, action_type, request_count)
-  VALUES (p_user_id, p_action_type, 1)
+  INSERT INTO rate_limits (user_id, action_type, request_count, window_start)
+  VALUES (p_user_id, p_action_type, 1, v_window_start)
   ON CONFLICT (user_id, action_type, window_start) 
   DO UPDATE SET request_count = rate_limits.request_count + 1;
   
   RETURN TRUE;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- If there's any error, allow the request (fail open)
+    RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -391,11 +400,16 @@ CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
 -- Function to archive old data
 CREATE OR REPLACE FUNCTION archive_old_data(p_months_old INTEGER DEFAULT 12)
 RETURNS VOID AS $$
+DECLARE
+  v_archived_votes INTEGER := 0;
+  v_archived_discussions INTEGER := 0;
 BEGIN
   -- Archive old votes
   INSERT INTO archived_restaurant_votes
   SELECT * FROM restaurant_votes
   WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  GET DIAGNOSTICS v_archived_votes = ROW_COUNT;
   
   DELETE FROM restaurant_votes
   WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
@@ -405,8 +419,18 @@ BEGIN
   SELECT * FROM restaurant_discussions
   WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
   
+  GET DIAGNOSTICS v_archived_discussions = ROW_COUNT;
+  
   DELETE FROM restaurant_discussions
   WHERE created_at < NOW() - INTERVAL '1 month' * p_months_old;
+  
+  -- Log the archival results
+  RAISE NOTICE 'Archived % votes and % discussions older than % months', 
+    v_archived_votes, v_archived_discussions, p_months_old;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log the error but don't fail
+    RAISE WARNING 'Error during archival: %', SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
 
