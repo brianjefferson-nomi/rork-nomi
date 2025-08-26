@@ -914,56 +914,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
       return { restaurants: rankedRestaurants, participationData };
     }
-
-      // Update the plan's collaborators to include user names from votes
-      const updatedPlan = {
-        ...plan,
-        collaborators: plan.collaborators || []
-      };
-
-      // Get collection member IDs
-      const collectionMemberIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
-      
-      // Filter votes to only include collection members
-      const memberVotes = transformedVotes.filter(vote => collectionMemberIds.has(vote.userId));
-      console.log('[getRankedRestaurantsWithAllVotes] Filtered to member votes:', memberVotes.length, 'out of', transformedVotes.length);
-
-      // Add any users from votes who aren't in collaborators (but only if they're supposed to be members)
-      const voteUserIds = new Set(transformedVotes.map(v => v.userId));
-      const existingCollaboratorIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
-      
-      voteUserIds.forEach(userId => {
-        if (!existingCollaboratorIds.has(userId)) {
-          const vote = transformedVotes.find(v => v.userId === userId);
-          if (vote) {
-            updatedPlan.collaborators.push({
-              userId: userId,
-              name: vote.userName,
-              avatar: '',
-              isVerified: false,
-              voteWeight: 1
-            });
-          }
-        }
-      });
-
-      const rankings = computeRankings(planRestaurants, memberVotes, { memberCount, collection: updatedPlan });
-      console.log('[getRankedRestaurantsWithAllVotes] Computed rankings:', rankings.length);
-
-      // Extract participation data from the first result (all results have the same participation data)
-      const participationData = rankings.length > 0 ? rankings[0].participationData : null;
-      const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
-
-      return { restaurants: rankedRestaurants, participationData };
-    } catch (error) {
-      console.error('[getRankedRestaurantsWithAllVotes] Error fetching votes:', error);
-      // Fallback to using only current user's votes
-      const votes = userVotes.filter(v => v.collectionId === planId);
-      const rankings = computeRankings(planRestaurants, votes, { memberCount });
-      const participationData = rankings.length > 0 ? rankings[0].participationData : null;
-      const rankedRestaurants = rankings.map(r => ({ restaurant: r.restaurant, meta: r.meta }));
-      return { restaurants: rankedRestaurants, participationData };
-    }
   }, [plansQuery.data, restaurants, userVotes]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
