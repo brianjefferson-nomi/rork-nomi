@@ -1195,7 +1195,10 @@ export const aggregateRestaurantData = async (query: string, location: string, u
           searchTripAdvisor(query, userLocation.city),
           new Promise((_, reject) => setTimeout(() => reject(new Error('TripAdvisor timeout')), 5000))
         ]),
-        Promise.resolve([]), // Foursquare temporarily disabled due to API issues
+        Promise.race([
+          searchFoursquareRestaurants(query, userLocation.lat, userLocation.lng, 5000),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Foursquare timeout')), 8000))
+        ]),
         Promise.race([
           searchRestaurantsWithYelp(query, userLocation.city, 20),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Yelp timeout')), 8000))
@@ -1219,7 +1222,7 @@ export const aggregateRestaurantData = async (query: string, location: string, u
       const worldwideData = worldwideResults.status === 'fulfilled' ? worldwideResults.value : [];
       const uberEatsData = uberEatsResults.status === 'fulfilled' ? uberEatsResults.value : [];
 
-      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length} (disabled), Yelp: ${yelpData.length}, Worldwide: ${worldwideData.length} (disabled), Uber Eats: ${uberEatsData.length}`);
+      console.log(`[API] Results - Maps Extractor: ${mapsExtractorData.length} (disabled), Local Business: ${localBusinessData.length}, Map Data: ${mapDataData.length} (disabled), Google: ${googleData.length}, TripAdvisor: ${tripAdvisorData.length}, Foursquare: ${foursquareData.length}, Yelp: ${yelpData.length}, Worldwide: ${worldwideData.length} (disabled), Uber Eats: ${uberEatsData.length}`);
 
       allResults = await combineLocationBasedResults(
         mapsExtractorData, 
@@ -1980,7 +1983,7 @@ export const searchFoursquareAutocomplete = async (
   }
 };
 
-// Search for restaurants using Foursquare API
+// Search for restaurants using Foursquare API v3
 export const searchFoursquareRestaurants = async (
   query: string, 
   lat?: number, 
@@ -1990,7 +1993,10 @@ export const searchFoursquareRestaurants = async (
   try {
     console.log('[Foursquare] Searching for restaurants:', query);
     
-    // Foursquare API v3 requires different parameters
+    // Use the exact endpoint format you specified
+    const url = 'https://api.foursquare.com/v3/places/search';
+    
+    // Build query parameters
     const params = new URLSearchParams({
       query: query,
       categories: '13065', // Food category ID for restaurants
@@ -2003,14 +2009,13 @@ export const searchFoursquareRestaurants = async (
       params.append('ll', `${lat},${lng}`);
     }
     
-    const url = `${FOURSQUARE_BASE_URL}/places/search?${params}`;
+    const fullUrl = `${url}?${params}`;
     
-    const response = await fetch(url, {
+    const response = await fetch(fullUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
-        'User-Agent': 'Rork-Nomi-App/1.0'
+        'Authorization': FOURSQUARE_API_KEY
       }
     });
     
@@ -2021,9 +2026,9 @@ export const searchFoursquareRestaurants = async (
     }
     
     const data = await response.json();
-    const results = data.results || [];
+    const results = data.results || data || [];
     
-    console.log(`[Foursquare] Found ${results.length} restaurants`);
+    console.log(`[Foursquare] Found ${results.length} restaurants for query: "${query}"`);
     return results;
   } catch (error) {
     console.error('[Foursquare] Error searching restaurants:', error);
@@ -2062,42 +2067,51 @@ export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any
   }
 };
 
-// Get photos for a restaurant
+// Get photos for a restaurant using Foursquare API v3
 export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number = 10): Promise<string[]> => {
   try {
     console.log('[Foursquare] Getting photos for restaurant:', fsqId);
     
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-      sort: 'POPULAR'
-    });
-    
-    const url = `${FOURSQUARE_BASE_URL}/places/${fsqId}/photos?${params}`;
+    // Use the exact endpoint format you specified
+    const url = `https://api.foursquare.com/v3/places/${fsqId}/photos`;
     
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
-        'User-Agent': 'Rork-Nomi-App/1.0'
+        'Authorization': FOURSQUARE_API_KEY
       }
     });
     
     if (!response.ok) {
+      console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    const photos = data.photos || [];
+    const photos = data.photos || data || [];
     
-    // Extract photo URLs
+    // Extract photo URLs - handle both v2 and v3 response formats
     const photoUrls = photos.map((photo: any) => {
-      const prefix = photo.prefix;
-      const suffix = photo.suffix;
-      return `${prefix}original${suffix}`;
+      // Handle v3 format (direct URL)
+      if (photo.url) {
+        return photo.url;
+      }
+      
+      // Handle v2 format (prefix + suffix)
+      if (photo.prefix && photo.suffix) {
+        return `${photo.prefix}original${photo.suffix}`;
+      }
+      
+      // Handle other formats
+      if (photo.original && photo.original.url) {
+        return photo.original.url;
+      }
+      
+      return null;
     }).filter(Boolean);
     
-    console.log(`[Foursquare] Retrieved ${photoUrls.length} photos`);
+    console.log(`[Foursquare] Retrieved ${photoUrls.length} photos for ${fsqId}`);
     return photoUrls;
   } catch (error) {
     console.error('[Foursquare] Error getting restaurant photos:', error);
