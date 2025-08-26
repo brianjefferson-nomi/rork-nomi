@@ -916,3 +916,13 @@ export function useCollectionById(id: string) {
     };
   }, [collection, membersQuery.data, membersQuery.isLoading]);
 }
+
+// Hook to get a specific restaurant by ID
+export function useRestaurantById(id: string) {
+  const { restaurants } = useRestaurants();
+  
+  return useMemo(() => {
+    if (!id) return null;
+    return restaurants.find((r: any) => r.id === id);
+  }, [restaurants, id]);
+}
