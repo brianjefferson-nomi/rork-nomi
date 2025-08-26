@@ -81,7 +81,7 @@ export const [AuthProvider, useAuth] = createContextHook<AuthStore>(() => {
     if (!user) return;
 
     try {
-      const updatedUser = await dbHelpers.getUserById(user.id);
+      const updatedUser = await dbHelpers.updateUser(user.id, updates);
       if (updatedUser) {
         setUser(updatedUser);
         await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
