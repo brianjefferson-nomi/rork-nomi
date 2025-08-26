@@ -1635,12 +1635,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 8,
     marginBottom: 12,
-  },
-  rankBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -2168,22 +2162,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
-  voteCountActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  voteButtonActive: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
-  },
-  likeButtonActive: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
-  },
-  dislikeButtonActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
-  },
+
   commentButton: {
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
@@ -2450,11 +2429,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
-  voteBreakdown: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
   consensusBadge: {
     backgroundColor: '#10B981',
     paddingHorizontal: 8,
@@ -2467,42 +2441,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     textTransform: 'lowercase',
-  },
-  memberVotesSection: {
-    marginTop: 16,
-  },
-  memberVotesTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  memberVotesList: {
-    gap: 8,
-  },
-  memberVoteItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  memberVoteAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  memberVoteInitial: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberVoteName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#1F2937',
-    flex: 1,
   },
   memberRestaurantActivity: {
     marginTop: 12,
