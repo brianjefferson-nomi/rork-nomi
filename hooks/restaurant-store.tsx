@@ -268,17 +268,18 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[RestaurantStore] useEffect - restaurantsQuery.data:', restaurantsQuery.data?.length);
     console.log('[RestaurantStore] useEffect - user ID:', user?.id);
     
-    if (restaurants.length === 0 && dataQuery.data?.restaurants) {
-      console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
-      setRestaurants(dataQuery.data.restaurants);
-    } else if (restaurants.length === 0 && restaurantsQuery.data) {
+    // Prioritize restaurantsQuery.data as it's the most direct source
+    if (restaurantsQuery.data && restaurantsQuery.data.length > 0) {
       console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
       setRestaurants(restaurantsQuery.data);
+    } else if (dataQuery.data?.restaurants && dataQuery.data.restaurants.length > 0) {
+      console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
+      setRestaurants(dataQuery.data.restaurants);
     } else if (restaurants.length === 0) {
       console.log('[RestaurantStore] No restaurants available from any source');
       setRestaurants([]);
     }
-  }, [restaurants.length, dataQuery.data, restaurantsQuery.data, user?.id]);
+  }, [restaurantsQuery.data, dataQuery.data, restaurants.length, user?.id]);
 
   // Ensure other data is available
   useEffect(() => {
@@ -976,9 +977,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[getCollectionRestaurants] Available restaurant IDs in store:', restaurants.map(r => r.id));
 
     if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
-      console.log('[getCollectionRestaurants] No restaurant_ids in collection, using first 5 available restaurants');
-      // Use first 5 available restaurants instead of mock restaurants
-      return restaurants.length > 0 ? restaurants.slice(0, 5) : [];
+      console.log('[getCollectionRestaurants] No restaurant_ids in collection');
+      console.log('[getCollectionRestaurants] Collection restaurant_ids:', collection.restaurant_ids);
+      return [];
     }
 
     // Filter restaurants that exist in the collection
@@ -1298,15 +1299,24 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
       return [];
     }
     
+    console.log(`[useCollectionRestaurants] Processing collection ${collectionId}`);
+    console.log(`[useCollectionRestaurants] Available plans:`, plans.length);
+    console.log(`[useCollectionRestaurants] Available restaurants:`, restaurants.length);
+    
     // Find the plan/collection
     const plan = plans.find((p: any) => p.id === collectionId);
-    if (!plan || !plan.restaurant_ids) {
-      console.log(`[useCollectionRestaurants] No plan found for collection ${collectionId} or no restaurant_ids`);
+    if (!plan) {
+      console.log(`[useCollectionRestaurants] No plan found for collection ${collectionId}`);
+      return [];
+    }
+    
+    if (!plan.restaurant_ids) {
+      console.log(`[useCollectionRestaurants] No restaurant_ids in plan for collection ${collectionId}`);
       return [];
     }
     
     console.log(`[useCollectionRestaurants] Collection ${collectionId} has ${plan.restaurant_ids.length} restaurant IDs:`, plan.restaurant_ids);
-    console.log(`[useCollectionRestaurants] Available restaurants:`, restaurants.length);
+    console.log(`[useCollectionRestaurants] Available restaurant IDs:`, restaurants.map(r => r.id));
     
     // Return restaurants that are in this collection
     const collectionRestaurants = restaurants.filter((r: any) => 
@@ -1314,6 +1324,9 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
     );
     
     console.log(`[useCollectionRestaurants] Found ${collectionRestaurants.length} restaurants for collection ${collectionId}`);
+    if (collectionRestaurants.length > 0) {
+      console.log(`[useCollectionRestaurants] Restaurant names:`, collectionRestaurants.map(r => r.name));
+    }
     return collectionRestaurants;
   }, [restaurants, plans, collectionId]);
 }
