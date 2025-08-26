@@ -925,6 +925,12 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
 // Enhanced collection hook with member details
 export function useCollectionById(id: string | undefined) {
   const { plans } = useRestaurants();
+  
+  // Add null check for id
+  if (!id || id === '') {
+    return null;
+  }
+  
   const collection = plans.find((p: any) => p.id === id);
   
   // Fetch collection members with proper names
@@ -936,10 +942,11 @@ export function useCollectionById(id: string | undefined) {
         const members = await dbHelpers.getCollectionMembers(id);
         return members;
       } catch (error) {
+        console.error('[useCollectionById] Error fetching members:', error);
         return [];
       }
     },
-    enabled: true, // Always enabled to maintain hook order
+    enabled: !!id, // Only enabled if we have an ID
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -947,7 +954,10 @@ export function useCollectionById(id: string | undefined) {
   });
   
   return useMemo(() => {
-    if (!collection) return null;
+    if (!collection) {
+      console.log(`[useCollectionById] No collection found for ID: ${id}`);
+      return null;
+    }
     
     // Enhanced collection with proper member data
     return {
@@ -959,7 +969,7 @@ export function useCollectionById(id: string | undefined) {
       // Add loading state for members
       membersLoading: membersQuery.isLoading
     };
-  }, [collection, membersQuery.data, membersQuery.isLoading]);
+  }, [collection, membersQuery.data, membersQuery.isLoading, id]);
 }
 
 // Hook to get a specific restaurant by ID

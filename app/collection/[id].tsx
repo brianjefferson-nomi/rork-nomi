@@ -338,10 +338,6 @@ export default function CollectionDetailScreen() {
   const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
   const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
   
-  // Get restaurants for this collection using the simpler function
-  const collectionRestaurants = getCollectionRestaurants(id || '');
-  const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
-  
   // If collection is not found in the store, fetch it directly from the database
   const directCollectionQuery = useQuery({
     queryKey: ['directCollection', id],
@@ -373,6 +369,10 @@ export default function CollectionDetailScreen() {
   
   // Use the direct collection if the store collection is not available
   const effectiveCollection = collection || directCollectionQuery.data;
+  
+  // Get restaurants for this collection using the simpler function
+  const collectionRestaurants = getCollectionRestaurants(id || '');
+  const rankedRestaurants = getRankedRestaurants(id, effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0) || [];
   
   // Debug logging for both approaches
   console.log('[CollectionDetail] Collection ID:', id);
