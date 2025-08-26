@@ -38,6 +38,9 @@ WHERE is_public = true;
 -- 2. ADD PAGINATION SUPPORT
 -- =====================================================
 
+-- Drop existing function if it exists (to handle return type changes)
+DROP FUNCTION IF EXISTS get_user_collections_paginated(UUID, INTEGER, INTEGER, BOOLEAN);
+
 -- Function to get paginated collections for a user
 CREATE OR REPLACE FUNCTION get_user_collections_paginated(
   p_user_id UUID,
@@ -146,6 +149,9 @@ CREATE TABLE IF NOT EXISTS user_activity_summary (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS update_user_activity_summary(UUID);
+
 -- Function to update user activity summary
 CREATE OR REPLACE FUNCTION update_user_activity_summary(p_user_id UUID)
 RETURNS VOID AS $$
@@ -199,6 +205,9 @@ CREATE TABLE IF NOT EXISTS collection_stats_cache (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS update_collection_stats_cache(UUID);
 
 -- Function to update collection stats cache
 CREATE OR REPLACE FUNCTION update_collection_stats_cache(p_collection_id UUID)
@@ -274,6 +283,9 @@ $$ LANGUAGE plpgsql;
 -- 5. ADD TRIGGERS FOR AUTOMATIC CACHE UPDATES
 -- =====================================================
 
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS trigger_update_collection_stats();
+
 -- Trigger to update collection stats when votes change
 CREATE OR REPLACE FUNCTION trigger_update_collection_stats()
 RETURNS TRIGGER AS $$
@@ -339,6 +351,9 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action 
 ON rate_limits(user_id, action_type, window_start);
 
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS check_rate_limit(UUID, TEXT, INTEGER, INTEGER);
+
 -- Function to check rate limits
 CREATE OR REPLACE FUNCTION check_rate_limit(
   p_user_id UUID,
@@ -396,6 +411,9 @@ CREATE TABLE IF NOT EXISTS archived_restaurant_votes (
 CREATE TABLE IF NOT EXISTS archived_restaurant_discussions (
   LIKE restaurant_discussions INCLUDING ALL
 );
+
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS archive_old_data(INTEGER);
 
 -- Function to archive old data
 CREATE OR REPLACE FUNCTION archive_old_data(p_months_old INTEGER DEFAULT 12)
