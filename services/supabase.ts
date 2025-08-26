@@ -856,24 +856,61 @@ export const dbHelpers = {
     try {
       console.log('[voteRestaurant] Attempting to vote with data:', voteData);
       
-      const { data, error } = await supabase
+      // First, check if a vote already exists for this user/restaurant/collection
+      const { data: existingVote, error: checkError } = await supabase
         .from('restaurant_votes')
-        .insert(voteData)
-        .select()
+        .select('*')
+        .eq('restaurant_id', voteData.restaurant_id)
+        .eq('user_id', voteData.user_id)
+        .eq('collection_id', voteData.collection_id)
         .single();
       
-      if (error) {
-        console.error('[voteRestaurant] Supabase error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw new Error(`Vote failed: ${error.message}`);
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('[voteRestaurant] Error checking existing vote:', checkError);
+        throw new Error(`Failed to check existing vote: ${checkError.message}`);
       }
       
-      console.log('[voteRestaurant] Vote successful:', data);
-      return data;
+      let result;
+      
+      if (existingVote) {
+        // Update existing vote
+        console.log('[voteRestaurant] Updating existing vote from', existingVote.vote, 'to', voteData.vote);
+        const { data, error } = await supabase
+          .from('restaurant_votes')
+          .update({
+            vote: voteData.vote,
+            reason: voteData.reason,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingVote.id)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('[voteRestaurant] Error updating vote:', error);
+          throw new Error(`Failed to update vote: ${error.message}`);
+        }
+        
+        result = data;
+      } else {
+        // Insert new vote
+        console.log('[voteRestaurant] Inserting new vote');
+        const { data, error } = await supabase
+          .from('restaurant_votes')
+          .insert(voteData)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('[voteRestaurant] Error inserting vote:', error);
+          throw new Error(`Failed to insert vote: ${error.message}`);
+        }
+        
+        result = data;
+      }
+      
+      console.log('[voteRestaurant] Vote successful:', result);
+      return result;
     } catch (error) {
       console.error('[voteRestaurant] Exception:', error);
       if (error instanceof Error) {

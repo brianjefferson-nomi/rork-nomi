@@ -457,7 +457,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     onSuccess: (data) => {
       console.log('[voteRestaurantMutation] Vote successful:', data);
+      // Invalidate all relevant queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['collectionVotes'] });
     },
     onError: (error) => {
       console.error('[voteRestaurantMutation] Error details:', {
