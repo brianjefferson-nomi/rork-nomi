@@ -32,7 +32,7 @@ export default function HomeScreen() {
           );
           
           // Transform Foursquare data to our format
-          const transformedNearby = nearbyData.map(transformFoursquareRestaurant);
+          const transformedNearby = nearbyData.map(transformFoursquareRestaurant).filter(Boolean);
           setNearbyRestaurants(transformedNearby);
           console.log('[HomeScreen] Loaded', transformedNearby.length, 'nearby restaurants');
         } catch (error) {
@@ -41,15 +41,23 @@ export default function HomeScreen() {
           if (error.message && error.message.includes('authentication failed')) {
             console.log('[HomeScreen] Foursquare API authentication failed - nearby restaurants disabled');
           }
-          setNearbyRestaurants([]);
+          // Fallback to showing some local restaurants when nearby fails
+          const fallbackRestaurants = availableRestaurants.slice(0, 4);
+          setNearbyRestaurants(fallbackRestaurants);
+          console.log('[HomeScreen] Using fallback restaurants:', fallbackRestaurants.length);
         } finally {
           setNearbyLoading(false);
         }
+      } else {
+        console.log('[HomeScreen] No user location available for nearby restaurants');
+        // Show fallback restaurants when no location is available
+        const fallbackRestaurants = availableRestaurants.slice(0, 4);
+        setNearbyRestaurants(fallbackRestaurants);
       }
     };
 
     fetchNearbyRestaurants();
-  }, [userLocation?.lat, userLocation?.lng]);
+  }, [userLocation?.lat, userLocation?.lng, availableRestaurants]);
 
   // Debug logging
   console.log('[HomeScreen] User authenticated:', isAuthenticated);
@@ -242,7 +250,11 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Navigation size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Nearby Restaurants</Text>
+            <Text style={styles.sectionTitle}>
+              {nearbyRestaurants.length > 0 && nearbyRestaurants[0].source === 'foursquare' 
+                ? 'Nearby Restaurants' 
+                : 'Local Restaurants'}
+            </Text>
             <TouchableOpacity onPress={() => router.push('/discover' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -266,7 +278,11 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.nearbyEmptyContainer}>
               <Text style={styles.nearbyEmptyText}>No nearby restaurants found</Text>
-              <Text style={styles.nearbyEmptySubtext}>Try updating your location</Text>
+              <Text style={styles.nearbyEmptySubtext}>
+                {userLocation?.lat && userLocation?.lng 
+                  ? 'Check your Foursquare API key in .env file' 
+                  : 'Enable location services to find nearby restaurants'}
+              </Text>
             </View>
           )}
         </View>
