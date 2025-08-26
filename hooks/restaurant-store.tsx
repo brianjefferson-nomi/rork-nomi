@@ -641,10 +641,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       }
     }
 
+    // If still not found, try to get it from the database directly
     if (!collection) {
-      console.log('[getCollectionRestaurants] Collection not found in any query data');
-      console.log('[getCollectionRestaurants] Available collection IDs in plansQuery:', plansQuery.data?.map(p => p.id) || []);
-      console.log('[getCollectionRestaurants] Available collection IDs in allCollections:', allCollectionsQuery.data?.map(c => c.id) || []);
+      console.log('[getCollectionRestaurants] Collection not found in query data, will fetch from database');
+      // For now, return empty array and let the component handle the loading
+      // The component should use a separate query to fetch the collection
       return [];
     }
 

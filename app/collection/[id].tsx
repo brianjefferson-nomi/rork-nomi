@@ -5,6 +5,8 @@ import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, Trend
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/services/supabase';
 
 function getConsensusStyle(consensus: string) {
   switch (consensus) {
@@ -318,7 +320,8 @@ export default function CollectionDetailScreen() {
     updateCollectionSettings,
     getRestaurantVotingDetails,
     toggleFavorite,
-    favoriteRestaurants
+    favoriteRestaurants,
+    restaurants
   } = useRestaurants();
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
@@ -339,29 +342,67 @@ export default function CollectionDetailScreen() {
   const collectionRestaurants = getCollectionRestaurants(id || '');
   const rankedRestaurants = getRankedRestaurants(id, collection?.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0) || [];
   
+  // If collection is not found in the store, fetch it directly from the database
+  const directCollectionQuery = useQuery({
+    queryKey: ['directCollection', id],
+    queryFn: async () => {
+      if (!id) return null;
+      try {
+        const { data, error } = await supabase
+          .from('collections')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) {
+          console.log('[CollectionDetail] Error fetching collection directly:', error.message);
+          return null;
+        }
+        
+        console.log('[CollectionDetail] Successfully fetched collection directly:', data.name);
+        return data;
+      } catch (error) {
+        console.log('[CollectionDetail] Exception fetching collection directly:', error);
+        return null;
+      }
+    },
+    enabled: !!id && !collection, // Only run if we have an ID and no collection found
+    retry: 1,
+    retryDelay: 1000
+  });
+  
+  // Use the direct collection if the store collection is not available
+  const effectiveCollection = collection || directCollectionQuery.data;
+  
   // Debug logging for both approaches
   console.log('[CollectionDetail] Collection ID:', id);
-  console.log('[CollectionDetail] Collection:', collection?.name);
+  console.log('[CollectionDetail] Collection:', effectiveCollection?.name);
   console.log('[CollectionDetail] Collection restaurants (simple):', collectionRestaurants.length);
   console.log('[CollectionDetail] Ranked restaurants:', rankedRestaurants.length);
   console.log('[CollectionDetail] User ID:', user?.id);
   console.log('[CollectionDetail] Is authenticated:', !!user);
   
-  // Use collectionRestaurants if rankedRestaurants is empty
-  const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : collectionRestaurants.map(r => ({ 
-    restaurant: r, 
-    meta: { 
-      likes: 0, 
-      dislikes: 0, 
-      rank: 1,
-      voteDetails: {
-        likeVoters: [],
-        dislikeVoters: []
-      },
-      approvalPercent: 0,
-      discussionCount: 0
-    } 
-  }));
+  // Get restaurants for the effective collection if the store function didn't work
+  const effectiveCollectionRestaurants = effectiveCollection && effectiveCollection.restaurant_ids 
+    ? restaurants.filter(r => effectiveCollection.restaurant_ids.includes(r.id))
+    : [];
+  
+  // Use collectionRestaurants if rankedRestaurants is empty, otherwise use effectiveCollectionRestaurants
+  const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : 
+    (collectionRestaurants.length > 0 ? collectionRestaurants : effectiveCollectionRestaurants).map(r => ({ 
+      restaurant: r, 
+      meta: { 
+        likes: 0, 
+        dislikes: 0, 
+        rank: 1,
+        voteDetails: {
+          likeVoters: [],
+          dislikeVoters: []
+        },
+        approvalPercent: 0,
+        discussionCount: 0
+      } 
+    }));
   
   console.log('[CollectionDetail] Display restaurants:', displayRestaurants.length);
   console.log('[CollectionDetail] Display restaurants details:', displayRestaurants.map(dr => ({
@@ -369,7 +410,7 @@ export default function CollectionDetailScreen() {
     id: dr.restaurant.id,
     cuisine: dr.restaurant.cuisine
   })));
-  const recommendations = collection ? getGroupRecommendations(id) : [];
+  const recommendations = effectiveCollection ? getGroupRecommendations(id) : [];
   
   // Load discussions asynchronously
   useEffect(() => {
@@ -391,11 +432,11 @@ export default function CollectionDetailScreen() {
   }, [id, getCollectionDiscussions]);
 
   // Calculate collection members for privacy filtering
-  const collectionMembers = collection?.collaborators && Array.isArray(collection.collaborators) 
-    ? collection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+  const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
+    ? effectiveCollection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
     : [];
 
-  if (!collection) {
+  if (!effectiveCollection) {
     return (
       <View style={styles.errorContainer}>
         <Text>Collection not found</Text>
@@ -404,7 +445,7 @@ export default function CollectionDetailScreen() {
   }
 
   // Add safety checks for collection data
-  if (!collection.name) {
+  if (!effectiveCollection.name) {
     return (
       <View style={styles.errorContainer}>
         <Text>Invalid collection data</Text>
