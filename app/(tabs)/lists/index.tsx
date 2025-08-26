@@ -14,13 +14,14 @@ type ViewType = 'grid' | 'list';
 
 export default function ListsScreen() {
   const { collections, restaurants, favoriteRestaurants, deleteCollection, leaveCollection } = useRestaurants();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
   // Debug logging for collections
+  console.log('[ListsScreen] User authenticated:', isAuthenticated);
   console.log('[ListsScreen] User ID:', user?.id);
   console.log('[ListsScreen] Collections count:', collections?.length || 0);
   console.log('[ListsScreen] Collections data:', collections?.map(c => ({

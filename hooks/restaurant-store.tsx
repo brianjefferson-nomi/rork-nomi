@@ -291,11 +291,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryFn: async () => {
       try {
         console.log('[RestaurantStore] Loading plans for user:', user?.id);
+        console.log('[RestaurantStore] User authenticated:', !!user?.id);
+        console.log('[RestaurantStore] User object:', user);
         
         // If no user ID, try to get all public collections as fallback
         if (!user?.id) {
           console.log('[RestaurantStore] No user ID, loading public collections as fallback');
           const publicCollections = await dbHelpers.getAllCollections();
+          console.log('[RestaurantStore] Public collections from fallback:', publicCollections?.length || 0);
           return publicCollections.map((plan: any) => ({
             ...plan,
             collaborators: plan.collaborators || [],
@@ -311,6 +314,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         console.log('[RestaurantStore] Loading plans for user:', user.id);
         const plans = await dbHelpers.getUserPlans(user.id);
         console.log('[RestaurantStore] Raw plans data:', plans?.length || 0);
+        console.log('[RestaurantStore] Plans data details:', plans?.map(p => ({ id: p.id, name: p.name, created_by: p.created_by, is_public: p.is_public })));
         
         // If no plans found for user, fallback to public collections
         if (!plans || plans.length === 0) {
@@ -343,9 +347,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         });
         
         console.log('[RestaurantStore] Mapped plans:', mappedPlans.length);
-        mappedPlans.forEach((plan, i) => {
-          console.log(`[RestaurantStore] Plan ${i}: ${plan.name} - restaurant_ids: ${plan.restaurant_ids?.length || 0}`);
-        });
+        console.log('[RestaurantStore] Final mapped plans:', mappedPlans?.map(p => ({ id: p.id, name: p.name, created_by: p.created_by, is_public: p.is_public })));
         
         return mappedPlans;
       } catch (error) {

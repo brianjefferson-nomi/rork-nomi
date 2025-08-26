@@ -14,6 +14,13 @@ export default function HomeScreen() {
   const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
 
+  // Debug logging
+  console.log('[HomeScreen] User authenticated:', isAuthenticated);
+  console.log('[HomeScreen] User ID:', user?.id);
+  console.log('[HomeScreen] Collections count:', collections?.length || 0);
+  console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
+  console.log('[HomeScreen] Is loading:', isLoading);
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
