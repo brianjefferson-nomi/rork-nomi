@@ -418,15 +418,45 @@ export const dbHelpers = {
   },
 
   async getUserPlans(userId: string) {
-    // Get collections that the user created OR public collections
-    const { data, error } = await supabase
+    // First, get collections that the user created
+    const { data: createdCollections, error: createdError } = await supabase
       .from('collections')
       .select('*')
-      .or(`created_by.eq.${userId},is_public.eq.true`)
-      .order('created_at', { ascending: false });
+      .eq('created_by', userId);
     
-    if (error) throw error;
-    return data;
+    if (createdError) throw createdError;
+    
+    // Then, get collections where the user is a member
+    const { data: memberCollections, error: memberError } = await supabase
+      .from('collection_members')
+      .select('collection_id')
+      .eq('user_id', userId);
+    
+    if (memberError) throw memberError;
+    
+    // Get the actual collection data for collections where user is a member
+    let memberCollectionData: any[] = [];
+    if (memberCollections && memberCollections.length > 0) {
+      const collectionIds = memberCollections.map(m => m.collection_id);
+      const { data: memberData, error: memberDataError } = await supabase
+        .from('collections')
+        .select('*')
+        .in('id', collectionIds);
+      
+      if (memberDataError) throw memberDataError;
+      memberCollectionData = memberData || [];
+    }
+    
+    // Combine and deduplicate collections
+    const allCollections = [...(createdCollections || []), ...memberCollectionData];
+    const uniqueCollections = allCollections.filter((collection, index, self) => 
+      index === self.findIndex(c => c.id === collection.id)
+    );
+    
+    // Sort by created_at descending
+    return uniqueCollections.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   },
 
   async getAllCollections() {
@@ -529,6 +559,17 @@ export const dbHelpers = {
     return data;
   },
 
+  async removeCollectionMember(collectionId: string, userId: string) {
+    const { error } = await supabase
+      .from('collection_members')
+      .delete()
+      .eq('collection_id', collectionId)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return true;
+  },
+
   async getCollectionMembers(collectionId: string) {
     try {
       const { data: membersData, error: membersError } = await supabase
@@ -586,15 +627,7 @@ export const dbHelpers = {
     }
   },
 
-  async removeCollectionMember(collectionId: string, userId: string) {
-    const { error } = await supabase
-      .from('collection_members')
-      .delete()
-      .eq('collection_id', collectionId)
-      .eq('user_id', userId);
-    
-    if (error) throw error;
-  },
+
 
   // Voting operations
   async getUserVotes(userId: string, collectionId?: string) {
