@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User } from 'lucide-react-native';
+import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User, Navigation } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { CollectionCard } from '@/components/CollectionCard';
 import { Collection } from '@/types/restaurant';
@@ -9,10 +9,43 @@ import { ContributorCard } from '@/components/ContributorCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
+import { getFoursquareNearbyRestaurants, transformFoursquareRestaurant } from '@/services/api';
 
 export default function HomeScreen() {
   const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
+  const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  // Fetch nearby restaurants when user location is available
+  useEffect(() => {
+    const fetchNearbyRestaurants = async () => {
+      if (userLocation?.lat && userLocation?.lng) {
+        setNearbyLoading(true);
+        try {
+          console.log('[HomeScreen] Fetching nearby restaurants at:', userLocation.lat, userLocation.lng);
+          const nearbyData = await getFoursquareNearbyRestaurants(
+            userLocation.lat,
+            userLocation.lng,
+            3000, // 3km radius
+            8 // Limit to 8 restaurants
+          );
+          
+          // Transform Foursquare data to our format
+          const transformedNearby = nearbyData.map(transformFoursquareRestaurant);
+          setNearbyRestaurants(transformedNearby);
+          console.log('[HomeScreen] Loaded', transformedNearby.length, 'nearby restaurants');
+        } catch (error) {
+          console.error('[HomeScreen] Error fetching nearby restaurants:', error);
+          setNearbyRestaurants([]);
+        } finally {
+          setNearbyLoading(false);
+        }
+      }
+    };
+
+    fetchNearbyRestaurants();
+  }, [userLocation?.lat, userLocation?.lng]);
 
   // Debug logging
   console.log('[HomeScreen] User authenticated:', isAuthenticated);
@@ -20,6 +53,7 @@ export default function HomeScreen() {
   console.log('[HomeScreen] Collections count:', collections?.length || 0);
   console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
   console.log('[HomeScreen] Is loading:', isLoading);
+  console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
 
   if (isLoading) {
     return (
@@ -198,6 +232,39 @@ export default function HomeScreen() {
               </View>
             ))}
           </ScrollView>
+        </View>
+
+        {/* Nearby Restaurants Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Navigation size={20} color="#FF6B6B" />
+            <Text style={styles.sectionTitle}>Nearby Restaurants</Text>
+            <TouchableOpacity onPress={() => router.push('/discover' as any)}>
+              <Text style={styles.seeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          {nearbyLoading ? (
+            <View style={styles.nearbyLoadingContainer}>
+              <ActivityIndicator size="small" color="#FF6B6B" />
+              <Text style={styles.nearbyLoadingText}>Finding restaurants near you...</Text>
+            </View>
+          ) : nearbyRestaurants.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+              {nearbyRestaurants.map(restaurant => (
+                <View key={restaurant.id} style={styles.cardWrapper}>
+                  <RestaurantCard
+                    restaurant={restaurant}
+                    onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.nearbyEmptyContainer}>
+              <Text style={styles.nearbyEmptyText}>No nearby restaurants found</Text>
+              <Text style={styles.nearbyEmptySubtext}>Try updating your location</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -417,5 +484,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF6B6B',
     fontWeight: '500',
+  },
+  // Nearby restaurants styles
+  nearbyLoadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nearbyLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  nearbyEmptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nearbyEmptyText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  nearbyEmptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
   },
 });

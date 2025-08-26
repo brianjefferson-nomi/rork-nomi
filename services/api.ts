@@ -2067,6 +2067,54 @@ export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any
   }
 };
 
+// Get nearby restaurants using Foursquare API v3
+export const getFoursquareNearbyRestaurants = async (
+  lat: number,
+  lng: number,
+  radius: number = 5000,
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[Foursquare] Getting nearby restaurants at:', lat, lng);
+    
+    // Use the exact endpoint format you specified
+    const url = 'https://api.foursquare.com/v3/places/nearby';
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+      ll: `${lat},${lng}`,
+      radius: radius.toString(),
+      categories: '13065', // Food category ID for restaurants
+      limit: limit.toString(),
+      sort: 'RATING'
+    });
+    
+    const fullUrl = `${url}?${params}`;
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': FOURSQUARE_API_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      console.error(`[Foursquare] Nearby API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const results = data.results || data || [];
+    
+    console.log(`[Foursquare] Found ${results.length} nearby restaurants`);
+    return results;
+  } catch (error) {
+    console.error('[Foursquare] Error getting nearby restaurants:', error);
+    return [];
+  }
+};
+
 // Get photos for a restaurant using Foursquare API v3
 export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number = 10): Promise<string[]> => {
   try {
