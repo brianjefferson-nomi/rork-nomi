@@ -764,8 +764,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       return { restaurants: [], participationData: null };
     }
 
-    const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
+    // Filter restaurants that exist in the collection and are available in the store
+    const planRestaurants = restaurants.filter(r => {
+      const isInPlan = plan.restaurant_ids.includes(r.id);
+      if (!isInPlan) {
+        console.log(`[getRankedRestaurantsWithAllVotes] Restaurant ${r.name} (${r.id}) not found in plan restaurant_ids`);
+      }
+      return isInPlan;
+    });
     console.log('[getRankedRestaurantsWithAllVotes] Filtered restaurants:', planRestaurants.length);
+    
+    // If no restaurants found, return empty result
+    if (planRestaurants.length === 0) {
+      console.log('[getRankedRestaurantsWithAllVotes] No restaurants found in store for plan');
+      return { restaurants: [], participationData: null };
+    }
 
     // Check if this is a shared collection (multiple members)
     const isSharedCollection = memberCount > 1;
@@ -919,17 +932,27 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       return restaurants.length > 0 ? restaurants.slice(0, 5) : [];
     }
 
-    const collectionRestaurants = restaurants.filter(r => collection.restaurant_ids.includes(r.id));
+    // Filter restaurants that exist in the collection
+    const collectionRestaurants = restaurants.filter(r => {
+      const isInCollection = collection.restaurant_ids.includes(r.id);
+      if (!isInCollection) {
+        console.log(`[getCollectionRestaurants] Restaurant ${r.name} (${r.id}) not found in collection restaurant_ids`);
+      }
+      return isInCollection;
+    });
+    
     console.log('[getCollectionRestaurants] Found restaurants:', collectionRestaurants.length);
     collectionRestaurants.forEach((r, i) => {
       console.log(`[getCollectionRestaurants] Restaurant ${i + 1}: ${r.name} (${r.id})`);
     });
 
-    // If no restaurants found in the collection, use first 5 available restaurants instead of mock
+    // If no restaurants found in the collection, log the missing IDs and return empty array
     if (collectionRestaurants.length === 0) {
-      console.log('[getCollectionRestaurants] No restaurants found in collection, using first 5 available restaurants');
-      console.log('[getCollectionRestaurants] Missing restaurant IDs:', collection.restaurant_ids.filter((id: string) => !restaurants.some(r => r.id === id)));
-      return restaurants.length > 0 ? restaurants.slice(0, 5) : [];
+      console.log('[getCollectionRestaurants] No restaurants found in collection');
+      const missingIds = collection.restaurant_ids.filter((id: string) => !restaurants.some(r => r.id === id));
+      console.log('[getCollectionRestaurants] Missing restaurant IDs:', missingIds);
+      console.log('[getCollectionRestaurants] Available restaurant IDs in store:', restaurants.map(r => r.id));
+      return [];
     }
 
     return collectionRestaurants;
