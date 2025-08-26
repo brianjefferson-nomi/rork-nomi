@@ -6,8 +6,9 @@ const AI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'sk-proj-your-api-k
 const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
 const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
-const FOURSQUARE_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY || 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
-const FOURSQUARE_BASE_URL = 'https://places-api.foursquare.com';
+const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'EAAKV5FPOD1JMYUGWSULS1C05H1M4GVHPWFEPREMTT3MP5SU';
+const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || '05GWIV2KWFUNMNVOYS3CRWDGIA3TISMBGDP3W3CZ5IYEXCOE';
+const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
 const STOCK_PHOTOS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const STOCK_PHOTOS_HOST = 'stock-photos-and-videos.p.rapidapi.com';
 const RESTAURANTS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
@@ -34,8 +35,17 @@ const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 // Log API key status for debugging
 console.log('[API] RapidAPI Key loaded:', RAPIDAPI_KEY ? '✅ YES' : '❌ NO');
 console.log('[API] TripAdvisor Key loaded:', TRIPADVISOR_API_KEY ? '✅ YES' : '❌ NO');
-console.log('[API] Foursquare Key loaded:', FOURSQUARE_API_KEY ? '✅ YES' : '❌ NO');
+console.log('[API] Foursquare Client ID loaded:', FOURSQUARE_CLIENT_ID ? '✅ YES' : '❌ NO');
 console.log('[API] Note: Yelp API3 may return 403 errors if your RapidAPI subscription does not include this service');
+
+// Foursquare API key validation
+const validateFoursquareKey = () => {
+  if (!FOURSQUARE_CLIENT_ID || FOURSQUARE_CLIENT_ID === 'EAAKV5FPOD1JMYUGWSULS1C05H1M4GVHPWFEPREMTT3MP5SU') {
+    console.warn('[Foursquare] Using fallback Client ID - consider setting EXPO_PUBLIC_FOURSQUARE_CLIENT_ID in your .env file');
+    return false;
+  }
+  return true;
+};
 
 // Enhanced API configuration for better restaurant data
 const API_CONFIG = {
@@ -1964,13 +1974,13 @@ export const searchFoursquareAutocomplete = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
+        'Authorization': FOURSQUARE_CLIENT_ID
       }
     });
     
     if (!response.ok) {
       if (response.status === 401) {
-        console.error('[Foursquare] Authentication failed - check API key');
+        console.error('[Foursquare] Authentication failed - check Client ID');
         throw new Error('Foursquare API authentication failed - please check your API key');
       }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
@@ -2019,14 +2029,14 @@ export const searchFoursquareRestaurants = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
+        'Authorization': FOURSQUARE_CLIENT_ID
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
       if (response.status === 401) {
-        console.error('[Foursquare] Authentication failed - check API key');
+        console.error('[Foursquare] Authentication failed - check Client ID');
         return [];
       }
       // Return empty array instead of throwing to prevent app crashes
@@ -2056,7 +2066,7 @@ export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`,
+        'Authorization': FOURSQUARE_CLIENT_ID,
         'User-Agent': 'Rork-Nomi-App/1.0'
       }
     });
@@ -2083,6 +2093,12 @@ export const getFoursquareNearbyRestaurants = async (
   limit: number = 20
 ): Promise<any[]> => {
   try {
+    // Validate API key first
+    if (!validateFoursquareKey()) {
+      console.log('[Foursquare] Skipping nearby restaurants - invalid API key');
+      return [];
+    }
+    
     console.log('[Foursquare] Getting nearby restaurants at:', lat, lng);
     
     // Use the exact endpoint format you specified
@@ -2103,17 +2119,23 @@ export const getFoursquareNearbyRestaurants = async (
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
+        'Authorization': FOURSQUARE_CLIENT_ID
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] Nearby API error: ${response.status} ${response.statusText}`);
       if (response.status === 401) {
-        console.error('[Foursquare] Authentication failed - check API key');
-        throw new Error('Foursquare API authentication failed - please check your API key');
+        console.error('[Foursquare] Authentication failed - API key may be invalid or expired');
+        console.error('[Foursquare] Please check your EXPO_PUBLIC_FOURSQUARE_CLIENT_ID in .env file');
+        return [];
       }
-      throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
+      if (response.status === 403) {
+        console.error('[Foursquare] Access forbidden - API key may not have required permissions');
+        return [];
+      }
+      console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
+      return [];
     }
     
     const data = await response.json();
@@ -2139,14 +2161,14 @@ export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
+        'Authorization': FOURSQUARE_CLIENT_ID
       }
     });
     
     if (!response.ok) {
       console.error(`[Foursquare] API error: ${response.status} ${response.statusText}`);
       if (response.status === 401) {
-        console.error('[Foursquare] Authentication failed - check API key');
+        console.error('[Foursquare] Authentication failed - check Client ID');
         throw new Error('Foursquare API authentication failed - please check your API key');
       }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
@@ -2199,13 +2221,13 @@ export const getFoursquareRestaurantTips = async (fsqId: string, limit: number =
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${FOURSQUARE_API_KEY}`
+        'Authorization': FOURSQUARE_CLIENT_ID
       }
     });
     
     if (!response.ok) {
       if (response.status === 401) {
-        console.error('[Foursquare] Authentication failed - check API key');
+        console.error('[Foursquare] Authentication failed - check Client ID');
         throw new Error('Foursquare API authentication failed - please check your API key');
       }
       throw new Error(`Foursquare API error: ${response.status} ${response.statusText}`);
