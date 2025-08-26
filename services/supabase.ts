@@ -521,6 +521,38 @@ export const dbHelpers = {
     return data;
   },
 
+  async getRestaurantsByIds(restaurantIds: string[]) {
+    // Get specific restaurants by their IDs
+    if (!restaurantIds || restaurantIds.length === 0) {
+      return [];
+    }
+    
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .in('id', restaurantIds)
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getRestaurantsByCodes(restaurantCodes: string[]) {
+    // Get specific restaurants by their restaurant_codes
+    if (!restaurantCodes || restaurantCodes.length === 0) {
+      return [];
+    }
+    
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .in('restaurant_code', restaurantCodes)
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async updatePlan(id: string, updates: Partial<Database['public']['Tables']['collections']['Update']>) {
     const { data, error } = await supabase
       .from('collections')

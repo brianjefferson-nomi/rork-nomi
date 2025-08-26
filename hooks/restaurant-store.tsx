@@ -6,7 +6,7 @@ import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion,
 import { mockRestaurants, mockVotes, mockDiscussions } from '@/mocks/restaurants';
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
 import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI } from '@/services/api';
-import { dbHelpers, Database } from '@/services/supabase';
+import { dbHelpers, Database, supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
 
 type Plan = Database['public']['Tables']['collections']['Row'];
@@ -44,6 +44,7 @@ interface RestaurantStore {
   getRankedRestaurants: (planId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
   getGroupRecommendations: (planId: string) => GroupRecommendation[];
   getCollectionRestaurants: (collectionId: string) => Restaurant[];
+  getCollectionRestaurantsFromDatabase: (collectionId: string) => Promise<Restaurant[]>;
   getPlanDiscussions: (planId: string, restaurantId?: string) => RestaurantDiscussion[];
   refreshLocation: () => Promise<void>;
   inviteToPlan: (planId: string, email: string, message?: string) => Promise<void>;
@@ -657,9 +658,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[getCollectionRestaurants] Available restaurant IDs in store:', restaurants.map(r => r.id));
 
     if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
-      console.log('[getCollectionRestaurants] No restaurant_ids in collection, using mock restaurants as fallback');
-      // Use mock restaurants as fallback when collection has no restaurant_ids
-      return mockRestaurants.slice(0, 5); // Return first 5 mock restaurants
+      console.log('[getCollectionRestaurants] No restaurant_ids in collection, using first 5 available restaurants');
+      // Use first 5 available restaurants instead of mock restaurants
+      return restaurants.length > 0 ? restaurants.slice(0, 5) : [];
     }
 
     const collectionRestaurants = restaurants.filter(r => collection.restaurant_ids.includes(r.id));
@@ -668,15 +669,61 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       console.log(`[getCollectionRestaurants] Restaurant ${i + 1}: ${r.name} (${r.id})`);
     });
 
-    // If no restaurants found in the collection, use mock restaurants as fallback
+    // If no restaurants found in the collection, use first 5 available restaurants instead of mock
     if (collectionRestaurants.length === 0) {
-      console.log('[getCollectionRestaurants] No restaurants found in collection, using mock restaurants as fallback');
+      console.log('[getCollectionRestaurants] No restaurants found in collection, using first 5 available restaurants');
       console.log('[getCollectionRestaurants] Missing restaurant IDs:', collection.restaurant_ids.filter((id: string) => !restaurants.some(r => r.id === id)));
-      return mockRestaurants.slice(0, 5); // Return first 5 mock restaurants
+      return restaurants.length > 0 ? restaurants.slice(0, 5) : [];
     }
 
     return collectionRestaurants;
   }, [plansQuery.data, allCollectionsQuery.data, restaurants]);
+
+  // Function to fetch restaurants directly from database for a collection
+  const getCollectionRestaurantsFromDatabase = useCallback(async (collectionId: string) => {
+    if (!collectionId) {
+      console.log('[getCollectionRestaurantsFromDatabase] No collectionId provided');
+      return [];
+    }
+
+    try {
+      console.log('[getCollectionRestaurantsFromDatabase] Fetching restaurants from database for collection:', collectionId);
+      
+      // First get the collection to find its restaurant_ids
+      const { data: collection, error: collectionError } = await supabase
+        .from('collections')
+        .select('restaurant_ids')
+        .eq('id', collectionId)
+        .single();
+
+      if (collectionError) {
+        console.error('[getCollectionRestaurantsFromDatabase] Error fetching collection:', collectionError);
+        return [];
+      }
+
+      if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
+        console.log('[getCollectionRestaurantsFromDatabase] No restaurant_ids in collection');
+        return [];
+      }
+
+      console.log('[getCollectionRestaurantsFromDatabase] Collection restaurant_ids:', collection.restaurant_ids);
+
+      // Fetch restaurants directly from database
+      const restaurantsData = await dbHelpers.getRestaurantsByIds(collection.restaurant_ids);
+      console.log('[getCollectionRestaurantsFromDatabase] Fetched restaurants from database:', restaurantsData.length);
+
+      if (restaurantsData && restaurantsData.length > 0) {
+        const mappedRestaurants = restaurantsData.map(mapDatabaseRestaurant);
+        console.log('[getCollectionRestaurantsFromDatabase] Mapped restaurants:', mappedRestaurants.length);
+        return mappedRestaurants;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('[getCollectionRestaurantsFromDatabase] Error:', error);
+      return [];
+    }
+  }, [mapDatabaseRestaurant]);
 
   const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
     return discussions.filter(d => 
@@ -835,6 +882,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getRankedRestaurants,
     getGroupRecommendations,
     getCollectionRestaurants,
+    getCollectionRestaurantsFromDatabase,
     getPlanDiscussions,
     refreshLocation,
     inviteToPlan,

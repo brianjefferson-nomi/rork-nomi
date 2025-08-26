@@ -315,6 +315,7 @@ export default function CollectionDetailScreen() {
     getRankedRestaurants, 
     getGroupRecommendations,
     getCollectionRestaurants,
+    getCollectionRestaurantsFromDatabase,
     getCollectionDiscussions,
     inviteToCollection,
     updateCollectionSettings,
@@ -374,6 +375,25 @@ export default function CollectionDetailScreen() {
   const collectionRestaurants = getCollectionRestaurants(id || '');
   const rankedRestaurants = getRankedRestaurants(id, effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0) || [];
   
+  // Fetch restaurants directly from database as a fallback
+  const directRestaurantsQuery = useQuery({
+    queryKey: ['directCollectionRestaurants', id],
+    queryFn: async () => {
+      if (!id) return [];
+      try {
+        const restaurants = await getCollectionRestaurantsFromDatabase(id);
+        console.log('[CollectionDetail] Direct restaurants query result:', restaurants.length);
+        return restaurants;
+      } catch (error) {
+        console.error('[CollectionDetail] Error fetching direct restaurants:', error);
+        return [];
+      }
+    },
+    enabled: !!id && (collectionRestaurants.length === 0 || rankedRestaurants.length === 0),
+    retry: 1,
+    retryDelay: 1000
+  });
+  
   // Debug logging for both approaches
   console.log('[CollectionDetail] Collection ID:', id);
   console.log('[CollectionDetail] Collection:', effectiveCollection?.name);
@@ -387,22 +407,37 @@ export default function CollectionDetailScreen() {
     ? restaurants.filter(r => effectiveCollection.restaurant_ids.includes(r.id))
     : (restaurants.length > 0 ? restaurants.slice(0, 5) : []); // Use first 5 restaurants as fallback
   
-  // Use collectionRestaurants if rankedRestaurants is empty, otherwise use effectiveCollectionRestaurants
-  const displayRestaurants = rankedRestaurants.length > 0 ? rankedRestaurants : 
-    (collectionRestaurants.length > 0 ? collectionRestaurants : effectiveCollectionRestaurants).map(r => ({ 
-      restaurant: r, 
-      meta: { 
-        likes: 0, 
-        dislikes: 0, 
-        rank: 1,
-        voteDetails: {
-          likeVoters: [],
-          dislikeVoters: []
-        },
-        approvalPercent: 0,
-        discussionCount: 0
-      } 
-    }));
+  // Use direct restaurants from database if available, otherwise fall back to other sources
+  const displayRestaurants = directRestaurantsQuery.data && directRestaurantsQuery.data.length > 0 
+    ? directRestaurantsQuery.data.map(r => ({ 
+        restaurant: r, 
+        meta: { 
+          likes: 0, 
+          dislikes: 0, 
+          rank: 1,
+          voteDetails: {
+            likeVoters: [],
+            dislikeVoters: []
+          },
+          approvalPercent: 0,
+          discussionCount: 0
+        } 
+      }))
+    : (rankedRestaurants.length > 0 ? rankedRestaurants : 
+        (collectionRestaurants.length > 0 ? collectionRestaurants : effectiveCollectionRestaurants).map(r => ({ 
+          restaurant: r, 
+          meta: { 
+            likes: 0, 
+            dislikes: 0, 
+            rank: 1,
+            voteDetails: {
+              likeVoters: [],
+              dislikeVoters: []
+            },
+            approvalPercent: 0,
+            discussionCount: 0
+          } 
+        })));
   
   console.log('[CollectionDetail] Display restaurants:', displayRestaurants.length);
   console.log('[CollectionDetail] Display restaurants details:', displayRestaurants.map(dr => ({
