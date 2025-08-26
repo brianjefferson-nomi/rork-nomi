@@ -447,6 +447,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userVotes'] });
+    },
+    onError: (error) => {
+      console.error('[voteRestaurantMutation] Error:', error);
+      // On error, we could revert the optimistic update, but for now we'll let the query invalidation handle it
     }
   });
 
@@ -465,6 +469,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['discussions'] });
+    },
+    onError: (error) => {
+      console.error('[addDiscussionMutation] Error:', error);
+      // On error, we could revert the optimistic update, but for now we'll let the query invalidation handle it
     }
   });
 
@@ -558,6 +566,27 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
     if (!user?.id) return;
 
+    // Optimistic update - immediately update local state
+    const optimisticVote = {
+      id: `temp-${Date.now()}`,
+      restaurantId,
+      userId: user.id,
+      collectionId: planId || 'default',
+      vote,
+      reason,
+      createdAt: new Date().toISOString()
+    };
+
+    // Update local userVotes state immediately
+    setUserVotes(prev => {
+      // Remove any existing vote for this user/restaurant/collection combination
+      const filtered = prev.filter(v => 
+        !(v.userId === user.id && v.restaurantId === restaurantId && v.collectionId === (planId || 'default'))
+      );
+      return [...filtered, optimisticVote];
+    });
+
+    // Then send to server
     voteRestaurantMutation.mutate({
       restaurant_id: restaurantId,
       user_id: user.id,
@@ -587,6 +616,24 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
     if (!user?.id) return;
 
+    // Optimistic update - immediately update local discussions state
+    const optimisticDiscussion: RestaurantDiscussion = {
+      id: `temp-discussion-${Date.now()}`,
+      restaurantId,
+      collectionId: planId,
+      userId: user.id,
+      userName: user.email?.split('@')[0] || 'User', // Use email prefix as fallback name
+      userAvatar: '', // Empty avatar for optimistic update
+      message,
+      timestamp: new Date(),
+      likes: 0,
+      replies: []
+    };
+
+    // Update local discussions state immediately
+    setDiscussions(prev => [...prev, optimisticDiscussion]);
+
+    // Then send to server
     await addDiscussionMutation.mutateAsync({
       restaurant_id: restaurantId,
       collection_id: planId,

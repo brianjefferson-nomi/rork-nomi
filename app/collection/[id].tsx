@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
@@ -358,8 +358,8 @@ export default function CollectionDetailScreen() {
     removeRestaurantFromCollection, 
     deleteCollection, 
     leaveCollection,
-    voteRestaurant, 
-    addDiscussion, 
+    voteRestaurant: originalVoteRestaurant, 
+    addDiscussion: originalAddDiscussion, 
     addRestaurantComment,
     getRankedRestaurants, 
     getGroupRecommendations,
@@ -373,6 +373,19 @@ export default function CollectionDetailScreen() {
     favoriteRestaurants,
     restaurants
   } = useRestaurants();
+
+  // Wrapper functions that trigger ranking updates
+  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
+    originalVoteRestaurant(restaurantId, vote, planId, reason);
+    // Trigger ranking update
+    setRankingUpdateTrigger(prev => prev + 1);
+  }, [originalVoteRestaurant]);
+
+  const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
+    await originalAddDiscussion(restaurantId, planId, message);
+    // Trigger ranking update
+    setRankingUpdateTrigger(prev => prev + 1);
+  }, [originalAddDiscussion]);
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
   const [voteReason, setVoteReason] = useState('');
@@ -387,6 +400,7 @@ export default function CollectionDetailScreen() {
   const [discussions, setDiscussions] = useState<any[]>([]);
   const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
   const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
+  const [rankingUpdateTrigger, setRankingUpdateTrigger] = useState(0);
   
   // If collection is not found in the store, fetch it directly from the database
   const directCollectionQuery = useQuery({
@@ -435,6 +449,11 @@ export default function CollectionDetailScreen() {
   const rankedRestaurants = rankedResult?.restaurants || [];
   const participationData = rankedResult?.participationData;
   
+  // Force re-calculation when rankingUpdateTrigger changes
+  const effectiveRankedRestaurants = useMemo(() => {
+    return rankedRestaurants;
+  }, [rankedRestaurants, rankingUpdateTrigger]);
+  
   console.log('[CollectionDetail] Participation data:', participationData);
   
   // Fetch restaurants directly from database as a fallback
@@ -473,7 +492,7 @@ export default function CollectionDetailScreen() {
           discussionCount: 0
         } 
       }))
-    : (rankedRestaurants.length > 0 ? rankedRestaurants : 
+    : (effectiveRankedRestaurants.length > 0 ? effectiveRankedRestaurants : 
         (collectionRestaurants.length > 0 ? collectionRestaurants : []).map(r => ({ 
           restaurant: r, 
           meta: { 
@@ -1094,7 +1113,7 @@ export default function CollectionDetailScreen() {
            isSharedCollection ? (
              <InsightsTab 
                collection={collection}
-               rankedRestaurants={restaurantsWithVotingData}
+               rankedRestaurants={effectiveRankedRestaurants}
                discussions={effectiveDiscussions}
                collectionMembers={collectionMembers}
                styles={styles}
