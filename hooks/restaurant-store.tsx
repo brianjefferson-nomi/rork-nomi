@@ -1228,10 +1228,17 @@ export function useCollectionById(id: string | undefined) {
   
   // Add null check for id
   if (!id || id === '') {
+    console.log('[useCollectionById] No ID provided');
     return null;
   }
   
-  const collection = plans.find((p: any) => p.id === id);
+  // Add null check for plans
+  if (!plans || !Array.isArray(plans)) {
+    console.log('[useCollectionById] No plans available');
+    return null;
+  }
+  
+  const collection = plans.find((p: any) => p && p.id === id);
   
   // Fetch collection members with proper names
   const membersQuery = useQuery({
@@ -1254,6 +1261,12 @@ export function useCollectionById(id: string | undefined) {
   });
   
   return useMemo(() => {
+    console.log(`[useCollectionById] Processing collection for ID: ${id}`, { 
+      hasCollection: !!collection, 
+      collectionName: collection?.name,
+      plansCount: plans?.length 
+    });
+    
     if (!collection) {
       console.log(`[useCollectionById] No collection found for ID: ${id}`);
       return null;

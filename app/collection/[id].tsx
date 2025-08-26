@@ -245,6 +245,16 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  
+  // Add null safety for the ID
+  if (!id) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text>Collection ID not found</Text>
+      </View>
+    );
+  }
+  
   const collection = useCollectionById(id) as any;
   const { user } = useAuth();
   const { 
@@ -506,10 +516,23 @@ export default function CollectionDetailScreen() {
   console.log('[CollectionDetail] Is shared collection:', isSharedCollection);
   console.log('[CollectionDetail] Collection members:', collectionMembers.length);
 
+  // Show loading state while collection is being fetched
+  if (!effectiveCollection && directCollectionQuery.isLoading) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text>Loading collection...</Text>
+      </View>
+    );
+  }
+  
+  // Show error state if collection is not found
   if (!effectiveCollection) {
     return (
       <View style={styles.errorContainer}>
         <Text>Collection not found</Text>
+        <Text style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+          ID: {id}
+        </Text>
       </View>
     );
   }
