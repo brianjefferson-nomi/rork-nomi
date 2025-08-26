@@ -20,6 +20,17 @@ export default function ListsScreen() {
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
+  // Debug logging for collections
+  console.log('[ListsScreen] User ID:', user?.id);
+  console.log('[ListsScreen] Collections count:', collections?.length || 0);
+  console.log('[ListsScreen] Collections data:', collections?.map(c => ({
+    id: c.id,
+    name: c.name,
+    created_by: c.created_by,
+    is_public: c.is_public,
+    restaurant_ids: c.restaurant_ids?.length || 0
+  })));
+
   const favoriteRestaurantsList = useMemo(() => {
     const favs = restaurants.filter(r => favoriteRestaurants.includes(r.id));
     
@@ -37,7 +48,10 @@ export default function ListsScreen() {
   }, [restaurants, favoriteRestaurants, sortBy]);
 
   const sortedCollections = useMemo(() => {
-    return (collections || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    console.log('[ListsScreen] Sorting collections:', collections?.length || 0);
+    const sorted = (collections || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    console.log('[ListsScreen] Sorted collections:', sorted.length);
+    return sorted;
   }, [collections]);
 
   const renderTabButton = (tab: TabType, icon: React.ReactNode, label: string, count: number) => (
@@ -115,7 +129,9 @@ export default function ListsScreen() {
   // Check if user is the owner of a collection
   const isCollectionOwner = (collection: Collection) => {
     if (!user) return false;
-    return collection.created_by === user.id || collection.creator_id === user.id;
+    const isOwner = collection.created_by === user.id || collection.creator_id === user.id;
+    console.log(`[ListsScreen] Collection ${collection.name} - User ${user.id} is owner: ${isOwner}`);
+    return isOwner;
   };
 
   return (
