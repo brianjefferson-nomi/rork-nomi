@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput,
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Utensils } from 'lucide-react-native';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
+import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ export default function RestaurantDetailScreen() {
   const [foodRecommendations, setFoodRecommendations] = useState<string[]>([]);
   const [loadingEnhancements, setLoadingEnhancements] = useState(true);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
 
@@ -125,7 +127,6 @@ export default function RestaurantDetailScreen() {
     
     console.log('[RestaurantDetail] Available collections:', collections?.length || 0);
     console.log('[RestaurantDetail] Restaurant ID:', restaurant.id);
-    console.log('[RestaurantDetail] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, restaurant_ids: c.restaurant_ids })));
     
     const availableCollections = collections.filter(c => {
       // Handle both restaurant_ids and restaurants fields, and ensure they exist
@@ -142,28 +143,36 @@ export default function RestaurantDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      'Add to Collection',
-      'Choose a collection:',
-      [
-        ...availableCollections.map(c => ({
-          text: c.name,
-          onPress: async () => {
-            try {
-              console.log(`[RestaurantDetail] Adding restaurant ${restaurant.id} to collection ${c.id}`);
-              await addRestaurantToCollection(c.id, restaurant.id);
-              console.log(`[RestaurantDetail] Successfully added to ${c.name}`);
-              Alert.alert('Success', `Added to ${c.name}`);
-            } catch (error) {
-              console.error(`[RestaurantDetail] Error adding to collection:`, error);
-              Alert.alert('Error', `Failed to add to ${c.name}. Please try again.`);
-            }
-          }
-        })),
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
+    setShowCollectionModal(true);
   };
+
+  const handleSelectCollection = async (collection: any) => {
+    try {
+      console.log(`[RestaurantDetail] Adding restaurant ${restaurant?.id} to collection ${collection.id}`);
+      await addRestaurantToCollection(collection.id, restaurant?.id || '');
+      console.log(`[RestaurantDetail] Successfully added to ${collection.name}`);
+      setShowCollectionModal(false);
+      Alert.alert('Success', `Added to ${collection.name}`);
+    } catch (error) {
+      console.error(`[RestaurantDetail] Error adding to collection:`, error);
+      Alert.alert('Error', `Failed to add to ${collection.name}. Please try again.`);
+    }
+  };
+
+  const handleCreateCollection = () => {
+    setShowCollectionModal(false);
+    router.push('/create-collection');
+  };
+
+  // Get available collections (collections where restaurant is not already added)
+  const availableCollections = useMemo(() => {
+    if (!restaurant || !collections) return [];
+    
+    return collections.filter(c => {
+      const restaurantIds = c.restaurant_ids || [];
+      return !restaurantIds.includes(restaurant.id);
+    });
+  }, [restaurant, collections]);
 
   const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter(img => img && img.trim().length > 0);
   const hasMultipleImages = images.length > 1;
@@ -490,10 +499,20 @@ export default function RestaurantDetailScreen() {
         </View>
 
         <View style={{ height: 32 }} />
-      </ScrollView>
-    </>
-  );
-}
+              </ScrollView>
+
+        {/* Collection Selector Modal */}
+        <CollectionSelectorModal
+          visible={showCollectionModal}
+          onClose={() => setShowCollectionModal(false)}
+          collections={availableCollections}
+          onSelectCollection={handleSelectCollection}
+          onCreateCollection={handleCreateCollection}
+          restaurantName={restaurant?.name}
+        />
+      </>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
