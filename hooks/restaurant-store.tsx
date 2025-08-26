@@ -1724,12 +1724,16 @@ export function useCollectionById(id: string) {
         console.log('[RestaurantStore] Fetched collection members:', members.length);
         return members;
       } catch (error) {
-        console.error('[RestaurantStore] Error fetching collection members:', error);
+        console.error('[RestaurantStore] Error fetching collection members:', {
+          error: JSON.stringify(error, null, 2),
+          message: error instanceof Error ? error.message : String(error),
+          collectionId: id
+        });
         return [];
       }
     },
     enabled: !!id,
-    retry: 1,
+    retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000 // 10 minutes
@@ -1742,7 +1746,7 @@ export function useCollectionById(id: string) {
     return {
       ...collection,
       // Use fetched members data instead of raw collaborators
-      collaborators: membersQuery.data && membersQuery.data.length > 0 
+      collaborators: membersQuery.data && Array.isArray(membersQuery.data) && membersQuery.data.length > 0 
         ? membersQuery.data
         : collection.collaborators && Array.isArray(collection.collaborators) 
           ? collection.collaborators.map((member: any) => {

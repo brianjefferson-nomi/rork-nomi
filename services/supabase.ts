@@ -1017,8 +1017,14 @@ export const dbHelpers = {
         .limit(100);
       
       if (error) {
-        console.error('[Supabase] Error fetching collections:', error);
-        throw error;
+        console.error('[Supabase] Error fetching collections:', {
+          error: JSON.stringify(error, null, 2),
+          message: error.message || 'No message',
+          code: error.code || 'No code',
+          details: error.details || 'No details',
+          hint: error.hint || 'No hint'
+        });
+        return [];
       }
       
       // Get user's collection memberships for client-side filtering
@@ -1334,38 +1340,75 @@ export const dbHelpers = {
     try {
       console.log('[Supabase] Getting collection members for:', collectionId);
       
-      const { data, error } = await supabase
+      // First, try to get collection members without user details
+      const { data: membersData, error: membersError } = await supabase
         .from('collection_members')
-        .select('*, users(id, name, avatar_url, is_local_expert, expert_areas)')
+        .select('*')
         .eq('collection_id', collectionId);
       
-      if (error) {
+      if (membersError) {
         console.error('[Supabase] Error fetching collection members:', {
-          error: JSON.stringify(error, null, 2),
-          message: error.message || 'No message',
-          code: error.code || 'No code',
-          details: error.details || 'No details',
-          hint: error.hint || 'No hint',
+          error: JSON.stringify(membersError, null, 2),
+          message: membersError.message || 'No message',
+          code: membersError.code || 'No code',
+          details: membersError.details || 'No details',
+          hint: membersError.hint || 'No hint',
           collectionId
         });
         return [];
       }
       
-      console.log('[Supabase] Successfully fetched collection members:', data?.length || 0);
+      console.log('[Supabase] Successfully fetched collection members:', membersData?.length || 0);
       
-      // Transform the data to include proper member information (without exposing user IDs)
-      return (data || []).map((member: any) => ({
-        // Don't expose the actual user_id for privacy
-        memberId: `member_${member.user_id?.substring(0, 8)}`, // Use a truncated, non-identifying ID
-        name: member.users?.name || `Member ${member.user_id?.substring(0, 8)}`,
-        avatar_url: member.users?.avatar_url,
+      // If we have members, try to get user details for each one
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map(member => member.user_id).filter(Boolean);
+        
+        if (userIds.length > 0) {
+          const { data: usersData, error: usersError } = await supabase
+            .from('users')
+            .select('id, name, avatar_url, is_local_expert, expert_areas')
+            .in('id', userIds);
+          
+          if (usersError) {
+            console.warn('[Supabase] Error fetching user details, using basic member info:', usersError.message);
+          }
+          
+          // Create a map of user data for quick lookup
+          const usersMap = new Map();
+          if (usersData) {
+            usersData.forEach(user => usersMap.set(user.id, user));
+          }
+          
+          // Transform the data to include proper member information
+          return membersData.map((member: any) => {
+            const userData = usersMap.get(member.user_id);
+            return {
+              memberId: `member_${member.user_id?.substring(0, 8)}`,
+              name: userData?.name || `Member ${member.user_id?.substring(0, 8)}`,
+              avatar_url: userData?.avatar_url,
+              role: member.role || 'member',
+              isVerified: userData?.is_local_expert || false,
+              expert_areas: userData?.expert_areas || [],
+              joined_at: member.joined_at,
+              _internalUserId: member.user_id
+            };
+          });
+        }
+      }
+      
+      // Fallback: return basic member info without user details
+      return (membersData || []).map((member: any) => ({
+        memberId: `member_${member.user_id?.substring(0, 8)}`,
+        name: `Member ${member.user_id?.substring(0, 8)}`,
+        avatar_url: null,
         role: member.role || 'member',
-        isVerified: member.users?.is_local_expert || false,
-        expert_areas: member.users?.expert_areas || [],
+        isVerified: false,
+        expert_areas: [],
         joined_at: member.joined_at,
-        // Keep the actual user_id only for internal operations (not exposed to UI)
         _internalUserId: member.user_id
       }));
+      
     } catch (error) {
       console.error('[Supabase] getCollectionMembers error:', {
         error: JSON.stringify(error, null, 2),
@@ -1871,19 +1914,44 @@ export const dbHelpers = {
 
   // Additional helper functions for components
   async getCollectionDiscussions(collectionId: string, restaurantId?: string) {
-    let query = supabase
-      .from('restaurant_discussions')
-      .select('*, users(name, avatar_url)')
-      .eq('collection_id', collectionId);
-    
-    if (restaurantId) {
-      query = query.eq('restaurant_id', restaurantId);
+    try {
+      console.log('[Supabase] Getting collection discussions for:', collectionId, 'restaurant:', restaurantId);
+      
+      let query = supabase
+        .from('restaurant_discussions')
+        .select('*, users(name, avatar_url)')
+        .eq('collection_id', collectionId);
+      
+      if (restaurantId) {
+        query = query.eq('restaurant_id', restaurantId);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[Supabase] Error fetching collection discussions:', {
+          error: JSON.stringify(error, null, 2),
+          message: error.message || 'No message',
+          code: error.code || 'No code',
+          details: error.details || 'No details',
+          hint: error.hint || 'No hint',
+          collectionId,
+          restaurantId
+        });
+        return [];
+      }
+      
+      console.log('[Supabase] Successfully fetched collection discussions:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('[Supabase] getCollectionDiscussions error:', {
+        error: JSON.stringify(error, null, 2),
+        message: error instanceof Error ? error.message : String(error),
+        collectionId,
+        restaurantId
+      });
+      return [];
     }
-    
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
   },
 
   async inviteToCollection(collectionId: string, inviterId: string, inviteeEmail: string, message?: string) {
