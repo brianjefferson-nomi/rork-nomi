@@ -848,39 +848,59 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 });
 
 // Helper hooks for specific use cases
-export function usePlanById(id: string) {
+export function usePlanById(id: string | undefined) {
   const { plans } = useRestaurants();
-  return useMemo(() => plans.find((p: any) => p.id === id), [plans, id]);
+  return useMemo(() => {
+    if (!id || id === '') return null;
+    return plans.find((p: any) => p.id === id);
+  }, [plans, id]);
 }
 
 export function usePlanRestaurants(plan: any) {
   const { restaurants } = useRestaurants();
   
   return useMemo(() => {
-    if (!plan) return [];
+    if (!plan || !plan.restaurant_ids) return [];
     return restaurants.filter((r: any) => plan.restaurant_ids.includes(r.id));
   }, [restaurants, plan]);
 }
 
-export function useRestaurantVotes(restaurantId: string, planId?: string) {
+export function useRestaurantVotes(restaurantId: string | undefined, planId?: string) {
   const { userVotes } = useRestaurants();
-  const votes = userVotes.filter((v: any) => 
-    v.restaurantId === restaurantId && 
-    (!planId || v.collectionId === planId)
-  );
   
-  return {
-    likes: votes.filter((v: any) => v.vote === 'like').length,
-    dislikes: votes.filter((v: any) => v.vote === 'dislike').length,
-    userVote: votes.find((v: any) => v.userId === 'currentUser')?.vote,
-    allVotes: votes
-  };
+  return useMemo(() => {
+    if (!restaurantId || restaurantId === '') {
+      return {
+        likes: 0,
+        dislikes: 0,
+        userVote: undefined,
+        allVotes: []
+      };
+    }
+    
+    const votes = userVotes.filter((v: any) => 
+      v.restaurantId === restaurantId && 
+      (!planId || v.collectionId === planId)
+    );
+    
+    return {
+      likes: votes.filter((v: any) => v.vote === 'like').length,
+      dislikes: votes.filter((v: any) => v.vote === 'dislike').length,
+      userVote: votes.find((v: any) => v.userId === 'currentUser')?.vote,
+      allVotes: votes
+    };
+  }, [userVotes, restaurantId, planId]);
 }
 
-export function useCollectionRestaurants(collectionId: string) {
+export function useCollectionRestaurants(collectionId: string | undefined) {
   const { restaurants, plans } = useRestaurants();
   
   return useMemo(() => {
+    if (!collectionId || collectionId === '') {
+      console.log(`[useCollectionRestaurants] No collectionId provided`);
+      return [];
+    }
+    
     // Find the plan/collection
     const plan = plans.find((p: any) => p.id === collectionId);
     if (!plan || !plan.restaurant_ids) {
@@ -946,7 +966,7 @@ export function useRestaurantById(id: string | undefined) {
   const { restaurants } = useRestaurants();
   
   return useMemo(() => {
-    if (!id) return null;
+    if (!id || id === '') return null;
     return restaurants.find((r: any) => r.id === id);
   }, [restaurants, id]);
 }
