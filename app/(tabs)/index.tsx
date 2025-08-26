@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User, Navigation } from 'lucide-react-native';
@@ -12,11 +12,18 @@ import { SearchWizard } from '@/components/SearchWizard';
 
 
 export default function HomeScreen() {
-  // Initialize hooks with proper error handling
+  // Initialize hooks with proper error handling - MUST be at the top
   const restaurantsData = useRestaurants();
   const authData = useAuth();
   
-  // Check if hooks are properly initialized
+  // Destructure with defaults and null checks
+  const { restaurants = [], collections = [], isLoading = false, userLocation, switchToCity } = restaurantsData || {};
+  const { user, isAuthenticated = false } = authData || {};
+  
+  const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  // Check if hooks are properly initialized - AFTER all hooks are called
   if (!restaurantsData || !authData) {
     return (
       <View style={styles.loadingContainer}>
@@ -25,13 +32,6 @@ export default function HomeScreen() {
       </View>
     );
   }
-  
-  // Destructure with defaults and null checks
-  const { restaurants = [], collections = [], isLoading = false, userLocation, switchToCity } = restaurantsData;
-  const { user, isAuthenticated = false } = authData;
-  
-  const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
-  const [nearbyLoading, setNearbyLoading] = useState(false);
 
   // Ensure collections is always an array
   const safeCollections = Array.isArray(collections) ? collections : [];
@@ -39,18 +39,22 @@ export default function HomeScreen() {
   const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
   
   // Filter restaurants by location with better matching - add null check
-  const cityRestaurants = (restaurants || []).filter(r => {
-    if (!r) return false;
-    const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
-    if (city === 'Los Angeles') {
-      return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
-    } else {
-      return /new york|manhattan|brooklyn|queens|bronx|soho|east village|upper east side|midtown|ny|nyc/i.test(address);
-    }
-  });
+  const cityRestaurants = useMemo(() => {
+    return (restaurants || []).filter(r => {
+      if (!r) return false;
+      const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
+      if (city === 'Los Angeles') {
+        return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
+      } else {
+        return /new york|manhattan|brooklyn|queens|bronx|soho|east village|upper east side|midtown|ny|nyc/i.test(address);
+      }
+    });
+  }, [restaurants, city]);
   
   // Use city-specific restaurants when available, otherwise show all
-  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
+  const availableRestaurants = useMemo(() => {
+    return cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
+  }, [cityRestaurants, restaurants]);
 
   // Show local restaurants
   useEffect(() => {
@@ -92,11 +96,11 @@ export default function HomeScreen() {
     );
   }
 
-  const trendingRestaurants = availableRestaurants.slice(0, 6);
+  const trendingRestaurants = useMemo(() => availableRestaurants.slice(0, 6), [availableRestaurants]);
   // No mock collections - only show real data from database
   
   // Convert plans to collections format for display
-  const planCollections: Collection[] = safeCollections.map(plan => ({
+  const planCollections: Collection[] = useMemo(() => safeCollections.map(plan => ({
     id: plan.id,
     name: plan.name,
     description: plan.description || 'A collaborative dining plan',
@@ -121,12 +125,12 @@ export default function HomeScreen() {
     collaborators: plan.collaborators || [],
     created_at: plan.created_at,
     updated_at: plan.updated_at
-  }));
+  })), [safeCollections]);
   
-  const displayCollections = planCollections || [];
-  const popularCollections = (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4);
-  const newRestaurants = availableRestaurants.slice(6, 10);
-  const localHighlights = availableRestaurants.slice(0, 4);
+  const displayCollections = useMemo(() => planCollections || [], [planCollections]);
+  const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
+  const newRestaurants = useMemo(() => availableRestaurants.slice(6, 10), [availableRestaurants]);
+  const localHighlights = useMemo(() => availableRestaurants.slice(0, 4), [availableRestaurants]);
   
   // Mock contributors data
   const suggestedContributors = [
