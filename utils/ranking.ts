@@ -19,34 +19,115 @@ function computeConsensus(likeRatio: number): RankedRestaurantMeta['consensus'] 
   return 'low';
 }
 
+// Helper function to analyze comment sentiment
+function analyzeCommentSentiment(comment: string): 'positive' | 'negative' | 'neutral' {
+  const lowerComment = comment.toLowerCase();
+  
+  const positiveWords = ['love', 'great', 'amazing', 'excellent', 'perfect', 'wonderful', 'fantastic', 'delicious', 'best', 'awesome', 'outstanding', 'superb', 'incredible'];
+  const negativeWords = ['hate', 'terrible', 'awful', 'bad', 'worst', 'disgusting', 'horrible', 'mediocre', 'disappointing', 'overrated', 'expensive', 'rude'];
+  
+  const positiveCount = positiveWords.filter(word => lowerComment.includes(word)).length;
+  const negativeCount = negativeWords.filter(word => lowerComment.includes(word)).length;
+  
+  if (positiveCount > negativeCount) return 'positive';
+  if (negativeCount > positiveCount) return 'negative';
+  return 'neutral';
+}
+
+// Helper function to calculate fit score based on occasion
+function calculateFitScore(restaurant: Restaurant, collection?: Collection): number {
+  if (!collection?.occasion) return 0;
+  
+  const occasion = collection.occasion.toLowerCase();
+  const restaurantVibe = restaurant.vibe?.map(v => v.toLowerCase()) || [];
+  const restaurantCuisine = restaurant.cuisine?.toLowerCase() || '';
+  const restaurantPriceRange = restaurant.priceRange || '';
+  
+  let fitScore = 0;
+  
+  // Birthday occasions
+  if (occasion.includes('birthday') || occasion.includes('celebration')) {
+    if (restaurantVibe.some(v => v.includes('special') || v.includes('celebration') || v.includes('upscale'))) fitScore += 2;
+    if (restaurantPriceRange.includes('$$$') || restaurantPriceRange.includes('$$$$')) fitScore += 1;
+    if (restaurantVibe.some(v => v.includes('romantic') || v.includes('intimate'))) fitScore += 1;
+  }
+  
+  // Date night occasions
+  if (occasion.includes('date') || occasion.includes('romantic')) {
+    if (restaurantVibe.some(v => v.includes('romantic') || v.includes('intimate'))) fitScore += 3;
+    if (restaurantVibe.some(v => v.includes('upscale') || v.includes('fine dining'))) fitScore += 2;
+    if (restaurantPriceRange.includes('$$$') || restaurantPriceRange.includes('$$$$')) fitScore += 1;
+  }
+  
+  // Business occasions
+  if (occasion.includes('business') || occasion.includes('work')) {
+    if (restaurantVibe.some(v => v.includes('business') || v.includes('professional'))) fitScore += 2;
+    if (restaurantVibe.some(v => v.includes('quiet') || v.includes('formal'))) fitScore += 1;
+    if (restaurantPriceRange.includes('$$') || restaurantPriceRange.includes('$$$')) fitScore += 1;
+  }
+  
+  // Casual occasions
+  if (occasion.includes('casual') || occasion.includes('quick')) {
+    if (restaurantVibe.some(v => v.includes('casual') || v.includes('quick'))) fitScore += 2;
+    if (restaurantPriceRange.includes('$') || restaurantPriceRange.includes('$$')) fitScore += 1;
+  }
+  
+  return fitScore;
+}
+
+// Helper function to calculate guardrail score
+function calculateGuardrailScore(likes: number, dislikes: number, totalMembers: number, totalVotes: number): number {
+  let guardrailScore = 0;
+  
+  // Majority Agreement Rule: Restaurant must reach at least 60% positive
+  const positiveRatio = totalVotes > 0 ? likes / totalVotes : 0;
+  if (positiveRatio >= 0.6) {
+    guardrailScore += 3; // Bonus for meeting majority agreement
+  } else if (positiveRatio < 0.4) {
+    guardrailScore -= 5; // Penalty for low agreement
+  }
+  
+  // 75% of contributors must engage before selecting a winner
+  const engagementRatio = totalMembers > 0 ? totalVotes / totalMembers : 0;
+  if (engagementRatio >= 0.75) {
+    guardrailScore += 2; // Bonus for high engagement
+  } else if (engagementRatio < 0.5) {
+    guardrailScore -= 3; // Penalty for low engagement
+  }
+  
+  return guardrailScore;
+}
+
 export function computeRankings(
   restaurants: Restaurant[],
   votes: RestaurantVote[],
   options?: ComputeOptions
 ): { restaurant: Restaurant; meta: RankedRestaurantMeta }[] {
   try {
-          console.log('[ranking] Starting computeRankings with:', {
-        restaurantCount: restaurants.length,
-        voteCount: votes.length,
-        options: options ? {
-          memberCount: options.memberCount,
-          hasCollection: !!options.collection,
-          collectionId: options.collection?.id,
-          collectionSettings: options.collection?.settings,
-          collectionConsensusThreshold: options.collection?.consensus_threshold,
-          collectionKeys: options.collection ? Object.keys(options.collection) : []
-        } : 'no options'
-      });
+    console.log('[ranking] Starting computeRankings with:', {
+      restaurantCount: restaurants.length,
+      voteCount: votes.length,
+      options: options ? {
+        memberCount: options.memberCount,
+        hasCollection: !!options.collection,
+        collectionId: options.collection?.id,
+        collectionSettings: options.collection?.settings,
+        collectionConsensusThreshold: options.collection?.consensus_threshold,
+        collectionKeys: options.collection ? Object.keys(options.collection) : []
+      } : 'no options'
+    });
     
     const now = Date.now();
+    const totalMembers = options?.memberCount || 1;
 
     const results = restaurants.map((restaurant, index) => {
       const rvotes = votes.filter((v) => v.restaurantId === restaurant.id);
 
-      let weightedLikes = 0;
-      let weightedDislikes = 0;
+      // 1. WEIGHTED VOTES
+      let weightedVoteScore = 0;
+      let positiveComments = 0;
+      let negativeComments = 0;
       let authorityApplied = false;
-      let recencyBoost = 0;
 
       // Build vote breakdown
       const likeVoters: VoterInfo[] = [];
@@ -81,12 +162,23 @@ export function computeRankings(
           reason: v.reason
         };
 
+        // Weighted Votes: Like = +2 points, Dislike = -2 points
         if (v.vote === 'like') {
-          weightedLikes += finalWeight;
+          weightedVoteScore += 2 * finalWeight;
           likeVoters.push(voterInfo);
         } else {
-          weightedDislikes += finalWeight;
+          weightedVoteScore -= 2 * finalWeight;
           dislikeVoters.push(voterInfo);
+        }
+
+        // Weighted Comments: Analyze sentiment in reasons
+        if (v.reason) {
+          const sentiment = analyzeCommentSentiment(v.reason);
+          if (sentiment === 'positive') {
+            positiveComments += 0.5 * finalWeight;
+          } else if (sentiment === 'negative') {
+            negativeComments += 0.5 * finalWeight;
+          }
         }
 
         // Track reasons
@@ -110,62 +202,41 @@ export function computeRankings(
           timestamp: new Date(v.timestamp ?? Date.now()),
           reason: v.reason
         });
-
-        if (v.timestamp) {
-          const ageDays = Math.max(0, (now - new Date(v.timestamp).getTime()) / (1000 * 60 * 60 * 24));
-          const boost = Math.max(0, 1 - Math.min(ageDays / 14, 1)) * 0.5;
-          recencyBoost += boost * (v.vote === 'like' ? 1 : -0.5);
-        }
       }
 
-      const likes = Math.max(0, Math.round(weightedLikes));
-      const dislikes = Math.max(0, Math.round(weightedDislikes));
+      const likes = likeVoters.length;
+      const dislikes = dislikeVoters.length;
       const totalVotes = likes + dislikes;
-      const netScore = likes - dislikes;
       const likeRatio = totalVotes > 0 ? likes / totalVotes : 0;
 
-      const engagement = (restaurant.commentsCount ?? 0) + (restaurant.savesCount ?? 0) + (restaurant.sharesCount ?? 0);
-      const engagementBoost = Math.min(1.5, engagement / 50);
-      const discussionCount = options?.discussions?.[restaurant.id] ?? 0;
+      // 2. SENTIMENT SCORE (from comments)
+      const sentimentScore = positiveComments - negativeComments;
+
+      // 3. FIT SCORE (match to occasion tags)
+      const fitScore = calculateFitScore(restaurant, options?.collection);
+
+      // 4. GUARDRAILS
+      const guardrailScore = calculateGuardrailScore(likes, dislikes, totalMembers, totalVotes);
+
+      // Calculate final restaurant score
+      const restaurantScore = weightedVoteScore + sentimentScore + fitScore + guardrailScore;
 
       const consensus = computeConsensus(likeRatio);
 
       let badge: RankedRestaurantMeta['badge'] | undefined = undefined;
-      // Handle both database format (consensus_threshold) and interface format (settings.consensusThreshold)
-      console.log('[ranking] Collection data for consensus threshold:', {
-        hasSettings: !!options?.collection?.settings,
-        settingsConsensusThreshold: options?.collection?.settings?.consensusThreshold,
-        hasConsensusThreshold: !!options?.collection?.consensus_threshold,
-        consensusThresholdValue: options?.collection?.consensus_threshold,
-        collectionKeys: options?.collection ? Object.keys(options.collection) : []
-      });
-      
       const consensusThreshold = options?.collection?.settings?.consensusThreshold ?? 
                                 (options?.collection?.consensus_threshold ? options.collection.consensus_threshold / 100 : 0.7);
       
-      console.log('[ranking] Final consensus threshold:', consensusThreshold);
-      
       if (totalVotes >= 3 && likeRatio >= consensusThreshold) badge = 'group_favorite';
       if (totalVotes >= 3 && likes === totalVotes) badge = 'unanimous';
-      if (totalVotes >= 5 && likeRatio >= 0.45 && likeRatio <= 0.55 && (engagement >= 10 || discussionCount >= 5)) badge = 'debated';
+      if (totalVotes >= 5 && likeRatio >= 0.45 && likeRatio <= 0.55) badge = 'debated';
 
       const approvalPercent = Math.round(likeRatio * 100);
 
-      const distanceBoost = 0;
-
-      const composite = netScore + engagementBoost + recencyBoost + distanceBoost;
-
-      let trend: RankedRestaurantMeta['trend'] = 'steady';
-      const recent = rvotes
-        .slice()
-        .sort((a, b) => (new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime()))
-        .slice(0, 5);
-      if (recent.length >= 3) {
-        const recentLikes = recent.filter((v) => v.vote === 'like').length;
-        const recentDislikes = recent.filter((v) => v.vote === 'dislike').length;
-        if (recentLikes >= recentDislikes + 2) trend = 'up';
-        else if (recentDislikes >= recentLikes + 2) trend = 'down';
-      }
+      // Calculate engagement metrics for display
+      const engagement = (restaurant.commentsCount ?? 0) + (restaurant.savesCount ?? 0) + (restaurant.sharesCount ?? 0);
+      const engagementBoost = Math.min(1.5, engagement / 50);
+      const discussionCount = options?.discussions?.[restaurant.id] ?? 0;
 
       // Get abstentions
       const allMemberIds = options?.collection?.collaborators?.map(m => {
@@ -192,28 +263,50 @@ export function computeRankings(
 
       const meta: RankedRestaurantMeta = {
         restaurantId: restaurant.id,
-        netScore,
+        netScore: restaurantScore,
         likes,
         dislikes,
         likeRatio,
         engagementBoost,
-        recencyBoost,
-        distanceBoost,
+        recencyBoost: 0, // Removed from new algorithm
+        distanceBoost: 0,
         authorityApplied,
         consensus,
         badge,
-        trend,
+        trend: 'steady', // Simplified for new algorithm
         approvalPercent,
         rank: 0, // Will be set after sorting
         voteDetails,
         discussionCount
       };
 
-      return { restaurant, meta, composite } as { restaurant: Restaurant; meta: RankedRestaurantMeta } & { composite: number };
+      return { restaurant, meta, composite: restaurantScore } as { restaurant: Restaurant; meta: RankedRestaurantMeta } & { composite: number };
     });
 
+    // Apply tie-breaker rules
     const sorted = results
-      .sort((a, b) => b.composite - a.composite)
+      .sort((a, b) => {
+        const scoreDiff = b.composite - a.composite;
+        
+        // If scores are within 2 points, apply tie-breaker
+        if (Math.abs(scoreDiff) <= 2) {
+          // Tie-breaker 1: Higher likes per capita
+          const aLikesPerCapita = a.meta.likes / Math.max(1, a.meta.likes + a.meta.dislikes);
+          const bLikesPerCapita = b.meta.likes / Math.max(1, b.meta.likes + b.meta.dislikes);
+          
+          if (Math.abs(aLikesPerCapita - bLikesPerCapita) > 0.01) {
+            return bLikesPerCapita - aLikesPerCapita;
+          }
+          
+          // Tie-breaker 2: Better fit to occasion
+          const aFitScore = calculateFitScore(a.restaurant, options?.collection);
+          const bFitScore = calculateFitScore(b.restaurant, options?.collection);
+          
+          return bFitScore - aFitScore;
+        }
+        
+        return scoreDiff;
+      })
       .map((r, idx, arr) => {
         r.meta.rank = idx + 1;
         if (idx === 0 && arr.length > 0) {
