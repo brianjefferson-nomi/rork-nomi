@@ -117,11 +117,25 @@ export default function RestaurantDetailScreen() {
   };
 
   const handleAddToCollection = () => {
+    if (!restaurant) {
+      console.log('[RestaurantDetail] No restaurant data available');
+      Alert.alert('Error', 'Restaurant data not available');
+      return;
+    }
+    
+    console.log('[RestaurantDetail] Available collections:', collections?.length || 0);
+    console.log('[RestaurantDetail] Restaurant ID:', restaurant.id);
+    console.log('[RestaurantDetail] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, restaurant_ids: c.restaurant_ids })));
+    
     const availableCollections = collections.filter(c => {
       // Handle both restaurant_ids and restaurants fields, and ensure they exist
       const restaurantIds = c.restaurant_ids || [];
-      return !restaurantIds.includes(restaurant.id);
+      const isAlreadyInCollection = restaurantIds.includes(restaurant.id);
+      console.log(`[RestaurantDetail] Collection ${c.name}: restaurant_ids=${restaurantIds}, already_included=${isAlreadyInCollection}`);
+      return !isAlreadyInCollection;
     });
+    
+    console.log('[RestaurantDetail] Available collections after filtering:', availableCollections.length);
     
     if (availableCollections.length === 0) {
       Alert.alert('No Collections', 'This restaurant is already in all your collections or you have no collections.');
@@ -134,9 +148,16 @@ export default function RestaurantDetailScreen() {
       [
         ...availableCollections.map(c => ({
           text: c.name,
-          onPress: () => {
-            addRestaurantToCollection(c.id, restaurant.id);
-            Alert.alert('Success', `Added to ${c.name}`);
+          onPress: async () => {
+            try {
+              console.log(`[RestaurantDetail] Adding restaurant ${restaurant.id} to collection ${c.id}`);
+              await addRestaurantToCollection(c.id, restaurant.id);
+              console.log(`[RestaurantDetail] Successfully added to ${c.name}`);
+              Alert.alert('Success', `Added to ${c.name}`);
+            } catch (error) {
+              console.error(`[RestaurantDetail] Error adding to collection:`, error);
+              Alert.alert('Error', `Failed to add to ${c.name}. Please try again.`);
+            }
           }
         })),
         { text: 'Cancel', style: 'cancel' }

@@ -600,12 +600,30 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, []);
 
   const addRestaurantToPlan = useCallback(async (planId: string, restaurantId: string) => {
+    console.log(`[RestaurantStore] addRestaurantToPlan called with planId=${planId}, restaurantId=${restaurantId}`);
+    
     const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan) return;
+    if (!plan) {
+      console.error(`[RestaurantStore] Plan not found with ID: ${planId}`);
+      console.log(`[RestaurantStore] Available plans:`, plansQuery.data?.map(p => ({ id: p.id, name: p.name })));
+      throw new Error(`Plan not found with ID: ${planId}`);
+    }
 
+    console.log(`[RestaurantStore] Found plan: ${plan.name}`);
+    console.log(`[RestaurantStore] Current restaurant_ids:`, plan.restaurant_ids);
+    
     const updatedRestaurantIds = [...(plan.restaurant_ids || []), restaurantId];
-    await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
-    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    console.log(`[RestaurantStore] Updated restaurant_ids:`, updatedRestaurantIds);
+    
+    try {
+      await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
+      console.log(`[RestaurantStore] Successfully updated plan in database`);
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      console.log(`[RestaurantStore] Invalidated userPlans query`);
+    } catch (error) {
+      console.error(`[RestaurantStore] Error updating plan:`, error);
+      throw error;
+    }
   }, [plansQuery.data, queryClient]);
 
   const removeRestaurantFromPlan = useCallback(async (planId: string, restaurantId: string) => {
