@@ -12,8 +12,24 @@ import { SearchWizard } from '@/components/SearchWizard';
 
 
 export default function HomeScreen() {
-  const { restaurants, collections, isLoading, userLocation, switchToCity } = useRestaurants();
-  const { user, isAuthenticated } = useAuth();
+  // Initialize hooks with proper error handling
+  const restaurantsData = useRestaurants();
+  const authData = useAuth();
+  
+  // Check if hooks are properly initialized
+  if (!restaurantsData || !authData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+        <Text style={styles.loadingText}>Initializing...</Text>
+      </View>
+    );
+  }
+  
+  // Destructure with defaults and null checks
+  const { restaurants = [], collections = [], isLoading = false, userLocation, switchToCity } = restaurantsData;
+  const { user, isAuthenticated = false } = authData;
+  
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
@@ -22,8 +38,9 @@ export default function HomeScreen() {
 
   const city = userLocation?.city === 'Los Angeles' ? 'Los Angeles' : 'New York';
   
-  // Filter restaurants by location with better matching
-  const cityRestaurants = restaurants.filter(r => {
+  // Filter restaurants by location with better matching - add null check
+  const cityRestaurants = (restaurants || []).filter(r => {
+    if (!r) return false;
     const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
     if (city === 'Los Angeles') {
       return /los angeles|hollywood|beverly hills|santa monica|west hollywood|downtown la|venice|koreatown|silver lake|la|california|ca/i.test(address);
@@ -33,7 +50,7 @@ export default function HomeScreen() {
   });
   
   // Use city-specific restaurants when available, otherwise show all
-  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
+  const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
 
   // Show local restaurants
   useEffect(() => {
@@ -55,13 +72,17 @@ export default function HomeScreen() {
     loadLocalRestaurants();
   }, [availableRestaurants]);
 
-  // Debug logging
-  console.log('[HomeScreen] User authenticated:', isAuthenticated);
-  console.log('[HomeScreen] User ID:', user?.id);
-  console.log('[HomeScreen] Collections count:', collections?.length || 0);
-  console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
-  console.log('[HomeScreen] Is loading:', isLoading);
-  console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
+  // Debug logging with error handling
+  try {
+    console.log('[HomeScreen] User authenticated:', isAuthenticated);
+    console.log('[HomeScreen] User ID:', user?.id);
+    console.log('[HomeScreen] Collections count:', collections?.length || 0);
+    console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
+    console.log('[HomeScreen] Is loading:', isLoading);
+    console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
+  } catch (error) {
+    console.error('[HomeScreen] Error in debug logging:', error);
+  }
 
   if (isLoading) {
     return (
