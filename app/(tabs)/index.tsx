@@ -23,16 +23,6 @@ export default function HomeScreen() {
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
-  // Check if hooks are properly initialized - AFTER all hooks are called
-  if (!restaurantsData || !authData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.loadingText}>Initializing...</Text>
-      </View>
-    );
-  }
-
   // Ensure collections is always an array
   const safeCollections = Array.isArray(collections) ? collections : [];
 
@@ -56,48 +46,7 @@ export default function HomeScreen() {
     return cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
   }, [cityRestaurants, restaurants]);
 
-  // Show local restaurants
-  useEffect(() => {
-    const loadLocalRestaurants = () => {
-      setNearbyLoading(true);
-      try {
-        // Always show local restaurants from available data
-        const localRestaurants = availableRestaurants.slice(0, 4);
-        setNearbyRestaurants(localRestaurants);
-        console.log('[HomeScreen] Loaded', localRestaurants.length, 'local restaurants');
-      } catch (error) {
-        console.error('[HomeScreen] Error loading local restaurants:', error);
-        setNearbyRestaurants([]);
-      } finally {
-        setNearbyLoading(false);
-      }
-    };
-
-    loadLocalRestaurants();
-  }, [availableRestaurants]);
-
-  // Debug logging with error handling
-  try {
-    console.log('[HomeScreen] User authenticated:', isAuthenticated);
-    console.log('[HomeScreen] User ID:', user?.id);
-    console.log('[HomeScreen] Collections count:', collections?.length || 0);
-    console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
-    console.log('[HomeScreen] Is loading:', isLoading);
-    console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
-  } catch (error) {
-    console.error('[HomeScreen] Error in debug logging:', error);
-  }
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-      </View>
-    );
-  }
-
   const trendingRestaurants = useMemo(() => availableRestaurants.slice(0, 6), [availableRestaurants]);
-  // No mock collections - only show real data from database
   
   // Convert plans to collections format for display
   const planCollections: Collection[] = useMemo(() => safeCollections.map(plan => ({
@@ -131,6 +80,56 @@ export default function HomeScreen() {
   const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
   const newRestaurants = useMemo(() => availableRestaurants.slice(6, 10), [availableRestaurants]);
   const localHighlights = useMemo(() => availableRestaurants.slice(0, 4), [availableRestaurants]);
+
+  // Show local restaurants
+  useEffect(() => {
+    const loadLocalRestaurants = () => {
+      setNearbyLoading(true);
+      try {
+        // Always show local restaurants from available data
+        const localRestaurants = availableRestaurants.slice(0, 4);
+        setNearbyRestaurants(localRestaurants);
+        console.log('[HomeScreen] Loaded', localRestaurants.length, 'local restaurants');
+      } catch (error) {
+        console.error('[HomeScreen] Error loading local restaurants:', error);
+        setNearbyRestaurants([]);
+      } finally {
+        setNearbyLoading(false);
+      }
+    };
+
+    loadLocalRestaurants();
+  }, [availableRestaurants]);
+
+  // Debug logging with error handling
+  try {
+    console.log('[HomeScreen] User authenticated:', isAuthenticated);
+    console.log('[HomeScreen] User ID:', user?.id);
+    console.log('[HomeScreen] Collections count:', collections?.length || 0);
+    console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
+    console.log('[HomeScreen] Is loading:', isLoading);
+    console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
+  } catch (error) {
+    console.error('[HomeScreen] Error in debug logging:', error);
+  }
+
+  // Check if hooks are properly initialized - AFTER all hooks are called
+  if (!restaurantsData || !authData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+        <Text style={styles.loadingText}>Initializing...</Text>
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    );
+  }
   
   // Mock contributors data
   const suggestedContributors = [
