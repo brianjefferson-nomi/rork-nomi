@@ -668,6 +668,10 @@ export const dbHelpers = {
       .single();
     
     if (error) throw error;
+    
+    // Update collection type based on new contributor count
+    await dbHelpers.updateCollectionTypeBasedOnContributors(collectionId);
+    
     return data;
   },
 
@@ -679,6 +683,10 @@ export const dbHelpers = {
       .eq('user_id', userId);
     
     if (error) throw error;
+    
+    // Update collection type based on new contributor count
+    await dbHelpers.updateCollectionTypeBasedOnContributors(collectionId);
+    
     return true;
   },
 
@@ -1140,34 +1148,96 @@ export const dbHelpers = {
       console.log('[migrateCollectionTypes] Found collections to migrate:', collections?.length || 0);
       
       for (const collection of collections || []) {
+        // Get all members for this collection (including creator)
+        const { data: members, error: memberError } = await supabase
+          .from('collection_members')
+          .select('user_id')
+          .eq('collection_id', collection.id);
+        
+        if (memberError) {
+          console.error(`[migrateCollectionTypes] Error fetching members for collection ${collection.name}:`, memberError);
+          continue;
+        }
+        
+        // Count total contributors (creator + members)
+        const totalContributors = (members?.length || 0) + 1; // +1 for creator
+        
         let newType = 'public'; // default
         
-        if (collection.is_public === false) {
-          // Check if this collection has members (shared)
-          const { data: members, error: memberError } = await supabase
-            .from('collection_members')
-            .select('user_id')
-            .eq('collection_id', collection.id);
-          
-          if (!memberError && members && members.length > 0) {
-            newType = 'shared';
-          } else {
-            newType = 'private';
-          }
+        if (totalContributors === 1) {
+          // Only creator - make it private
+          newType = 'private';
+        } else if (totalContributors > 1) {
+          // Multiple contributors - make it shared
+          newType = 'shared';
         }
         
         // Update the collection type
-        await supabase
+        const { error: updateError } = await supabase
           .from('collections')
-          .update({ collection_type: newType })
+          .update({ 
+            collection_type: newType,
+            is_public: newType === 'public' // Keep for backward compatibility
+          })
           .eq('id', collection.id);
         
-        console.log(`[migrateCollectionTypes] Updated collection ${collection.name} to type: ${newType}`);
+        if (updateError) {
+          console.error(`[migrateCollectionTypes] Error updating collection ${collection.name}:`, updateError);
+        } else {
+          console.log(`[migrateCollectionTypes] Updated collection "${collection.name}" to type: ${newType} (${totalContributors} contributors)`);
+        }
       }
       
       console.log('[migrateCollectionTypes] Migration completed successfully');
     } catch (error) {
       console.error('[migrateCollectionTypes] Migration failed:', error);
+    }
+  },
+
+  async updateCollectionTypeBasedOnContributors(collectionId: string) {
+    console.log('[updateCollectionTypeBasedOnContributors] Updating collection type for:', collectionId);
+    
+    try {
+      // Get all members for this collection
+      const { data: members, error: memberError } = await supabase
+        .from('collection_members')
+        .select('user_id')
+        .eq('collection_id', collectionId);
+      
+      if (memberError) {
+        console.error('[updateCollectionTypeBasedOnContributors] Error fetching members:', memberError);
+        return;
+      }
+      
+      // Count total contributors (creator + members)
+      const totalContributors = (members?.length || 0) + 1; // +1 for creator
+      
+      let newType = 'public'; // default
+      
+      if (totalContributors === 1) {
+        // Only creator - make it private
+        newType = 'private';
+      } else if (totalContributors > 1) {
+        // Multiple contributors - make it shared
+        newType = 'shared';
+      }
+      
+      // Update the collection type
+      const { error: updateError } = await supabase
+        .from('collections')
+        .update({ 
+          collection_type: newType,
+          is_public: newType === 'public' // Keep for backward compatibility
+        })
+        .eq('id', collectionId);
+      
+      if (updateError) {
+        console.error('[updateCollectionTypeBasedOnContributors] Error updating collection:', updateError);
+      } else {
+        console.log(`[updateCollectionTypeBasedOnContributors] Updated collection to type: ${newType} (${totalContributors} contributors)`);
+      }
+    } catch (error) {
+      console.error('[updateCollectionTypeBasedOnContributors] Error:', error);
     }
   }
 };

@@ -40,55 +40,7 @@ export default function HomeScreen() {
   // Use city-specific restaurants when available, otherwise show all
   const availableRestaurants = cityRestaurants.length > 0 ? cityRestaurants : restaurants;
   const trendingRestaurants = availableRestaurants.slice(0, 6);
-  // Mock collections data for display when no plans exist
-  const mockCollections: Collection[] = [
-    {
-      id: 'mock-1',
-      name: 'Date Night Spots',
-      description: 'Romantic restaurants perfect for special occasions',
-      cover_image: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-      created_by: 'mock-user',
-      is_public: true,
-      likes: 45,
-      equal_voting: true,
-      admin_weighted: false,
-      expertise_weighted: false,
-      minimum_participation: 1,
-      allow_vote_changes: true,
-      anonymous_voting: false,
-      vote_visibility: 'public',
-      discussion_enabled: true,
-      auto_ranking_enabled: true,
-      consensus_threshold: 50,
-      restaurant_ids: [],
-      collaborators: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: 'mock-2', 
-      name: 'Best Brunch',
-      description: 'Weekend brunch favorites in the city',
-      cover_image: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-      created_by: 'mock-user',
-      is_public: true,
-      likes: 32,
-      equal_voting: true,
-      admin_weighted: false,
-      expertise_weighted: false,
-      minimum_participation: 1,
-      allow_vote_changes: true,
-      anonymous_voting: false,
-      vote_visibility: 'public',
-      discussion_enabled: true,
-      auto_ranking_enabled: true,
-      consensus_threshold: 50,
-      restaurant_ids: [],
-      collaborators: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ];
+  // No mock collections - only show real data from database
   
   // Convert plans to collections format for display
   const planCollections: Collection[] = safeCollections.map(plan => ({
@@ -118,7 +70,7 @@ export default function HomeScreen() {
     updated_at: plan.updated_at
   }));
   
-  const displayCollections = planCollections.length > 0 ? planCollections : mockCollections;
+  const displayCollections = planCollections || [];
   const popularCollections = (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4);
   const newRestaurants = availableRestaurants.slice(6, 10);
   const localHighlights = availableRestaurants.slice(0, 4);
