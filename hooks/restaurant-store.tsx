@@ -286,6 +286,32 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     gcTime: 5 * 60 * 1000 // 5 minutes
   });
 
+  // Load all public collections for discovery
+  const allCollectionsQuery = useQuery({
+    queryKey: ['allCollections'],
+    queryFn: async () => {
+      try {
+        const collections = await dbHelpers.getAllCollections();
+        return collections.map((collection: any) => ({
+          ...collection,
+          collaborators: collection.collaborators || [],
+          settings: {
+            voteVisibility: collection.vote_visibility || 'public',
+            discussionEnabled: collection.discussion_enabled !== false,
+            autoRankingEnabled: collection.auto_ranking_enabled !== false,
+            consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
+          }
+        }));
+      } catch (error) {
+        return [];
+      }
+    },
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+
   // Mutations
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
@@ -397,8 +423,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [plansQuery.data, queryClient]);
 
   const createPlan = useCallback(async (planData: any) => {
-    await createPlanMutation.mutateAsync(planData);
-  }, [createPlanMutation]);
+    await createPlanMutation.mutateAsync({
+      ...planData,
+      userId: user?.id
+    });
+  }, [createPlanMutation, user?.id]);
 
   const deletePlan = useCallback(async (planId: string) => {
     if (!user?.id) return;
@@ -587,10 +616,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     restaurants,
     plans: plansQuery.data || [],
     collections: plansQuery.data || [], // Alias for plans
+    allCollections: allCollectionsQuery.data || [], // All public collections for discovery
     userVotes,
     discussions,
     favoriteRestaurants,
-    isLoading: restaurantsQuery.isLoading || plansQuery.isLoading,
+    isLoading: restaurantsQuery.isLoading || plansQuery.isLoading || allCollectionsQuery.isLoading,
     searchHistory,
     searchResults,
     userLocation,

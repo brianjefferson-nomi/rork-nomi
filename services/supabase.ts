@@ -384,6 +384,7 @@ export const dbHelpers = {
     isPublic?: boolean;
     occasion?: string;
     collection_type?: 'public' | 'private' | 'shared';
+    userId?: string; // Add userId parameter
   }) {
     const collectionCode = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -392,7 +393,7 @@ export const dbHelpers = {
       .insert({
         name: planData.name,
         description: planData.description || '',
-        created_by: 'current-user-id', // This should be replaced with actual user ID
+        created_by: planData.userId || 'current-user-id', // Use provided userId or fallback
         collection_code: collectionCode,
         is_public: planData.isPublic ?? true,
         occasion: planData.occasion || 'general',
@@ -417,10 +418,23 @@ export const dbHelpers = {
   },
 
   async getUserPlans(userId: string) {
+    // Get collections that the user created OR public collections
     const { data, error } = await supabase
       .from('collections')
       .select('*')
-      .eq('created_by', userId)
+      .or(`created_by.eq.${userId},is_public.eq.true`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getAllCollections() {
+    // Get all public collections for discovery
+    const { data, error } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('is_public', true)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
