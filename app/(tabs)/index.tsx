@@ -16,12 +16,18 @@ export default function HomeScreen() {
   const restaurantsData = useRestaurants();
   const authData = useAuth();
   
-  // Destructure with defaults and null checks
-  const { restaurants = [], collections = [], isLoading = false, userLocation, switchToCity } = restaurantsData || {};
-  const { user, isAuthenticated = false } = authData || {};
-  
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+
+  // Destructure with defaults and null checks - ensure these are always defined
+  const restaurants = restaurantsData?.restaurants || [];
+  const collections = restaurantsData?.collections || [];
+  const isLoading = restaurantsData?.isLoading || false;
+  const userLocation = restaurantsData?.userLocation;
+  const switchToCity = restaurantsData?.switchToCity;
+  
+  const user = authData?.user;
+  const isAuthenticated = authData?.isAuthenticated || false;
 
   // Ensure collections is always an array
   const safeCollections = Array.isArray(collections) ? collections : [];
