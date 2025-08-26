@@ -42,6 +42,16 @@ export default function RestaurantDetailScreen() {
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
 
+  // Get available collections (collections where restaurant is not already added)
+  const availableCollections = useMemo(() => {
+    if (!restaurant || !collections) return [];
+    
+    return collections.filter(c => {
+      const restaurantIds = c.restaurant_ids || [];
+      return !restaurantIds.includes(restaurant.id);
+    });
+  }, [restaurant, collections]);
+
   // Enhanced restaurant data loading with proper image assignment and caching
   useEffect(() => {
     const loadData = async () => {
@@ -127,15 +137,6 @@ export default function RestaurantDetailScreen() {
     
     console.log('[RestaurantDetail] Available collections:', collections?.length || 0);
     console.log('[RestaurantDetail] Restaurant ID:', restaurant.id);
-    
-    const availableCollections = collections.filter(c => {
-      // Handle both restaurant_ids and restaurants fields, and ensure they exist
-      const restaurantIds = c.restaurant_ids || [];
-      const isAlreadyInCollection = restaurantIds.includes(restaurant.id);
-      console.log(`[RestaurantDetail] Collection ${c.name}: restaurant_ids=${restaurantIds}, already_included=${isAlreadyInCollection}`);
-      return !isAlreadyInCollection;
-    });
-    
     console.log('[RestaurantDetail] Available collections after filtering:', availableCollections.length);
     
     if (availableCollections.length === 0) {
@@ -163,16 +164,6 @@ export default function RestaurantDetailScreen() {
     setShowCollectionModal(false);
     router.push('/create-collection');
   };
-
-  // Get available collections (collections where restaurant is not already added)
-  const availableCollections = useMemo(() => {
-    if (!restaurant || !collections) return [];
-    
-    return collections.filter(c => {
-      const restaurantIds = c.restaurant_ids || [];
-      return !restaurantIds.includes(restaurant.id);
-    });
-  }, [restaurant, collections]);
 
   const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter(img => img && img.trim().length > 0);
   const hasMultipleImages = images.length > 1;
