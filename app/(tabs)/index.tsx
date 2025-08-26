@@ -17,47 +17,25 @@ export default function HomeScreen() {
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
-  // Fetch nearby restaurants when user location is available
+  // Show local restaurants
   useEffect(() => {
-    const fetchNearbyRestaurants = async () => {
-      if (userLocation?.lat && userLocation?.lng) {
-        setNearbyLoading(true);
-        try {
-          console.log('[HomeScreen] Fetching nearby restaurants at:', userLocation.lat, userLocation.lng);
-          const nearbyData = await getFoursquareNearbyRestaurants(
-            userLocation.lat,
-            userLocation.lng,
-            3000, // 3km radius
-            8 // Limit to 8 restaurants
-          );
-          
-          // Transform Foursquare data to our format
-          const transformedNearby = nearbyData.map(transformFoursquareRestaurant).filter(Boolean);
-          setNearbyRestaurants(transformedNearby);
-          console.log('[HomeScreen] Loaded', transformedNearby.length, 'nearby restaurants');
-        } catch (error) {
-          console.error('[HomeScreen] Error fetching nearby restaurants:', error);
-          // Check if it's an authentication error
-          if (error.message && error.message.includes('authentication failed')) {
-            console.log('[HomeScreen] Foursquare API authentication failed - nearby restaurants disabled');
-          }
-          // Fallback to showing some local restaurants when nearby fails
-          const fallbackRestaurants = availableRestaurants.slice(0, 4);
-          setNearbyRestaurants(fallbackRestaurants);
-          console.log('[HomeScreen] Using fallback restaurants:', fallbackRestaurants.length);
-        } finally {
-          setNearbyLoading(false);
-        }
-      } else {
-        console.log('[HomeScreen] No user location available for nearby restaurants');
-        // Show fallback restaurants when no location is available
-        const fallbackRestaurants = availableRestaurants.slice(0, 4);
-        setNearbyRestaurants(fallbackRestaurants);
+    const loadLocalRestaurants = () => {
+      setNearbyLoading(true);
+      try {
+        // Always show local restaurants from available data
+        const localRestaurants = availableRestaurants.slice(0, 4);
+        setNearbyRestaurants(localRestaurants);
+        console.log('[HomeScreen] Loaded', localRestaurants.length, 'local restaurants');
+      } catch (error) {
+        console.error('[HomeScreen] Error loading local restaurants:', error);
+        setNearbyRestaurants([]);
+      } finally {
+        setNearbyLoading(false);
       }
     };
 
-    fetchNearbyRestaurants();
-  }, [userLocation?.lat, userLocation?.lng, availableRestaurants]);
+    loadLocalRestaurants();
+  }, [availableRestaurants]);
 
   // Debug logging
   console.log('[HomeScreen] User authenticated:', isAuthenticated);
@@ -246,15 +224,11 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Nearby Restaurants Section */}
+        {/* Local Restaurants Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Navigation size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>
-              {nearbyRestaurants.length > 0 && nearbyRestaurants[0].source === 'foursquare' 
-                ? 'Nearby Restaurants' 
-                : 'Local Restaurants'}
-            </Text>
+            <Text style={styles.sectionTitle}>Local Restaurants</Text>
             <TouchableOpacity onPress={() => router.push('/discover' as any)}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
@@ -262,7 +236,7 @@ export default function HomeScreen() {
           {nearbyLoading ? (
             <View style={styles.nearbyLoadingContainer}>
               <ActivityIndicator size="small" color="#FF6B6B" />
-              <Text style={styles.nearbyLoadingText}>Finding restaurants near you...</Text>
+              <Text style={styles.nearbyLoadingText}>Loading local restaurants...</Text>
             </View>
           ) : nearbyRestaurants.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
@@ -277,12 +251,8 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <View style={styles.nearbyEmptyContainer}>
-              <Text style={styles.nearbyEmptyText}>No nearby restaurants found</Text>
-              <Text style={styles.nearbyEmptySubtext}>
-                {userLocation?.lat && userLocation?.lng 
-                  ? 'Check your Foursquare API key in .env file' 
-                  : 'Enable location services to find nearby restaurants'}
-              </Text>
+              <Text style={styles.nearbyEmptyText}>No local restaurants found</Text>
+              <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
             </View>
           )}
         </View>
