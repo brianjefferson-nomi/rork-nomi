@@ -824,7 +824,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         collaborators: plan.collaborators || []
       };
 
-      // Add any users from votes who aren't in collaborators
+      // Get collection member IDs
+      const collectionMemberIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
+      
+      // Filter votes to only include collection members
+      const memberVotes = transformedVotes.filter(vote => collectionMemberIds.has(vote.userId));
+      console.log('[getRankedRestaurantsWithAllVotes] Filtered to member votes:', memberVotes.length, 'out of', transformedVotes.length);
+
+      // Add any users from votes who aren't in collaborators (but only if they're supposed to be members)
       const voteUserIds = new Set(transformedVotes.map(v => v.userId));
       const existingCollaboratorIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
       
@@ -843,7 +850,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         }
       });
 
-      const rankings = computeRankings(planRestaurants, transformedVotes, { memberCount, collection: updatedPlan });
+      const rankings = computeRankings(planRestaurants, memberVotes, { memberCount, collection: updatedPlan });
       console.log('[getRankedRestaurantsWithAllVotes] Computed rankings:', rankings.length);
 
       // Extract participation data from the first result (all results have the same participation data)

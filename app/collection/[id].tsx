@@ -40,9 +40,13 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {(() => {
                 const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
                 const participatingMembers = rankedRestaurants.reduce((total, { meta }, restaurantIndex) => {
+                  // Filter votes to only include collection members
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  
                   const uniqueVoters = new Set([
-                    ...meta.voteDetails.likeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`),
-                    ...meta.voteDetails.dislikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`)
+                    ...memberLikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`),
+                    ...memberDislikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`)
                   ]);
                   return total + uniqueVoters.size;
                 }, 0);
@@ -55,7 +59,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
               {rankedRestaurants.reduce((total, { meta }) => {
-                return total + meta.voteDetails.likeVoters.length + meta.voteDetails.dislikeVoters.length;
+                // Filter votes to only include collection members
+                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                return total + memberLikeVoters.length + memberDislikeVoters.length;
               }, 0)}
             </Text>
             <Text style={styles.analyticLabel}>Total Votes</Text>
@@ -65,10 +72,15 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             <Text style={styles.analyticValue}>
               {(() => {
                 const totalVotes = rankedRestaurants.reduce((total, { meta }) => {
-                  return total + meta.voteDetails.likeVoters.length + meta.voteDetails.dislikeVoters.length;
+                  // Filter votes to only include collection members
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  return total + memberLikeVoters.length + memberDislikeVoters.length;
                 }, 0);
                 const likeVotes = rankedRestaurants.reduce((total, { meta }) => {
-                  return total + meta.voteDetails.likeVoters.length;
+                  // Filter votes to only include collection members
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  return total + memberLikeVoters.length;
                 }, 0);
                 return totalVotes > 0 ? Math.round((likeVotes / totalVotes) * 100) : 0;
               })()}%
@@ -78,7 +90,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
-              {discussions.length}
+              {discussions.filter((discussion: any) => collectionMembers.includes(discussion.userId)).length}
             </Text>
             <Text style={styles.analyticLabel}>Discussions</Text>
           </View>
@@ -112,8 +124,12 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {(() => {
                 if (!meta?.voteDetails) return <></>;
 
-                const totalVotes = meta.voteDetails.likeVoters.length + meta.voteDetails.dislikeVoters.length;
-                const approvalRate = totalVotes > 0 ? Math.round((meta.voteDetails.likeVoters.length / totalVotes) * 100) : 0;
+                // Filter votes to only include collection members
+                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                
+                const totalVotes = memberLikeVoters.length + memberDislikeVoters.length;
+                const approvalRate = totalVotes > 0 ? Math.round((memberLikeVoters.length / totalVotes) * 100) : 0;
 
                 return (
                   <View style={styles.approvalSection}>
@@ -122,7 +138,7 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
                     <Text style={styles.voteBreakdown}>
-                      {meta.voteDetails.likeVoters.length} likes and {meta.voteDetails.dislikeVoters.length} dislikes
+                      {memberLikeVoters.length} likes and {memberDislikeVoters.length} dislikes
                     </Text>
                     <View style={styles.consensusBadge}>
                       <Text style={styles.consensusBadgeText}>
@@ -138,14 +154,16 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 if (!meta?.voteDetails) return <></>;
 
                 const filteredLikeVoters = meta.voteDetails.likeVoters.filter((voter: any) => {
-                  if (collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  // Only show votes from collection members
+                  if (!collectionMembers.includes(voter.userId)) {
                     return false;
                   }
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
                 });
 
                 const filteredDislikeVoters = meta.voteDetails.dislikeVoters.filter((voter: any) => {
-                  if (collection.is_public && !collectionMembers.includes(voter.userId)) {
+                  // Only show votes from collection members
+                  if (!collectionMembers.includes(voter.userId)) {
                     return false;
                   }
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
@@ -189,12 +207,12 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {(() => {
                 const filteredDiscussions = discussions.filter((discussion: any) => {
                   const matchesRestaurant = discussion.restaurantId === restaurant.id;
-                  const isPublic = collection.is_public;
                   const isMember = collectionMembers.includes(discussion.userId);
                   const hasValidName = discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                   
                   if (!matchesRestaurant) return false;
-                  if (!collection.is_public && !isMember) return false;
+                  // Only show discussions from collection members
+                  if (!isMember) return false;
                   return hasValidName;
                 });
 
@@ -927,7 +945,7 @@ export default function CollectionDetailScreen() {
                        <View style={styles.approvalSection}>
                          <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
                          <Text style={styles.voteBreakdown}>
-                           {meta.likes} likes • {meta.dislikes} dislikes
+                           {meta.voteDetails?.likeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0} dislikes
                          </Text>
                          {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
                            <View style={styles.consensusBadge}>
@@ -951,7 +969,7 @@ export default function CollectionDetailScreen() {
                            onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
                          >
                            <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
-                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.likes}</Text>
+                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0}</Text>
                          </TouchableOpacity>
                          
                          <TouchableOpacity 
@@ -963,7 +981,7 @@ export default function CollectionDetailScreen() {
                            onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
                          >
                            <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
-                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.dislikes}</Text>
+                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0}</Text>
                          </TouchableOpacity>
                          
                          <TouchableOpacity 
@@ -971,7 +989,7 @@ export default function CollectionDetailScreen() {
                            onPress={() => setShowDiscussionModal(restaurant.id)}
                          >
                            <MessageCircle size={16} color="#6B7280" />
-                           <Text style={styles.voteCount}>{meta.discussionCount}</Text>
+                           <Text style={styles.voteCount}>{discussions.filter((d: any) => d.restaurantId === restaurant.id && collectionMembers.includes(d.userId)).length}</Text>
                          </TouchableOpacity>
                        </View>
                      )}
