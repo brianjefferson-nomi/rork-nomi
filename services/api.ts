@@ -1,34 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Use a fallback AI API since the Rork API is not working
+// Use environment variables for API keys (more secure)
 const AI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const AI_API_KEY = 'sk-proj-your-api-key-here'; // This should be replaced with a working API key
-const RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
-const TRIPADVISOR_API_KEY = 'F99007CEF189438793FFD5D7B484839A';
+const AI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'sk-proj-your-api-key-here';
+const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
-const FOURSQUARE_API_KEY = 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
+const FOURSQUARE_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_API_KEY || 'X5ZAL1Q3QSXJPTNY2IFTUTKCUEDL3AXL5XY2N05ML42OYT0J';
 const FOURSQUARE_BASE_URL = 'https://places-api.foursquare.com';
-const STOCK_PHOTOS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const STOCK_PHOTOS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const STOCK_PHOTOS_HOST = 'stock-photos-and-videos.p.rapidapi.com';
-const RESTAURANTS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const RESTAURANTS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const RESTAURANTS_HOST = 'restaurants222.p.rapidapi.com';
-const TRIPADVISOR_RAPIDAPI_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const TRIPADVISOR_RAPIDAPI_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const TRIPADVISOR_RAPIDAPI_HOST = 'tripadvisor16.p.rapidapi.com';
-const FORK_SPOON_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const FORK_SPOON_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const FORK_SPOON_HOST = 'the-fork-the-spoon.p.rapidapi.com';
-const REDDIT_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const REDDIT_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const REDDIT_HOST = 'reddit3.p.rapidapi.com';
-const GOOGLE_MAPS_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const GOOGLE_MAPS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const GOOGLE_MAPS_HOST = 'google-map-places-new-v2.p.rapidapi.com';
-const UNSPLASH_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const UNSPLASH_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const UNSPLASH_HOST = 'unsplash-image-search-api.p.rapidapi.com';
-const YELP_API_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const YELP_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const YELP_HOST = 'yelp-business-api.p.rapidapi.com';
-const YELP_API3_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const YELP_API3_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const YELP_API3_HOST = 'yelp-api3.p.rapidapi.com';
-const WORLDWIDE_RESTAURANTS_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const WORLDWIDE_RESTAURANTS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const WORLDWIDE_RESTAURANTS_HOST = 'worldwide-restaurants.p.rapidapi.com';
-const UBER_EATS_KEY = '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
+const UBER_EATS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 
 // Enhanced API configuration for better restaurant data
