@@ -376,7 +376,21 @@ export default function CollectionDetailScreen() {
     queryKey: ['rankedRestaurantsWithAllVotes', id, memberCount, rankingUpdateTrigger],
     queryFn: async () => {
       if (!id) return { restaurants: [], participationData: null };
-      return await getRankedRestaurantsWithAllVotes(id, memberCount);
+      console.log('[CollectionDetail] Fetching ranked restaurants with all votes for collection:', id);
+      const result = await getRankedRestaurantsWithAllVotes(id, memberCount);
+      console.log('[CollectionDetail] Ranked restaurants result:', {
+        restaurantsCount: result.restaurants?.length || 0,
+        hasParticipationData: !!result.participationData,
+        sampleRestaurant: result.restaurants?.[0] ? {
+          name: result.restaurants[0].restaurant.name,
+          meta: {
+            likes: result.restaurants[0].meta.likes,
+            dislikes: result.restaurants[0].meta.dislikes,
+            voteDetails: result.restaurants[0].meta.voteDetails
+          }
+        } : null
+      });
+      return result;
     },
     enabled: !!id,
     retry: 1,
@@ -449,9 +463,18 @@ export default function CollectionDetailScreen() {
   useEffect(() => {
     if (id) {
       setIsLoadingDiscussions(true);
+      console.log('[CollectionDetail] Loading discussions for collection:', id);
       getCollectionDiscussions(id)
         .then((data) => {
           console.log('[CollectionDetail] Loaded discussions:', data?.length || 0);
+          if (data && data.length > 0) {
+            console.log('[CollectionDetail] Sample discussion:', {
+              id: data[0].id,
+              message: data[0].message,
+              userName: data[0].userName,
+              restaurantId: data[0].restaurantId
+            });
+          }
           setDiscussions(data || []);
         })
         .catch((error) => {
