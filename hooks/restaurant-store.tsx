@@ -115,15 +115,24 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     userNotes: dbRestaurant.userNotes || []
   }), []);
 
-  // Load restaurants from API
+  // Load restaurants from database
   const restaurantsQuery = useQuery({
     queryKey: ['restaurants'],
     queryFn: async () => {
       try {
-        const restaurantsData = await aggregateRestaurantData('', 'New York', 40.7128, -74.0060);
-        return restaurantsData.map(mapDatabaseRestaurant);
+        // Fetch restaurants from database instead of external APIs
+        const restaurantsData = await dbHelpers.getAllRestaurants();
+        if (!restaurantsData) throw new Error('No restaurants data returned');
+        
+        if (restaurantsData && restaurantsData.length > 0) {
+          return restaurantsData.map(mapDatabaseRestaurant);
+        } else {
+          // Fallback to mock data if no restaurants in database
+          return mockRestaurants;
+        }
       } catch (error) {
-        // Fallback to mock data if API fails
+        console.error('Error loading restaurants from database:', error);
+        // Fallback to mock data if database fails
         return mockRestaurants;
       }
     },
@@ -699,12 +708,21 @@ export function useCollectionRestaurants(collectionId: string) {
   return useMemo(() => {
     // Find the plan/collection
     const plan = plans.find((p: any) => p.id === collectionId);
-    if (!plan || !plan.restaurant_ids) return [];
+    if (!plan || !plan.restaurant_ids) {
+      console.log(`[useCollectionRestaurants] No plan found for collection ${collectionId} or no restaurant_ids`);
+      return [];
+    }
+    
+    console.log(`[useCollectionRestaurants] Collection ${collectionId} has ${plan.restaurant_ids.length} restaurant IDs:`, plan.restaurant_ids);
+    console.log(`[useCollectionRestaurants] Available restaurants:`, restaurants.length);
     
     // Return restaurants that are in this collection
-    return restaurants.filter((r: any) => 
+    const collectionRestaurants = restaurants.filter((r: any) => 
       r && r.id && plan.restaurant_ids && Array.isArray(plan.restaurant_ids) && plan.restaurant_ids.includes(r.id)
     );
+    
+    console.log(`[useCollectionRestaurants] Found ${collectionRestaurants.length} restaurants for collection ${collectionId}`);
+    return collectionRestaurants;
   }, [restaurants, plans, collectionId]);
 }
 

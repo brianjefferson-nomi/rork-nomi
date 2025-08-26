@@ -471,6 +471,17 @@ export const dbHelpers = {
     return data;
   },
 
+  async getAllRestaurants() {
+    // Get all restaurants from database
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+
   async updatePlan(id: string, updates: Partial<Database['public']['Tables']['collections']['Update']>) {
     const { data, error } = await supabase
       .from('collections')
