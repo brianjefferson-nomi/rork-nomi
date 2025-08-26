@@ -19,6 +19,7 @@ export default function ListsScreen() {
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'private' | 'shared' | 'public'>('all');
 
   // Debug logging for collections
   console.log('[ListsScreen] User authenticated:', isAuthenticated);
@@ -71,6 +72,34 @@ export default function ListsScreen() {
     console.log('[ListsScreen] Sorted collections:', sorted.length);
     return sorted;
   }, [collections]);
+
+  // Filter collections by type
+  const filteredCollections = useMemo(() => {
+    if (selectedCollectionType === 'all') return sortedCollections;
+    
+    return sortedCollections.filter(collection => {
+      // Check if user is the creator (private collections)
+      const isCreator = collection.created_by === user?.id;
+      
+      // Check if user is a member (shared collections)
+      const isMember = (collection as any).collaborators && Array.isArray((collection as any).collaborators) && 
+        (collection as any).collaborators.some((member: any) => {
+          const memberId = typeof member === 'string' ? member : member?.userId || member?.id;
+          return memberId === user?.id;
+        });
+      
+      switch (selectedCollectionType) {
+        case 'private':
+          return isCreator && !isMember; // Creator only, not shared
+        case 'shared':
+          return isMember; // User is a member but not creator
+        case 'public':
+          return collection.is_public && !isCreator && !isMember; // Public collections user doesn't own or belong to
+        default:
+          return true;
+      }
+    });
+  }, [sortedCollections, selectedCollectionType, user?.id]);
 
   const renderTabButton = (tab: TabType, icon: React.ReactNode, label: string, count: number) => (
     <TouchableOpacity
@@ -164,6 +193,52 @@ export default function ListsScreen() {
         {renderTabButton('favorites', <Heart size={18} color={activeTab === 'favorites' ? '#FF6B6B' : '#666'} />, 'Favorites', (favoriteRestaurants || []).length)}
       </View>
 
+      {activeTab === 'collections' && (
+        <View style={styles.collectionTypeCarousel}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+          >
+            <TouchableOpacity
+              style={[styles.collectionTypeButton, selectedCollectionType === 'all' && styles.activeCollectionTypeButton]}
+              onPress={() => setSelectedCollectionType('all')}
+            >
+              <Text style={[styles.collectionTypeText, selectedCollectionType === 'all' && styles.activeCollectionTypeText]}>
+                All ({sortedCollections.length})
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.collectionTypeButton, selectedCollectionType === 'private' && styles.activeCollectionTypeButton]}
+              onPress={() => setSelectedCollectionType('private')}
+            >
+              <Text style={[styles.collectionTypeText, selectedCollectionType === 'private' && styles.activeCollectionTypeText]}>
+                Private ({sortedCollections.filter(c => c.created_by === user?.id && !(c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.collectionTypeButton, selectedCollectionType === 'shared' && styles.activeCollectionTypeButton]}
+              onPress={() => setSelectedCollectionType('shared')}
+            >
+              <Text style={[styles.collectionTypeText, selectedCollectionType === 'shared' && styles.activeCollectionTypeText]}>
+                Shared ({sortedCollections.filter(c => (c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.collectionTypeButton, selectedCollectionType === 'public' && styles.activeCollectionTypeButton]}
+              onPress={() => setSelectedCollectionType('public')}
+            >
+              <Text style={[styles.collectionTypeText, selectedCollectionType === 'public' && styles.activeCollectionTypeText]}>
+                Public ({sortedCollections.filter(c => c.is_public && c.created_by !== user?.id && !(c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
       {activeTab === 'favorites' && (favoriteRestaurants || []).length > 0 && (
         <View style={styles.controlsContainer}>
           <TouchableOpacity
@@ -203,7 +278,7 @@ export default function ListsScreen() {
       )}
 
       {activeTab === 'collections' ? (
-        (collections || []).length === 0 ? (
+        (filteredCollections || []).length === 0 ? (
           <View style={styles.emptyState}>
             <BookOpen size={48} color="#CCC" />
             <Text style={styles.emptyTitle}>No plans yet</Text>
@@ -229,7 +304,7 @@ export default function ListsScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.collectionsGrid}>
-              {sortedCollections.map(plan => {
+              {filteredCollections.map(plan => {
                 // Convert plan to collection format for display
                 const collection: Collection = {
                   id: plan.id,
@@ -577,6 +652,34 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     color: '#FF6B6B',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  collectionTypeCarousel: {
+    marginBottom: 16,
+  },
+  carouselContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  collectionTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  activeCollectionTypeButton: {
+    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
+  },
+  collectionTypeText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  activeCollectionTypeText: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });
