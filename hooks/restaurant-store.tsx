@@ -701,23 +701,30 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return [];
       }
 
+      console.log('[getCollectionRestaurantsFromDatabase] Collection data:', collection);
+
       if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
         console.log('[getCollectionRestaurantsFromDatabase] No restaurant_ids in collection');
         return [];
       }
 
       console.log('[getCollectionRestaurantsFromDatabase] Collection restaurant_ids:', collection.restaurant_ids);
+      console.log('[getCollectionRestaurantsFromDatabase] Restaurant IDs type:', typeof collection.restaurant_ids);
+      console.log('[getCollectionRestaurantsFromDatabase] Restaurant IDs length:', collection.restaurant_ids.length);
 
       // Fetch restaurants directly from database
       const restaurantsData = await dbHelpers.getRestaurantsByIds(collection.restaurant_ids);
       console.log('[getCollectionRestaurantsFromDatabase] Fetched restaurants from database:', restaurantsData.length);
+      console.log('[getCollectionRestaurantsFromDatabase] Raw restaurant data:', restaurantsData);
 
       if (restaurantsData && restaurantsData.length > 0) {
         const mappedRestaurants = restaurantsData.map(mapDatabaseRestaurant);
         console.log('[getCollectionRestaurantsFromDatabase] Mapped restaurants:', mappedRestaurants.length);
+        console.log('[getCollectionRestaurantsFromDatabase] Sample mapped restaurant:', mappedRestaurants[0]);
         return mappedRestaurants;
       }
 
+      console.log('[getCollectionRestaurantsFromDatabase] No restaurants found in database');
       return [];
     } catch (error) {
       console.error('[getCollectionRestaurantsFromDatabase] Error:', error);

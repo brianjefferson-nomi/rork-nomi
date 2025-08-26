@@ -381,6 +381,7 @@ export default function CollectionDetailScreen() {
     queryFn: async () => {
       if (!id) return [];
       try {
+        console.log('[CollectionDetail] Starting direct restaurants query for ID:', id);
         const restaurants = await getCollectionRestaurantsFromDatabase(id);
         console.log('[CollectionDetail] Direct restaurants query result:', restaurants.length);
         return restaurants;
@@ -393,6 +394,11 @@ export default function CollectionDetailScreen() {
     retry: 1,
     retryDelay: 1000
   });
+  
+  console.log('[CollectionDetail] Direct restaurants query enabled:', !!id && (collectionRestaurants.length === 0 || rankedRestaurants.length === 0));
+  console.log('[CollectionDetail] Direct restaurants query data:', directRestaurantsQuery.data?.length || 0);
+  console.log('[CollectionDetail] Direct restaurants query loading:', directRestaurantsQuery.isLoading);
+  console.log('[CollectionDetail] Direct restaurants query error:', directRestaurantsQuery.error);
   
   // Debug logging for both approaches
   console.log('[CollectionDetail] Collection ID:', id);

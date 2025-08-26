@@ -524,8 +524,11 @@ export const dbHelpers = {
   async getRestaurantsByIds(restaurantIds: string[]) {
     // Get specific restaurants by their IDs
     if (!restaurantIds || restaurantIds.length === 0) {
+      console.log('[getRestaurantsByIds] No restaurant IDs provided');
       return [];
     }
+    
+    console.log('[getRestaurantsByIds] Fetching restaurants with IDs:', restaurantIds);
     
     const { data, error } = await supabase
       .from('restaurants')
@@ -533,7 +536,14 @@ export const dbHelpers = {
       .in('id', restaurantIds)
       .order('name', { ascending: true });
     
-    if (error) throw error;
+    if (error) {
+      console.error('[getRestaurantsByIds] Database error:', error);
+      throw error;
+    }
+    
+    console.log('[getRestaurantsByIds] Found restaurants:', data?.length || 0);
+    console.log('[getRestaurantsByIds] Restaurant data:', data);
+    
     return data || [];
   },
 
