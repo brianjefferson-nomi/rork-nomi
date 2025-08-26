@@ -853,14 +853,35 @@ export const dbHelpers = {
     vote: 'like' | 'dislike';
     reason?: string;
   }) {
-    const { data, error } = await supabase
-      .from('restaurant_votes')
-      .insert(voteData)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+    try {
+      console.log('[voteRestaurant] Attempting to vote with data:', voteData);
+      
+      const { data, error } = await supabase
+        .from('restaurant_votes')
+        .insert(voteData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[voteRestaurant] Supabase error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Vote failed: ${error.message}`);
+      }
+      
+      console.log('[voteRestaurant] Vote successful:', data);
+      return data;
+    } catch (error) {
+      console.error('[voteRestaurant] Exception:', error);
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown error occurred while voting');
+      }
+    }
   },
 
   // Discussion operations

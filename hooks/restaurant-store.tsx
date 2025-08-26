@@ -452,14 +452,29 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   const voteRestaurantMutation = useMutation({
     mutationFn: async (voteData: any) => {
+      console.log('[voteRestaurantMutation] Starting vote with data:', voteData);
       return await dbHelpers.voteRestaurant(voteData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[voteRestaurantMutation] Vote successful:', data);
       queryClient.invalidateQueries({ queryKey: ['userVotes'] });
     },
     onError: (error) => {
-      console.error('[voteRestaurantMutation] Error:', error);
-      // On error, we could revert the optimistic update, but for now we'll let the query invalidation handle it
+      console.error('[voteRestaurantMutation] Error details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        error: error
+      });
+      
+      // Revert optimistic update on error
+      setUserVotes(prev => {
+        // Remove the optimistic vote that was added (identified by temp prefix in timestamp)
+        return prev.filter(v => !v.timestamp?.startsWith('temp-'));
+      });
+      
+      // Show user-friendly error message
+      console.error('[voteRestaurantMutation] Vote failed:', error?.message || 'Unknown error');
     }
   });
 
@@ -576,14 +591,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     if (!user?.id) return;
 
     // Optimistic update - immediately update local state
-    const optimisticVote = {
-      id: `temp-${Date.now()}`,
+    const optimisticVote: RestaurantVote = {
       restaurantId,
       userId: user.id,
       collectionId: planId || 'default',
       vote,
       reason,
-      createdAt: new Date().toISOString()
+      timestamp: `temp-${Date.now()}` // Use temp prefix to identify optimistic votes
     };
 
     // Update local userVotes state immediately
