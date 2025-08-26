@@ -43,6 +43,7 @@ interface RestaurantStore {
   addDiscussion: (restaurantId: string, planId: string, message: string) => void;
   getRankedRestaurants: (planId?: string, memberCount?: number) => { restaurant: Restaurant; meta: RankedRestaurantMeta }[];
   getGroupRecommendations: (planId: string) => GroupRecommendation[];
+  getCollectionRestaurants: (collectionId: string) => Restaurant[];
   getPlanDiscussions: (planId: string, restaurantId?: string) => RestaurantDiscussion[];
   refreshLocation: () => Promise<void>;
   inviteToPlan: (planId: string, email: string, message?: string) => Promise<void>;
@@ -567,21 +568,78 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [user?.id, addDiscussionMutation]);
 
   const getRankedRestaurants = useCallback((planId?: string, memberCount: number = 1) => {
-    if (!planId) return [];
+    if (!planId) {
+      console.log('[getRankedRestaurants] No planId provided');
+      return [];
+    }
+
+    console.log('[getRankedRestaurants] Looking for plan:', planId);
+    console.log('[getRankedRestaurants] Available plans:', plansQuery.data?.length || 0);
+    console.log('[getRankedRestaurants] Available restaurants:', restaurants.length);
 
     const plan = plansQuery.data?.find((p: any) => p.id === planId);
-    if (!plan || !plan.restaurant_ids) return [];
+    if (!plan) {
+      console.log('[getRankedRestaurants] Plan not found');
+      return [];
+    }
+
+    console.log('[getRankedRestaurants] Found plan:', plan.name);
+    console.log('[getRankedRestaurants] Plan restaurant_ids:', plan.restaurant_ids?.length || 0);
+
+    if (!plan.restaurant_ids || plan.restaurant_ids.length === 0) {
+      console.log('[getRankedRestaurants] No restaurant_ids in plan');
+      return [];
+    }
 
     const planRestaurants = restaurants.filter(r => plan.restaurant_ids.includes(r.id));
-    const votes = userVotes.filter(v => v.collectionId === planId);
+    console.log('[getRankedRestaurants] Filtered restaurants:', planRestaurants.length);
 
-    return computeRankings(planRestaurants, votes, { memberCount });
+    const votes = userVotes.filter(v => v.collectionId === planId);
+    console.log('[getRankedRestaurants] Votes for plan:', votes.length);
+
+    const rankings = computeRankings(planRestaurants, votes, { memberCount });
+    console.log('[getRankedRestaurants] Computed rankings:', rankings.length);
+
+    return rankings;
   }, [plansQuery.data, restaurants, userVotes]);
 
   const getGroupRecommendations = useCallback((planId: string) => {
     const rankedRestaurants = getRankedRestaurants(planId);
     return []; // Simplified for now
   }, [getRankedRestaurants]);
+
+  // Simple function to get restaurants for a collection
+  const getCollectionRestaurants = useCallback((collectionId: string) => {
+    if (!collectionId) {
+      console.log('[getCollectionRestaurants] No collectionId provided');
+      return [];
+    }
+
+    console.log('[getCollectionRestaurants] Getting restaurants for collection:', collectionId);
+    console.log('[getCollectionRestaurants] Available restaurants:', restaurants.length);
+
+    const collection = plansQuery.data?.find((p: any) => p.id === collectionId);
+    if (!collection) {
+      console.log('[getCollectionRestaurants] Collection not found');
+      return [];
+    }
+
+    console.log('[getCollectionRestaurants] Found collection:', collection.name);
+    console.log('[getCollectionRestaurants] Collection restaurant_ids:', collection.restaurant_ids?.length || 0);
+
+    if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
+      console.log('[getCollectionRestaurants] No restaurant_ids in collection');
+      return [];
+    }
+
+    const collectionRestaurants = restaurants.filter(r => collection.restaurant_ids.includes(r.id));
+    console.log('[getCollectionRestaurants] Found restaurants:', collectionRestaurants.length);
+    collectionRestaurants.forEach((r, i) => {
+      console.log(`[getCollectionRestaurants] Restaurant ${i + 1}: ${r.name} (${r.id})`);
+    });
+
+    return collectionRestaurants;
+  }, [plansQuery.data, restaurants]);
 
   const getPlanDiscussions = useCallback((planId: string, restaurantId?: string) => {
     return discussions.filter(d => 
@@ -739,6 +797,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addDiscussion,
     getRankedRestaurants,
     getGroupRecommendations,
+    getCollectionRestaurants,
     getPlanDiscussions,
     refreshLocation,
     inviteToPlan,
