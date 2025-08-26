@@ -345,6 +345,7 @@ export default function CollectionDetailScreen() {
     queryFn: async () => {
       if (!id) return null;
       try {
+        console.log('[CollectionDetail] Fetching collection directly from database:', id);
         const { data, error } = await supabase
           .from('collections')
           .select('*')
@@ -357,6 +358,7 @@ export default function CollectionDetailScreen() {
         }
         
         console.log('[CollectionDetail] Successfully fetched collection directly:', data.name);
+        console.log('[CollectionDetail] Collection restaurant_ids:', data.restaurant_ids?.length || 0);
         return data;
       } catch (error) {
         console.log('[CollectionDetail] Exception fetching collection directly:', error);
@@ -364,7 +366,7 @@ export default function CollectionDetailScreen() {
       }
     },
     enabled: !!id && !collection, // Only run if we have an ID and no collection found
-    retry: 1,
+    retry: 2,
     retryDelay: 1000
   });
   

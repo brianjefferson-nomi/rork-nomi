@@ -290,6 +290,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userPlans', user?.id],
     queryFn: async () => {
       try {
+        console.log('[RestaurantStore] Loading plans for user:', user?.id);
+        
         // If no user ID, try to get all public collections as fallback
         if (!user?.id) {
           console.log('[RestaurantStore] No user ID, loading public collections as fallback');
@@ -326,16 +328,19 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           }));
         }
         
-        const mappedPlans = plans.map((plan: any) => ({
-          ...plan,
-          collaborators: plan.collaborators || [],
-          settings: {
-            voteVisibility: plan.vote_visibility || 'public',
-            discussionEnabled: plan.discussion_enabled !== false,
-            autoRankingEnabled: plan.auto_ranking_enabled !== false,
-            consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
-          }
-        }));
+        const mappedPlans = plans.map((plan: any) => {
+          console.log('[RestaurantStore] Mapping plan:', plan.name, 'with restaurant_ids:', plan.restaurant_ids?.length || 0);
+          return {
+            ...plan,
+            collaborators: plan.collaborators || [],
+            settings: {
+              voteVisibility: plan.vote_visibility || 'public',
+              discussionEnabled: plan.discussion_enabled !== false,
+              autoRankingEnabled: plan.auto_ranking_enabled !== false,
+              consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
+            }
+          };
+        });
         
         console.log('[RestaurantStore] Mapped plans:', mappedPlans.length);
         mappedPlans.forEach((plan, i) => {
@@ -347,7 +352,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         console.error('[RestaurantStore] Error loading plans:', error);
         // Fallback to public collections on error
         try {
+          console.log('[RestaurantStore] Attempting fallback to public collections');
           const publicCollections = await dbHelpers.getAllCollections();
+          console.log('[RestaurantStore] Fallback successful, found:', publicCollections?.length || 0, 'public collections');
           return publicCollections.map((plan: any) => ({
             ...plan,
             collaborators: plan.collaborators || [],
@@ -360,14 +367,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           }));
         } catch (fallbackError) {
           console.error('[RestaurantStore] Fallback also failed:', fallbackError);
+          console.log('[RestaurantStore] Returning empty array as last resort');
           return [];
         }
       }
     },
-    enabled: true, // Always enabled, even without user ID
-    retry: 2,
+    enabled: !!user?.id, // Only enabled when user is authenticated
+    retry: 3,
     retryDelay: 1000,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute - shorter to get fresh data
     gcTime: 5 * 60 * 1000 // 5 minutes
   });
 
@@ -380,6 +388,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       });
     }
   }, [plansQuery.data]);
+
+  // Invalidate queries when user changes
+  useEffect(() => {
+    if (user?.id) {
+      console.log('[RestaurantStore] User changed, invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    }
+  }, [user?.id, queryClient]);
 
   // Load all public collections for discovery
   const allCollectionsQuery = useQuery({

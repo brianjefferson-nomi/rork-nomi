@@ -419,6 +419,8 @@ export const dbHelpers = {
 
   async getUserPlans(userId: string) {
     try {
+      console.log('[getUserPlans] Starting to fetch plans for user:', userId);
+      
       // Get all collections the user should have access to:
       // 1. Collections created by the user (public, private, shared)
       // 2. Collections where the user is a member
@@ -432,8 +434,11 @@ export const dbHelpers = {
       
       if (createdError) {
         console.error('[getUserPlans] Error fetching created collections:', createdError);
-        throw createdError;
+        // Don't throw error, continue with other queries
+        console.log('[getUserPlans] Continuing with other queries despite created collections error');
       }
+      
+      console.log('[getUserPlans] Created collections found:', createdCollections?.length || 0);
       
       // Then, get collections where the user is a member
       const { data: memberCollections, error: memberError } = await supabase
@@ -443,13 +448,18 @@ export const dbHelpers = {
       
       if (memberError) {
         console.error('[getUserPlans] Error fetching member collections:', memberError);
-        throw memberError;
+        // Don't throw error, continue with other queries
+        console.log('[getUserPlans] Continuing with other queries despite member collections error');
       }
+      
+      console.log('[getUserPlans] Member collections found:', memberCollections?.length || 0);
       
       // Get the actual collection data for collections where user is a member
       let memberCollectionData: any[] = [];
       if (memberCollections && memberCollections.length > 0) {
         const collectionIds = memberCollections.map(m => m.collection_id);
+        console.log('[getUserPlans] Fetching member collection data for IDs:', collectionIds);
+        
         const { data: memberData, error: memberDataError } = await supabase
           .from('collections')
           .select('*')
@@ -457,9 +467,12 @@ export const dbHelpers = {
         
         if (memberDataError) {
           console.error('[getUserPlans] Error fetching member collection data:', memberDataError);
-          throw memberDataError;
+          // Don't throw error, continue with other queries
+          console.log('[getUserPlans] Continuing with other queries despite member data error');
+        } else {
+          memberCollectionData = memberData || [];
+          console.log('[getUserPlans] Member collection data found:', memberCollectionData.length);
         }
-        memberCollectionData = memberData || [];
       }
       
       // Get all public collections for discovery
@@ -470,8 +483,11 @@ export const dbHelpers = {
       
       if (publicError) {
         console.error('[getUserPlans] Error fetching public collections:', publicError);
-        throw publicError;
+        // Don't throw error, continue with other queries
+        console.log('[getUserPlans] Continuing with other queries despite public collections error');
       }
+      
+      console.log('[getUserPlans] Public collections found:', publicCollections?.length || 0);
       
       // Combine all collections
       const allCollections = [

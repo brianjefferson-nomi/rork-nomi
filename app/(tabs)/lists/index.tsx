@@ -49,7 +49,24 @@ export default function ListsScreen() {
 
   const sortedCollections = useMemo(() => {
     console.log('[ListsScreen] Sorting collections:', collections?.length || 0);
-    const sorted = (collections || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    // Validate collections data
+    const validCollections = (collections || []).filter(collection => {
+      if (!collection || !collection.id || !collection.name) {
+        console.log('[ListsScreen] Filtering out invalid collection:', collection);
+        return false;
+      }
+      return true;
+    });
+    
+    console.log('[ListsScreen] Valid collections:', validCollections.length);
+    
+    const sorted = validCollections.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+    
     console.log('[ListsScreen] Sorted collections:', sorted.length);
     return sorted;
   }, [collections]);
