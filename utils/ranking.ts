@@ -95,6 +95,16 @@ function calculateGuardrailScore(likes: number, dislikes: number, totalMembers: 
     guardrailScore -= 3; // Penalty for low engagement
   }
   
+  console.log(`[guardrail] Guardrail calculation:`, {
+    likes,
+    dislikes,
+    totalVotes,
+    totalMembers,
+    positiveRatio: positiveRatio.toFixed(2),
+    engagementRatio: engagementRatio.toFixed(2),
+    guardrailScore
+  });
+  
   return guardrailScore;
 }
 
@@ -220,6 +230,17 @@ export function computeRankings(
 
       // Calculate final restaurant score
       const restaurantScore = weightedVoteScore + sentimentScore + fitScore + guardrailScore;
+      
+      console.log(`[ranking] ${restaurant.name} score breakdown:`, {
+        weightedVoteScore: weightedVoteScore.toFixed(2),
+        sentimentScore: sentimentScore.toFixed(2),
+        fitScore: fitScore.toFixed(2),
+        guardrailScore: guardrailScore.toFixed(2),
+        totalScore: restaurantScore.toFixed(2),
+        likes,
+        dislikes,
+        likeRatio: likeRatio.toFixed(2)
+      });
 
       const consensus = computeConsensus(likeRatio);
 
@@ -288,21 +309,32 @@ export function computeRankings(
       .sort((a, b) => {
         const scoreDiff = b.composite - a.composite;
         
+        console.log(`[ranking] Comparing ${a.restaurant.name} (score: ${a.composite.toFixed(2)}, likes: ${a.meta.likes}) vs ${b.restaurant.name} (score: ${b.composite.toFixed(2)}, likes: ${b.meta.likes})`);
+        
         // If scores are within 2 points, apply tie-breaker
         if (Math.abs(scoreDiff) <= 2) {
-          // Tie-breaker 1: Higher likes per capita
-          const aLikesPerCapita = a.meta.likes / Math.max(1, a.meta.likes + a.meta.dislikes);
-          const bLikesPerCapita = b.meta.likes / Math.max(1, b.meta.likes + b.meta.dislikes);
+          console.log(`[ranking] Scores within 2 points, applying tie-breaker`);
           
-          if (Math.abs(aLikesPerCapita - bLikesPerCapita) > 0.01) {
-            return bLikesPerCapita - aLikesPerCapita;
+          // Tie-breaker 1: Higher total likes (not likes per capita)
+          if (a.meta.likes !== b.meta.likes) {
+            console.log(`[ranking] Tie-breaker 1: ${a.restaurant.name} has ${a.meta.likes} likes, ${b.restaurant.name} has ${b.meta.likes} likes`);
+            return b.meta.likes - a.meta.likes;
           }
           
           // Tie-breaker 2: Better fit to occasion
           const aFitScore = calculateFitScore(a.restaurant, options?.collection);
           const bFitScore = calculateFitScore(b.restaurant, options?.collection);
           
-          return bFitScore - aFitScore;
+          if (aFitScore !== bFitScore) {
+            console.log(`[ranking] Tie-breaker 2: ${a.restaurant.name} fit score: ${aFitScore}, ${b.restaurant.name} fit score: ${bFitScore}`);
+            return bFitScore - aFitScore;
+          }
+          
+          // Tie-breaker 3: Higher like ratio
+          if (Math.abs(a.meta.likeRatio - b.meta.likeRatio) > 0.01) {
+            console.log(`[ranking] Tie-breaker 3: ${a.restaurant.name} like ratio: ${a.meta.likeRatio}, ${b.restaurant.name} like ratio: ${b.meta.likeRatio}`);
+            return b.meta.likeRatio - a.meta.likeRatio;
+          }
         }
         
         return scoreDiff;
@@ -312,6 +344,9 @@ export function computeRankings(
         if (idx === 0 && arr.length > 0) {
           r.meta.badge = r.meta.badge ?? 'top_choice';
         }
+        
+        console.log(`[ranking] Final rank ${r.meta.rank}: ${r.restaurant.name} (score: ${r.composite.toFixed(2)}, likes: ${r.meta.likes}, dislikes: ${r.meta.dislikes})`);
+        
         return { restaurant: r.restaurant, meta: r.meta };
       });
 

@@ -314,7 +314,15 @@ export default function CollectionDetailScreen() {
   
   // Get restaurants for this collection using the simpler function
   const collectionRestaurants = getCollectionRestaurants(id || '');
-  const rankedRestaurants = getRankedRestaurants(id, effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0) || [];
+  
+  // Calculate proper member count for ranking
+  const memberCount = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
+    ? effectiveCollection.collaborators.length 
+    : (effectiveCollection?.is_public ? 1 : 1); // Default to 1 for private/public collections
+  
+  console.log('[CollectionDetail] Member count for ranking:', memberCount);
+  
+  const rankedRestaurants = getRankedRestaurants(id, memberCount) || [];
   
   // Fetch restaurants directly from database as a fallback
   const directRestaurantsQuery = useQuery({
@@ -482,16 +490,6 @@ export default function CollectionDetailScreen() {
     : [];
 
   // Determine collection type
-  const isCollectionOwner = () => {
-    if (!user || !effectiveCollection) return false;
-    return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
-  };
-
-  const isCollectionMember = () => {
-    if (!user || !effectiveCollection) return false;
-    return collectionMembers.includes(user.id);
-  };
-
   const getCollectionType = () => {
     if (!effectiveCollection) return 'private';
     
@@ -503,6 +501,16 @@ export default function CollectionDetailScreen() {
     
     // Otherwise it's private
     return 'private';
+  };
+
+  const isCollectionOwner = () => {
+    if (!user || !effectiveCollection) return false;
+    return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
+  };
+
+  const isCollectionMember = () => {
+    if (!user || !effectiveCollection) return false;
+    return collectionMembers.includes(user.id);
   };
 
   const collectionType = getCollectionType();
