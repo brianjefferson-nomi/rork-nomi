@@ -471,6 +471,12 @@ export const dbHelpers = {
         
         if (memberDataError) {
           console.error('[getUserPlans] Error fetching member collection data:', memberDataError);
+          console.error('[getUserPlans] Error details:', {
+            message: memberDataError.message,
+            details: memberDataError.details,
+            hint: memberDataError.hint,
+            code: memberDataError.code
+          });
           // Don't throw error, continue with other queries
           console.log('[getUserPlans] Continuing with other queries despite member data error');
         } else {
@@ -509,16 +515,32 @@ export const dbHelpers = {
       console.log(`[getUserPlans] Created: ${createdCollections?.length || 0}, Members: ${memberCollectionData.length}, Public: ${publicCollections?.length || 0}`);
       
       // For each collection, get its members to populate the collaborators field
+      console.log('[getUserPlans] Processing collections with members...');
       const collectionsWithMembers = await Promise.all(
-        uniqueCollections.map(async (collection) => {
+        uniqueCollections.map(async (collection, index) => {
+          console.log(`[getUserPlans] Processing collection ${index + 1}/${uniqueCollections.length}: ${collection.id}`);
           try {
             const members = await dbHelpers.getCollectionMembers(collection.id);
+            console.log(`[getUserPlans] Found ${members.length} members for collection ${collection.id}`);
+            
+            const collaborators = members.map((member: any) => {
+              const userId = member._internalUserId || member.userId || member.id;
+              console.log(`[getUserPlans] Mapping member: ${member.name || 'Unknown'} -> ${userId}`);
+              return userId;
+            });
+            
+            console.log(`[getUserPlans] Mapped ${collaborators.length} collaborators for collection ${collection.id}`);
+            
             return {
               ...collection,
-              collaborators: members.map((member: any) => member._internalUserId || member.userId || member.id)
+              collaborators
             };
           } catch (error) {
             console.error(`[getUserPlans] Error fetching members for collection ${collection.id}:`, error);
+            console.error(`[getUserPlans] Error details for collection ${collection.id}:`, {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
+            });
             return {
               ...collection,
               collaborators: []
@@ -533,7 +555,15 @@ export const dbHelpers = {
       );
     } catch (error) {
       console.error('[getUserPlans] Exception:', error);
-      throw error;
+      console.error('[getUserPlans] Exception details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      // Return empty array instead of throwing to prevent app crashes
+      console.log('[getUserPlans] Returning empty array due to error');
+      return [];
     }
   },
 
@@ -558,6 +588,10 @@ export const dbHelpers = {
           };
         } catch (error) {
           console.error(`[getAllCollections] Error fetching members for collection ${collection.id}:`, error);
+          console.error(`[getAllCollections] Error details for collection ${collection.id}:`, {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          });
           return {
             ...collection,
             collaborators: []
@@ -731,12 +765,21 @@ export const dbHelpers = {
 
   async getCollectionMembers(collectionId: string) {
     try {
+      console.log('[getCollectionMembers] Fetching members for collection:', collectionId);
+      
       const { data: membersData, error: membersError } = await supabase
         .from('collection_members')
         .select('*')
         .eq('collection_id', collectionId);
       
       if (membersError) {
+        console.error('[getCollectionMembers] Error fetching members:', membersError);
+        console.error('[getCollectionMembers] Error details:', {
+          message: membersError.message,
+          details: membersError.details,
+          hint: membersError.hint,
+          code: membersError.code
+        });
         return [];
       }
       
@@ -782,6 +825,11 @@ export const dbHelpers = {
       }));
       
     } catch (error) {
+      console.error('[getCollectionMembers] Exception:', error);
+      console.error('[getCollectionMembers] Exception details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return [];
     }
   },
