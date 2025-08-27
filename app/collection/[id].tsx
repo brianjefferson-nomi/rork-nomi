@@ -138,6 +138,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   collectionMembers,
                   sampleDiscussion: discussions[0] ? {
                     userId: discussions[0].userId,
+                    userName: discussions[0].userName,
+                    message: discussions[0].message,
                     userIdShort: discussions[0].userId?.substring(0, 8),
                     isInCollection: collectionMembers.includes(discussions[0].userId?.substring(0, 8))
                   } : null
@@ -652,8 +654,8 @@ export default function CollectionDetailScreen() {
     loadRealDiscussions();
   }, [id]);
 
-  // Use real discussions if available, otherwise fall back to stored discussions
-  const effectiveDiscussions = realDiscussions.length > 0 ? realDiscussions : discussions;
+  // Use discussions with proper user names (from getCollectionDiscussions)
+  const effectiveDiscussions = discussions;
 
   // Calculate collection members for privacy filtering
   const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
