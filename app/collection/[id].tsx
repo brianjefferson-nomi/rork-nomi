@@ -136,6 +136,13 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   totalDiscussions: discussions.length,
                   filteredDiscussions: filteredDiscussions.length,
                   collectionMembers,
+                  allDiscussions: discussions.map(d => ({
+                    userId: d.userId,
+                    userName: d.userName,
+                    message: d.message?.substring(0, 50),
+                    collectionId: d.collectionId,
+                    restaurantId: d.restaurantId
+                  })),
                   sampleDiscussion: discussions[0] ? {
                     userId: discussions[0].userId,
                     userName: discussions[0].userName,
@@ -656,6 +663,26 @@ export default function CollectionDetailScreen() {
 
   // Use discussions with proper user names (from getCollectionDiscussions)
   const effectiveDiscussions = discussions;
+  
+  console.log('[CollectionDetail] Effective discussions for InsightsTab:', {
+    discussionsLength: discussions.length,
+    effectiveDiscussionsLength: effectiveDiscussions.length,
+    sampleDiscussion: effectiveDiscussions[0] ? {
+      id: effectiveDiscussions[0].id,
+      userId: effectiveDiscussions[0].userId,
+      userName: effectiveDiscussions[0].userName,
+      message: effectiveDiscussions[0].message?.substring(0, 50),
+      collectionId: effectiveDiscussions[0].collectionId,
+      restaurantId: effectiveDiscussions[0].restaurantId
+    } : null,
+    allDiscussions: effectiveDiscussions.map(d => ({
+      id: d.id,
+      userId: d.userId,
+      userName: d.userName,
+      collectionId: d.collectionId,
+      restaurantId: d.restaurantId
+    }))
+  });
 
   // Calculate collection members for privacy filtering
   const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
