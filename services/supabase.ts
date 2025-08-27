@@ -944,17 +944,47 @@ export const dbHelpers = {
       console.log('[voteRestaurant] Attempting to vote with data:', voteData);
       
       // First, check if a vote already exists for this user/restaurant/collection
-      const { data: existingVote, error: checkError } = await supabase
-        .from('restaurant_votes')
-        .select('*')
-        .eq('restaurant_id', voteData.restaurant_id)
-        .eq('user_id', voteData.user_id)
-        .eq('collection_id', voteData.collection_id)
-        .single();
+      let existingVote = null;
+      let checkError = null;
       
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+      try {
+        const { data, error } = await supabase
+          .from('restaurant_votes')
+          .select('*')
+          .eq('restaurant_id', voteData.restaurant_id)
+          .eq('user_id', voteData.user_id)
+          .eq('collection_id', voteData.collection_id)
+          .maybeSingle();
+        
+        existingVote = data;
+        checkError = error;
+      } catch (error) {
+        console.error('[voteRestaurant] Exception during vote check:', error);
+        checkError = error;
+      }
+      
+      if (checkError) {
         console.error('[voteRestaurant] Error checking existing vote:', checkError);
-        throw new Error(`Failed to check existing vote: ${checkError.message}`);
+        // If it's a 406 error, try a different approach
+        if (checkError && typeof checkError === 'object' && 'code' in checkError && checkError.code === '406') {
+          console.log('[voteRestaurant] 406 error detected, trying alternative query');
+          // Try a simpler query without the single() constraint
+          const { data: existingVotes, error: altError } = await supabase
+            .from('restaurant_votes')
+            .select('*')
+            .eq('restaurant_id', voteData.restaurant_id)
+            .eq('user_id', voteData.user_id)
+            .eq('collection_id', voteData.collection_id);
+          
+          if (altError) {
+            console.error('[voteRestaurant] Alternative query also failed:', altError);
+            throw new Error(`Failed to check existing vote: ${altError.message}`);
+          }
+          
+          existingVote = existingVotes && existingVotes.length > 0 ? existingVotes[0] : null;
+        } else {
+          throw new Error(`Failed to check existing vote: ${checkError && typeof checkError === 'object' && 'message' in checkError ? checkError.message : 'Unknown error'}`);
+        }
       }
       
       let result;
