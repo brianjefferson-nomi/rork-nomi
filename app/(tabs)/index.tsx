@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User, Navigation } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -64,8 +64,8 @@ export default function HomeScreen() {
 
   // Use Mapbox restaurants when available, fallback to existing restaurants
   const trendingRestaurants = useMemo(() => {
-    // For logged out users, use mock data
-    if (!isAuthenticated) {
+    // For logged out users or web platform, use mock data
+    if (!isAuthenticated || Platform.OS === 'web') {
       return mockRestaurants.slice(0, 6);
     }
     if (mapboxRestaurants.length > 0) {
@@ -199,8 +199,8 @@ export default function HomeScreen() {
   
   // Use Mapbox restaurants for new restaurants section
   const newRestaurants = useMemo(() => {
-    // For logged out users, use mock data
-    if (!isAuthenticated) {
+    // For logged out users or web platform, use mock data
+    if (!isAuthenticated || Platform.OS === 'web') {
       return mockRestaurants.slice(6, 10);
     }
     if (mapboxRestaurants.length > 6) {
@@ -211,8 +211,8 @@ export default function HomeScreen() {
   
   // Use Mapbox restaurants for local highlights
   const localHighlights = useMemo(() => {
-    // For logged out users, use mock data
-    if (!isAuthenticated) {
+    // For logged out users or web platform, use mock data
+    if (!isAuthenticated || Platform.OS === 'web') {
       return mockRestaurants.slice(0, 4);
     }
     if (mapboxRestaurants.length > 0) {
@@ -225,6 +225,13 @@ export default function HomeScreen() {
   useEffect(() => {
     // For logged out users, use mock data instead of loading real restaurants
     if (!isAuthenticated) {
+      setMapboxRestaurants(mockRestaurants);
+      setNearbyRestaurants(mockRestaurants.slice(0, 4));
+      return;
+    }
+
+    // For web platform, use mock data to ensure consistency
+    if (Platform.OS === 'web') {
       setMapboxRestaurants(mockRestaurants);
       setNearbyRestaurants(mockRestaurants.slice(0, 4));
       return;
