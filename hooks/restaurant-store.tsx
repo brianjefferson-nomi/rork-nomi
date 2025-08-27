@@ -1134,9 +1134,24 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [plansQuery.data, user?.id]);
 
   const getCollectionDiscussions = useCallback(async (collectionId: string, restaurantId?: string) => {
+    console.log('[RestaurantStore] getCollectionDiscussions called with:', { collectionId, restaurantId });
     try {
-      return await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+      const result = await dbHelpers.getCollectionDiscussions(collectionId, restaurantId);
+      console.log('[RestaurantStore] getCollectionDiscussions result:', {
+        length: result?.length || 0,
+        sample: result?.[0] ? {
+          id: result[0].id,
+          userId: result[0].userId,
+          collectionId: result[0].collectionId,
+          restaurantId: result[0].restaurantId,
+          rawUserId: result[0].user_id,
+          rawCollectionId: result[0].collection_id,
+          rawRestaurantId: result[0].restaurant_id
+        } : null
+      });
+      return result;
     } catch (error) {
+      console.error('[RestaurantStore] getCollectionDiscussions error:', error);
       return [];
     }
   }, []);
