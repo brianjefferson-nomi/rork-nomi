@@ -1097,6 +1097,10 @@ export const dbHelpers = {
       // Transform the data to match the expected frontend structure
       const transformedData = (data || []).map(discussion => ({
         ...discussion,
+        // Map database field names to frontend field names
+        userId: discussion.user_id,
+        collectionId: discussion.collection_id,
+        restaurantId: discussion.restaurant_id,
         userName: discussion.users?.name || 'Unknown User',
         timestamp: discussion.created_at,
         // Keep the original message field
@@ -1109,8 +1113,9 @@ export const dbHelpers = {
           id: transformedData[0].id,
           userName: transformedData[0].userName,
           message: transformedData[0].message?.substring(0, 50),
-          userId: transformedData[0].user_id,
-          collectionId: transformedData[0].collection_id
+          userId: transformedData[0].userId,
+          collectionId: transformedData[0].collectionId,
+          restaurantId: transformedData[0].restaurantId
         } : null
       });
       
@@ -1145,6 +1150,10 @@ export const dbHelpers = {
       // Transform the data to match the expected frontend structure
       const transformedData = (data || []).map(discussion => ({
         ...discussion,
+        // Map database field names to frontend field names
+        userId: discussion.user_id,
+        collectionId: discussion.collection_id,
+        restaurantId: discussion.restaurant_id,
         userName: discussion.users?.name || 'Unknown User',
         timestamp: discussion.created_at,
         // Keep the original message field
