@@ -171,14 +171,23 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     message: d.message?.substring(0, 50),
                     collectionId: d.collectionId,
                     restaurantId: d.restaurantId,
-                    matchesCollection: d.collectionId === collection.id
+                    matchesCollection: d.collectionId === collection.id,
+                    // Add raw data for debugging
+                    rawUserId: d.user_id,
+                    rawCollectionId: d.collection_id,
+                    rawRestaurantId: d.restaurant_id
                   })),
                   sampleDiscussion: discussions[0] ? {
                     userId: discussions[0].userId,
                     userName: discussions[0].userName,
                     message: discussions[0].message,
                     collectionId: discussions[0].collectionId,
-                    matchesCollection: discussions[0].collectionId === collection.id
+                    matchesCollection: discussions[0].collectionId === collection.id,
+                    // Add raw data for debugging
+                    rawUserId: discussions[0].user_id,
+                    rawCollectionId: discussions[0].collection_id,
+                    rawRestaurantId: discussions[0].restaurant_id,
+                    allKeys: Object.keys(discussions[0])
                   } : null
                 });
                 
@@ -652,15 +661,19 @@ export default function CollectionDetailScreen() {
           console.log('[CollectionDetail] Is array:', Array.isArray(data));
           
           if (data && data.length > 0) {
-            console.log('[CollectionDetail] Sample discussion:', {
-              id: data[0].id,
-              message: data[0].message,
-              userName: data[0].userName,
-              restaurantId: data[0].restaurantId,
-              collectionId: data[0].collectionId,
-              userId: data[0].userId,
-              keys: Object.keys(data[0])
-            });
+                      console.log('[CollectionDetail] Sample discussion:', {
+            id: data[0].id,
+            message: data[0].message,
+            userName: data[0].userName,
+            restaurantId: data[0].restaurantId,
+            collectionId: data[0].collectionId,
+            userId: data[0].userId,
+            // Add raw database fields for comparison
+            rawUserId: data[0].user_id,
+            rawCollectionId: data[0].collection_id,
+            rawRestaurantId: data[0].restaurant_id,
+            keys: Object.keys(data[0])
+          });
           } else {
             console.log('[CollectionDetail] No discussions found or empty array');
           }
