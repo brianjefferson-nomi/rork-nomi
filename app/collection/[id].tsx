@@ -649,9 +649,18 @@ export default function CollectionDetailScreen() {
       console.log('[CollectionDetail] Loading discussions for collection:', id);
       console.log('[CollectionDetail] getCollectionDiscussions function:', typeof getCollectionDiscussions);
       console.log('[CollectionDetail] getCollectionDiscussions function details:', {
-        name: getCollectionDiscussions.name,
-        toString: getCollectionDiscussions.toString().substring(0, 100)
+        name: getCollectionDiscussions?.name || 'no name',
+        toString: getCollectionDiscussions?.toString?.()?.substring(0, 100) || 'no toString',
+        isFunction: typeof getCollectionDiscussions === 'function',
+        isUndefined: getCollectionDiscussions === undefined,
+        isNull: getCollectionDiscussions === null
       });
+      
+      if (typeof getCollectionDiscussions !== 'function') {
+        console.error('[CollectionDetail] getCollectionDiscussions is not a function!');
+        setIsLoadingDiscussions(false);
+        return;
+      }
       
       getCollectionDiscussions(id)
         .then((data) => {
