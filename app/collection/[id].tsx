@@ -445,10 +445,15 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 }
 
 export default function CollectionDetailScreen() {
+  console.log('[CollectionDetail] Component mounting...');
+  
   const { id } = useLocalSearchParams<{ id: string }>();
+  
+  console.log('[CollectionDetail] Collection ID from params:', id);
   
   // Add null safety for the ID
   if (!id) {
+    console.log('[CollectionDetail] No ID provided, showing error');
     return (
       <View style={styles.errorContainer}>
         <Text>Collection ID not found</Text>
