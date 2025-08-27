@@ -10,6 +10,7 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
 import { searchMapboxRestaurants, getMapboxNearbyRestaurants, transformMapboxToRestaurant, searchFoursquareRestaurants, deduplicateRestaurants } from '@/services/api';
+import { mockRestaurants } from '@/mocks/restaurants';
 
 
 export default function HomeScreen() {
@@ -54,16 +55,24 @@ export default function HomeScreen() {
   
   // Use city-specific restaurants when available, otherwise show all
   const availableRestaurants = useMemo(() => {
+    // For logged out users, use mock data
+    if (!isAuthenticated) {
+      return mockRestaurants;
+    }
     return cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
-  }, [cityRestaurants, restaurants, city]);
+  }, [cityRestaurants, restaurants, city, isAuthenticated]);
 
   // Use Mapbox restaurants when available, fallback to existing restaurants
   const trendingRestaurants = useMemo(() => {
+    // For logged out users, use mock data
+    if (!isAuthenticated) {
+      return mockRestaurants.slice(0, 6);
+    }
     if (mapboxRestaurants.length > 0) {
       return mapboxRestaurants.slice(0, 6);
     }
     return availableRestaurants.slice(0, 6);
-  }, [mapboxRestaurants, availableRestaurants]);
+  }, [mapboxRestaurants, availableRestaurants, isAuthenticated]);
   
   // For New York, prioritize local restaurants over trending
   const shouldPrioritizeLocal = city === 'New York';
@@ -96,27 +105,131 @@ export default function HomeScreen() {
     updated_at: plan.updated_at
   })), [safeCollections]);
   
-  const displayCollections = useMemo(() => planCollections || [], [planCollections]);
+  // Mock collections for logged out users
+  const mockCollections: Collection[] = [
+    {
+      id: 'mock-1',
+      name: 'Weekend Brunch Spots',
+      description: 'The best places for a leisurely weekend brunch in NYC',
+      cover_image: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+      created_by: 'Food Lover',
+      creator_id: 'mock-user-1',
+      occasion: 'brunch',
+      is_public: true,
+      likes: 156,
+      equal_voting: true,
+      admin_weighted: false,
+      expertise_weighted: false,
+      minimum_participation: 0.5,
+      voting_deadline: undefined,
+      allow_vote_changes: true,
+      anonymous_voting: false,
+      vote_visibility: 'public',
+      discussion_enabled: true,
+      auto_ranking_enabled: true,
+      consensus_threshold: 0.7,
+      restaurant_ids: ['1', '2', '3'],
+      collaborators: ['mock-user-1', 'mock-user-2'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'mock-2',
+      name: 'Date Night Favorites',
+      description: 'Romantic restaurants perfect for special occasions',
+      cover_image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400',
+      created_by: 'Romance Expert',
+      creator_id: 'mock-user-2',
+      occasion: 'date_night',
+      is_public: true,
+      likes: 89,
+      equal_voting: true,
+      admin_weighted: false,
+      expertise_weighted: false,
+      minimum_participation: 0.3,
+      voting_deadline: undefined,
+      allow_vote_changes: true,
+      anonymous_voting: false,
+      vote_visibility: 'public',
+      discussion_enabled: true,
+      auto_ranking_enabled: true,
+      consensus_threshold: 0.6,
+      restaurant_ids: ['1', '5', '8'],
+      collaborators: ['mock-user-2', 'mock-user-3'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'mock-3',
+      name: 'Quick Lunch Options',
+      description: 'Fast, delicious lunch spots for busy professionals',
+      cover_image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
+      created_by: 'Lunch Hunter',
+      creator_id: 'mock-user-3',
+      occasion: 'lunch',
+      is_public: true,
+      likes: 234,
+      equal_voting: true,
+      admin_weighted: false,
+      expertise_weighted: false,
+      minimum_participation: 0.4,
+      voting_deadline: undefined,
+      allow_vote_changes: true,
+      anonymous_voting: false,
+      vote_visibility: 'public',
+      discussion_enabled: true,
+      auto_ranking_enabled: true,
+      consensus_threshold: 0.5,
+      restaurant_ids: ['2', '4', '6'],
+      collaborators: ['mock-user-3', 'mock-user-4'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ];
+
+  const displayCollections = useMemo(() => {
+    // For logged out users, use mock collections
+    if (!isAuthenticated) {
+      return mockCollections;
+    }
+    return planCollections || [];
+  }, [planCollections, isAuthenticated]);
+  
   const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
   
   // Use Mapbox restaurants for new restaurants section
   const newRestaurants = useMemo(() => {
+    // For logged out users, use mock data
+    if (!isAuthenticated) {
+      return mockRestaurants.slice(6, 10);
+    }
     if (mapboxRestaurants.length > 6) {
       return mapboxRestaurants.slice(6, 10);
     }
     return availableRestaurants.slice(6, 10);
-  }, [mapboxRestaurants, availableRestaurants]);
+  }, [mapboxRestaurants, availableRestaurants, isAuthenticated]);
   
   // Use Mapbox restaurants for local highlights
   const localHighlights = useMemo(() => {
+    // For logged out users, use mock data
+    if (!isAuthenticated) {
+      return mockRestaurants.slice(0, 4);
+    }
     if (mapboxRestaurants.length > 0) {
       return mapboxRestaurants.slice(0, 4);
     }
     return availableRestaurants.slice(0, 4);
-  }, [mapboxRestaurants, availableRestaurants]);
+  }, [mapboxRestaurants, availableRestaurants, isAuthenticated]);
 
   // Load Mapbox restaurants
   useEffect(() => {
+    // For logged out users, use mock data instead of loading real restaurants
+    if (!isAuthenticated) {
+      setMapboxRestaurants(mockRestaurants);
+      setNearbyRestaurants(mockRestaurants.slice(0, 4));
+      return;
+    }
+
     if (!userLocation) return;
 
     const loadRealRestaurants = async () => {
