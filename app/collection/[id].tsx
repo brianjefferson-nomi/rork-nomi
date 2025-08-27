@@ -673,7 +673,9 @@ export default function CollectionDetailScreen() {
       // Test direct service call
       console.log('[CollectionDetail] Testing direct service call...');
       try {
+        console.log('[CollectionDetail] About to call dbHelpers.getCollectionDiscussions...');
         const directResult = await dbHelpers.getCollectionDiscussions(id);
+        console.log('[CollectionDetail] Direct service call completed successfully');
         console.log('[CollectionDetail] Direct service call result:', {
           length: directResult?.length || 0,
           sample: directResult?.[0] ? {
@@ -683,11 +685,17 @@ export default function CollectionDetailScreen() {
             restaurantId: directResult[0].restaurantId,
             rawUserId: directResult[0].user_id,
             rawCollectionId: directResult[0].collection_id,
-            rawRestaurantId: directResult[0].restaurant_id
+            rawRestaurantId: directResult[0].restaurant_id,
+            allKeys: Object.keys(directResult[0])
           } : null
         });
       } catch (error) {
         console.error('[CollectionDetail] Direct service call failed:', error);
+        console.error('[CollectionDetail] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : 'No stack',
+          name: error instanceof Error ? error.name : 'Unknown'
+        });
       }
       
       getCollectionDiscussions(id)
