@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/auth-store';
-import { dbHelpers } from '@/services/supabase';
+import { dbHelpers, supabase } from '@/services/supabase';
 
 export default function JoinPlanScreen() {
   const [planCode, setPlanCode] = useState('');
@@ -24,8 +24,19 @@ export default function JoinPlanScreen() {
     try {
       setIsLoading(true);
       
-      // Find plan by code
-      const plan = await dbHelpers.getPlanByCode(planCode.trim());
+      // Find plan by code - query collections table directly
+      const { data: plans, error } = await supabase
+        .from('collections')
+        .select('*')
+        .eq('collection_code', planCode.trim())
+        .limit(1);
+      
+      if (error || !plans || plans.length === 0) {
+        Alert.alert('Error', 'Plan not found. Please check the code and try again.');
+        return;
+      }
+      
+      const plan = plans[0];
       
       if (!plan) {
         Alert.alert('Error', 'Plan not found. Please check the code and try again.');
@@ -45,9 +56,10 @@ export default function JoinPlanScreen() {
       // Add user to collaborators
       const updatedCollaborators = typedPlan.collaborators && Array.isArray(typedPlan.collaborators) ? [...typedPlan.collaborators, user!.id] : [user!.id];
       await dbHelpers.updatePlan(typedPlan.id, {
+        ...typedPlan,
         collaborators: updatedCollaborators,
         updated_at: new Date().toISOString()
-      });
+      } as any);
 
       Alert.alert('Success', `You've joined "${typedPlan.name || 'the plan'}"!`, [
         {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image, Animated } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -232,7 +232,7 @@ function InsightsTab({
                 </View>
                 <View style={styles.restaurantTitleContainer}>
                   <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
-                  <Text style={styles.restaurantSubtitle}>Ranked #{index + 1} • {restaurant.cuisine || 'Restaurant'}</Text>
+                  <Text style={styles.restaurantSubtitle}>{`Ranked #${index + 1} • ${restaurant.cuisine || 'Restaurant'}`}</Text>
                 </View>
                 <View style={styles.restaurantRank}>
                   <Text style={styles.rankText}>#{index + 1}</Text>
@@ -288,7 +288,7 @@ function InsightsTab({
                       <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
                     </View>
                     <Text style={styles.voteBreakdown}>
-                      {memberLikeVoters.length} likes and {memberDislikeVoters.length} dislikes
+                      {`${memberLikeVoters.length} likes and ${memberDislikeVoters.length} dislikes`}
                     </Text>
                     <View style={styles.consensusBadge}>
                       <Text style={styles.consensusBadgeText}>
@@ -327,11 +327,11 @@ function InsightsTab({
                 
                 return (
                   <View style={styles.memberVotesSection}>
-                    <Text style={styles.memberVotesTitle}>Member Activity for {restaurant.name}</Text>
+                    <Text style={styles.memberVotesTitle}>{`Member Activity for ${restaurant.name}`}</Text>
                     
                     {/* Votes Section */}
                     <View style={styles.activitySection}>
-                      <Text style={styles.activitySectionTitle}>Votes ({filteredLikeVoters.length + filteredDislikeVoters.length})</Text>
+                      <Text style={styles.activitySectionTitle}>{`Votes (${filteredLikeVoters.length + filteredDislikeVoters.length})`}</Text>
                       <View style={styles.memberVotesList}>
                         {filteredLikeVoters.map((voter: any, index: number) => (
                           <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
@@ -431,7 +431,7 @@ function InsightsTab({
                   <View style={styles.discussionsSection}>
                     <View style={styles.discussionsHeader}>
                       <MessageCircle size={14} color="#6B7280" />
-                      <Text style={styles.discussionsLabel}>Discussions & Comments ({allContent.length})</Text>
+                      <Text style={styles.discussionsLabel}>{`Discussions & Comments (${allContent.length})`}</Text>
                       <TouchableOpacity 
                         style={styles.addCommentButton}
                         onPress={() => setShowCommentModal(restaurant.id)}
@@ -555,12 +555,9 @@ export default function CollectionDetailScreen() {
     restaurants
   } = useRestaurants();
 
-  // Wrapper functions that trigger ranking updates
-  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
-    originalVoteRestaurant(restaurantId, vote, planId, reason);
-    // Trigger ranking update
-    setRankingUpdateTrigger(prev => prev + 1);
-  }, [originalVoteRestaurant]);
+
+
+
 
   const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
     await originalAddDiscussion(restaurantId, planId, message);
@@ -633,6 +630,13 @@ export default function CollectionDetailScreen() {
   const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
   const [rankingUpdateTrigger, setRankingUpdateTrigger] = useState(0);
   
+  // Animation state for ranking updates
+  const [restaurantPositions, setRestaurantPositions] = useState<Record<string, { currentRank: number; previousRank: number }>>({});
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [voteFeedback, setVoteFeedback] = useState<{ restaurantId: string; vote: 'like' | 'dislike'; visible: boolean } | null>(null);
+  const animatedValues = useRef<Record<string, Animated.Value>>({});
+  const voteFeedbackOpacity = useRef(new Animated.Value(0)).current;
+  
   // If collection is not found in the store, fetch it directly from the database
   const directCollectionQuery = useQuery({
     queryKey: ['directCollection', id],
@@ -679,6 +683,104 @@ export default function CollectionDetailScreen() {
   const rankedResult = getRankedRestaurants(id, memberCount);
   const rankedRestaurants = rankedResult?.restaurants || [];
   const participationData = rankedResult?.participationData;
+
+  // Function to animate restaurant ranking changes
+  const animateRankingUpdate = useCallback((oldRankings: any[], newRankings: any[]) => {
+    if (isAnimating) return; // Prevent multiple animations
+    
+    setIsAnimating(true);
+    
+    // Create animated values for each restaurant
+    newRankings.forEach(({ restaurant, meta }) => {
+      if (!animatedValues.current[restaurant.id]) {
+        animatedValues.current[restaurant.id] = new Animated.Value(0);
+      }
+    });
+    
+    // Find restaurants that changed position
+    const positionChanges: Record<string, { from: number; to: number }> = {};
+    
+    newRankings.forEach(({ restaurant, meta }, newIndex) => {
+      const oldIndex = oldRankings.findIndex(r => r.restaurant.id === restaurant.id);
+      if (oldIndex !== -1 && oldIndex !== newIndex) {
+        positionChanges[restaurant.id] = { from: oldIndex, to: newIndex };
+      }
+    });
+    
+    // Animate position changes with enhanced visual feedback
+    const animations = Object.entries(positionChanges).map(([restaurantId, { from, to }]) => {
+      const animatedValue = animatedValues.current[restaurantId];
+      if (!animatedValue) return null;
+      
+      // Enhanced animation sequence
+      return Animated.sequence([
+        // Highlight the restaurant that changed position
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        // Keep it highlighted briefly
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        // Return to normal
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        })
+      ]);
+    }).filter(Boolean) as Animated.CompositeAnimation[];
+    
+    if (animations.length > 0) {
+      Animated.parallel(animations).start(() => {
+        setIsAnimating(false);
+      });
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isAnimating]);
+
+  // Wrapper functions that trigger ranking updates with animation
+  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
+    // Show immediate visual feedback
+    setVoteFeedback({ restaurantId, vote, visible: true });
+    
+    // Animate feedback visibility
+    Animated.sequence([
+      Animated.timing(voteFeedbackOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(voteFeedbackOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+        delay: 1000,
+      })
+    ]).start(() => {
+      setVoteFeedback(null);
+    });
+    
+    // Store current rankings for animation
+    const currentRankings = rankedResult?.restaurants || [];
+    
+    // Trigger the actual vote
+    originalVoteRestaurant(restaurantId, vote, planId, reason);
+    
+    // Trigger ranking update with animation
+    setRankingUpdateTrigger(prev => prev + 1);
+    
+    // Animate the ranking change after a short delay
+    setTimeout(() => {
+      const newRankings = getRankedRestaurants(id, memberCount)?.restaurants || [];
+      animateRankingUpdate(currentRankings, newRankings);
+    }, 500);
+  }, [originalVoteRestaurant, rankedResult, user, id, memberCount, animateRankingUpdate, voteFeedbackOpacity]);
   
   // Query to get ranked restaurants with all votes (including user names)
   const rankedRestaurantsWithAllVotesQuery = useQuery({
@@ -1240,7 +1342,7 @@ export default function CollectionDetailScreen() {
             <View style={styles.stat}>
               <Users size={16} color="#666" />
               <Text style={styles.statText}>
-                {effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0} members
+                {`${effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0} members`}
               </Text>
             </View>
           </View>
@@ -1348,10 +1450,52 @@ export default function CollectionDetailScreen() {
                   meta?.rank === 1;
                 
                 return (
-                   <View key={restaurant?.id || index} style={[
-                     styles.restaurantItem,
-                     shouldShowWinningStyles && styles.winningRestaurantItem
-                   ]}>
+                   <Animated.View 
+                     key={restaurant?.id || index} 
+                     style={[
+                       styles.restaurantItem,
+                       shouldShowWinningStyles && styles.winningRestaurantItem,
+                       animatedValues.current[restaurant.id] && {
+                         transform: [{
+                           scale: animatedValues.current[restaurant.id].interpolate({
+                             inputRange: [0, 1],
+                             outputRange: [1, 1.05]
+                           })
+                         }],
+                         shadowOpacity: animatedValues.current[restaurant.id].interpolate({
+                           inputRange: [0, 1],
+                           outputRange: [0.1, 0.4]
+                         }),
+                         shadowRadius: animatedValues.current[restaurant.id].interpolate({
+                           inputRange: [0, 1],
+                           outputRange: [8, 12]
+                         })
+                       }
+                     ]}
+                   >
+                     {/* Vote Feedback Overlay */}
+                     {voteFeedback && voteFeedback.restaurantId === restaurant.id && (
+                       <Animated.View 
+                         style={[
+                           styles.voteFeedbackOverlay,
+                           { opacity: voteFeedbackOpacity }
+                         ]}
+                       >
+                         <View style={[
+                           styles.voteFeedbackContent,
+                           voteFeedback.vote === 'like' ? styles.likeFeedback : styles.dislikeFeedback
+                         ]}>
+                           {voteFeedback.vote === 'like' ? (
+                             <ThumbsUp size={24} color="#FFFFFF" />
+                           ) : (
+                             <ThumbsDown size={24} color="#FFFFFF" />
+                           )}
+                           <Text style={styles.voteFeedbackText}>
+                             {voteFeedback.vote === 'like' ? 'Liked!' : 'Disliked!'}
+                           </Text>
+                         </View>
+                       </Animated.View>
+                     )}
                      {/* Top Badges Row - Only for shared collections */}
                      {isSharedCollection && (
                        <View style={styles.badgesRow}>
@@ -1388,7 +1532,7 @@ export default function CollectionDetailScreen() {
                         <Text style={styles.restaurantName}>{restaurant.name}</Text>
                         <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
                         <Text style={styles.restaurantDetails}>
-                          {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
+                          {`${restaurant.priceRange} • ${restaurant.neighborhood || 'Restaurant'}`}
                         </Text>
                       </View>
                       
@@ -1407,13 +1551,13 @@ export default function CollectionDetailScreen() {
                        <View style={styles.approvalSection}>
                          <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
                          <Text style={styles.voteBreakdown}>
-                           {meta.voteDetails?.likeVoters?.filter((v: any) => {
+                           {`${meta.voteDetails?.likeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => {
+                           }).length || 0} likes • ${meta.voteDetails?.dislikeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} dislikes
+                           }).length || 0} dislikes`}
                          </Text>
                          {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
                            <View style={styles.consensusBadge}>
@@ -1435,6 +1579,7 @@ export default function CollectionDetailScreen() {
                              userLiked && styles.likeButtonActive
                            ]}
                            onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
+                           activeOpacity={0.7}
                          >
                            <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
                            <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => {
@@ -1450,6 +1595,7 @@ export default function CollectionDetailScreen() {
                              userDisliked && styles.dislikeButtonActive
                            ]}
                            onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
+                           activeOpacity={0.7}
                          >
                            <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
                            <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => {
@@ -1480,7 +1626,7 @@ export default function CollectionDetailScreen() {
                          <Text style={styles.removeButtonText}>Remove</Text>
                        </TouchableOpacity>
                      )}
-                  </View>
+                  </Animated.View>
                 );
               })
             )}
@@ -2456,6 +2602,36 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Vote feedback styles
+  voteFeedbackOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  voteFeedbackContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
+  },
+  likeFeedback: {
+    backgroundColor: '#22C55E',
+  },
+  dislikeFeedback: {
+    backgroundColor: '#EF4444',
+  },
+  voteFeedbackText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

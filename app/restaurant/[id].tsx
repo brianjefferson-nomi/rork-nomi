@@ -28,7 +28,9 @@ const generateCuisineSpecificDishes = (cuisine: string, restaurantName: string):
 
 export default function RestaurantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  console.log('[RestaurantDetail] Looking for restaurant with ID:', id);
   const restaurant = useRestaurantById(id || '');
+  console.log('[RestaurantDetail] Found restaurant:', restaurant?.name || 'NOT FOUND');
   const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection } = useRestaurants();
   const votes = useRestaurantVotes(id || '');
   const [editingNote, setEditingNote] = useState(false);

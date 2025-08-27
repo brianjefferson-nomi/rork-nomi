@@ -27,8 +27,8 @@ export function CollectionSelectorModal({
 }: CollectionSelectorModalProps) {
   const getCollectionImage = (collection: Collection) => {
     // Use collection cover image if available, otherwise use a default
-    if (collection.cover_image && collection.cover_image.startsWith('http')) {
-      return collection.cover_image;
+    if ((collection as any).cover_image && (collection as any).cover_image.startsWith('http')) {
+      return (collection as any).cover_image;
     }
     
     // Generate a default image based on collection name or occasion
@@ -67,7 +67,7 @@ export function CollectionSelectorModal({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {restaurantName ? `Add "${restaurantName}" to collection` : 'Save to collection'}
+              {restaurantName ? `Add ${restaurantName} to collection` : 'Save to collection'}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={20} color="#666" />

@@ -43,7 +43,7 @@ export function ContributorCard({
             )}
           </View>
           <Text style={styles.compactStats}>
-            {contributor.thumbsUp} 👍 {' • '} {contributor.reviewCount || 0} reviews
+                            {`${contributor.thumbsUp} 👍 • ${contributor.reviewCount || 0} reviews`}
           </Text>
           {contributor.badges && contributor.badges.length > 0 && (
             <Text style={styles.compactBadge}>{contributor.badges[0]}</Text>

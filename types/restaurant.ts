@@ -27,10 +27,27 @@ export interface Restaurant {
   website?: string;
   priceLevel?: number;
   vibeTags?: string[];
+  // Enhanced location structure
+  location?: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    neighborhood: string;
+    formattedAddress: string;
+  };
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   // Location-based fields
   distance?: string;
   proximity?: 'Very Close' | 'Nearby' | 'Close' | 'Within Range';
   isFavorite?: boolean;
+  // Source information
+  source?: string;
+  sourceId?: string;
 }
 
 export interface Collection {

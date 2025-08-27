@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { Send, Bot, User, MapPin, DollarSign, Star, ExternalLink } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { searchMapboxRestaurants, getMapboxNearbyRestaurants, deduplicateRestaurants } from '@/services/api';
 import { router } from 'expo-router';
 
 interface Message {
@@ -45,16 +46,43 @@ export default function AIScreen() {
       if (isSearchQuery) {
         try {
           console.log('[AI] Searching for restaurants based on user query');
-          const results = await searchRestaurants(userMessage);
-          searchResults = results;
-          console.log(`[AI] Found ${results.length} new restaurants`);
+          
+          // Use Mapbox APIs for better search results
+          const lat = userLocation?.lat || 40.7128;
+          const lng = userLocation?.lng || -74.0060;
+          
+          // Search with the user's query
+          const mapboxResults = await searchMapboxRestaurants(userMessage, lat, lng, 5000, 10);
+          const transformedMapbox = mapboxResults.map((restaurant: any) => ({
+            id: restaurant.id,
+            name: restaurant.name,
+            cuisine: restaurant.cuisine || 'Restaurant',
+            rating: restaurant.rating || 4.0,
+            priceRange: restaurant.price || '$',
+            neighborhood: restaurant.location?.city || userLocation?.city || 'NYC',
+            address: restaurant.location?.formattedAddress || '',
+            description: restaurant.description || 'A great dining experience awaits.',
+            vibe: restaurant.attributes || []
+          }));
+          
+          searchResults = transformedMapbox;
+          console.log(`[AI] Found ${searchResults.length} new restaurants with Mapbox`);
         } catch (error) {
           console.error('[AI] Error searching restaurants:', error);
+          
+          // Fallback to regular search
+          try {
+            const results = await searchRestaurants(userMessage);
+            searchResults = results;
+            console.log(`[AI] Found ${results.length} restaurants with fallback search`);
+          } catch (fallbackError) {
+            console.error('[AI] Fallback search also failed:', fallbackError);
+          }
         }
       }
       
-      // Combine existing restaurants with new results now in store
-      const allRestaurants = [...restaurants, ...searchResults.slice(0, 10)];
+                // Combine existing restaurants with new results and deduplicate
+          const allRestaurants = deduplicateRestaurants([...restaurants, ...searchResults.slice(0, 10)]);
       
       const response = await fetch('https://toolkit.rork.com/text/llm/', {
         method: 'POST',

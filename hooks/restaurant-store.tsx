@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion, GroupRecommendation } from '@/types/restaurant';
 // Removed mock data imports - only use real data from database
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
-import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI } from '@/services/api';
+import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI, deduplicateRestaurants } from '@/services/api';
 import { dbHelpers, Database, supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
 
@@ -84,6 +84,7 @@ interface RestaurantStore {
   addMemberToCollection: (collectionId: string, userId: string, role?: 'member' | 'admin') => Promise<any>;
   removeMemberFromCollection: (collectionId: string, userId: string) => Promise<void>;
   updateCollectionType: (collectionId: string, collectionType: 'public' | 'private' | 'shared') => Promise<any>;
+  addRestaurantToStore: (restaurant: Restaurant) => void;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -192,15 +193,29 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryKey: ['userFavorites', user?.id || ''],
     queryFn: async () => {
       try {
-        const favorites = await dbHelpers.getUserFavorites(user?.id || '');
-        return favorites;
+        // Only fetch from database if we have a user ID
+        if (user?.id) {
+          const favorites = await dbHelpers.getUserFavorites(user.id);
+          console.log('[favoritesQuery] Fetched favorites from database:', favorites);
+          return favorites;
+        } else {
+          console.log('[favoritesQuery] No user ID, falling back to AsyncStorage');
+          // Fallback to AsyncStorage when no user ID
+          const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
+          const parsedFavorites = storedFavorites ? JSON.parse(storedFavorites) : [];
+          console.log('[favoritesQuery] Fetched favorites from AsyncStorage:', parsedFavorites);
+          return parsedFavorites;
+        }
       } catch (error) {
+        console.error('[favoritesQuery] Error fetching favorites:', error);
         // Fallback to AsyncStorage
         const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
-        return storedFavorites ? JSON.parse(storedFavorites) : [];
+        const parsedFavorites = storedFavorites ? JSON.parse(storedFavorites) : [];
+        console.log('[favoritesQuery] Fallback to AsyncStorage:', parsedFavorites);
+        return parsedFavorites;
       }
     },
-    enabled: true, // Always enabled to maintain hook order
+    enabled: !!user?.id, // Only enable when we have a user ID
     retry: 1,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -231,11 +246,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
     queryFn: async () => {
-      const [storedVotes, storedDiscussions, storedNotes, storedSearchHistory, location] = await Promise.all([
+      const [storedVotes, storedDiscussions, storedNotes, storedSearchHistory, storedFavorites, location] = await Promise.all([
         AsyncStorage.getItem('userVotes'),
         AsyncStorage.getItem('discussions'),
         AsyncStorage.getItem('restaurantNotes'),
         AsyncStorage.getItem('searchHistory'),
+        AsyncStorage.getItem('favoriteRestaurants'),
         getUserLocation()
       ]);
 
@@ -249,7 +265,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         restaurants: restaurantsWithNotes,
         userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : []),
         discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : []),
-        favoriteRestaurants: favoritesQuery.data || [],
+        favoriteRestaurants: favoritesQuery.data || (storedFavorites ? JSON.parse(storedFavorites) : []),
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
       };
@@ -291,6 +307,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       setUserLocation(dataQuery.data.userLocation);
     }
   }, [dataQuery.data]);
+
+  // Load favorites from AsyncStorage when user is not available yet
+  useEffect(() => {
+    const loadFavoritesFromStorage = async () => {
+      if (!user?.id && favoriteRestaurants.length === 0) {
+        try {
+          const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
+          if (storedFavorites) {
+            const parsedFavorites = JSON.parse(storedFavorites);
+            console.log('[RestaurantStore] Loaded favorites from AsyncStorage:', parsedFavorites);
+            setFavoriteRestaurants(parsedFavorites);
+          }
+        } catch (error) {
+          console.error('[RestaurantStore] Error loading favorites from AsyncStorage:', error);
+        }
+      }
+    };
+
+    loadFavoritesFromStorage();
+  }, [user?.id, favoriteRestaurants.length]);
 
   // Enhanced user plans/collections query with better error handling and data validation
   const plansQuery = useQuery({
@@ -541,9 +577,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
       console.log('[toggleFavoriteMutation] Database update successful:', result);
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       console.log('[toggleFavoriteMutation] Success callback - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['userFavorites'] });
+      queryClient.invalidateQueries({ queryKey: ['userFavorites', variables.userId] });
     },
     onError: (error) => {
       console.error('[toggleFavoriteMutation] Error updating favorites:', error);
@@ -565,19 +601,36 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Helper functions
   const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
+    console.log(`[RestaurantStore] searchRestaurants called with query: "${query}"`);
+    console.log(`[RestaurantStore] User location:`, userLocation);
+    
     try {
+      console.log(`[RestaurantStore] Calling searchRestaurantsWithAPI...`);
       const results = await searchRestaurantsWithAPI(query, userLocation?.city || 'New York');
-      setSearchResults(results);
-      return results;
+      console.log(`[RestaurantStore] API returned ${results?.length || 0} results`);
+      console.log(`[RestaurantStore] First few results:`, results?.slice(0, 3));
+      
+      // Deduplicate results before setting
+      const deduplicatedResults = deduplicateRestaurants(results);
+      console.log(`[RestaurantStore] After deduplication: ${deduplicatedResults?.length || 0} results`);
+      
+      setSearchResults(deduplicatedResults);
+      console.log(`[RestaurantStore] Search results set in state`);
+      return deduplicatedResults;
     } catch (error) {
+      console.error(`[RestaurantStore] API search failed, falling back to local search:`, error);
       // Fallback to local search
       const filtered = restaurants.filter(restaurant =>
         restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
         restaurant.cuisine.toLowerCase().includes(query.toLowerCase()) ||
         restaurant.neighborhood.toLowerCase().includes(query.toLowerCase())
       );
-      setSearchResults(filtered);
-      return filtered;
+      console.log(`[RestaurantStore] Local search found ${filtered.length} results`);
+      
+      // Deduplicate fallback results too
+      const deduplicatedFiltered = deduplicateRestaurants(filtered);
+      setSearchResults(deduplicatedFiltered);
+      return deduplicatedFiltered;
     }
   }, [restaurants, userLocation]);
 
@@ -658,14 +711,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [deletePlanMutation, user?.id]);
 
   const toggleFavorite = useCallback((restaurantId: string) => {
-    if (!user?.id) {
-      console.log('[toggleFavorite] No user ID available');
-      return;
-    }
-
     console.log('[toggleFavorite] Toggling favorite for restaurant:', restaurantId);
     console.log('[toggleFavorite] Current favorites:', favoriteRestaurants);
-    console.log('[toggleFavorite] User ID:', user.id);
+    console.log('[toggleFavorite] User ID:', user?.id);
 
     const newFavorites = favoriteRestaurants.includes(restaurantId)
       ? favoriteRestaurants.filter(id => id !== restaurantId)
@@ -673,11 +721,24 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     console.log('[toggleFavorite] New favorites array:', newFavorites);
 
+    // Update local state immediately
     setFavoriteRestaurants(newFavorites);
-    toggleFavoriteMutation.mutate({ userId: user.id, favoriteRestaurants: newFavorites });
     
-    console.log('[toggleFavorite] Mutation triggered for database update');
-  }, [favoriteRestaurants, user?.id, toggleFavoriteMutation]);
+    // Save to AsyncStorage as backup
+    AsyncStorage.setItem('favoriteRestaurants', JSON.stringify(newFavorites))
+      .then(() => console.log('[toggleFavorite] Saved to AsyncStorage'))
+      .catch(error => console.error('[toggleFavorite] AsyncStorage error:', error));
+    
+    // Update database if user is logged in
+    if (user?.id) {
+      toggleFavoriteMutation.mutate({ userId: user.id, favoriteRestaurants: newFavorites });
+      // Also invalidate the specific query key with user ID
+      queryClient.invalidateQueries({ queryKey: ['userFavorites', user.id] });
+      console.log('[toggleFavorite] Database update triggered');
+    } else {
+      console.log('[toggleFavorite] No user ID, only saved to AsyncStorage');
+    }
+  }, [favoriteRestaurants, user?.id, toggleFavoriteMutation, queryClient]);
 
   const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
     if (!user?.id) return;
@@ -1229,6 +1290,26 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, []);
 
+  // Add restaurant to store when selected from search results
+  const addRestaurantToStore = useCallback((restaurant: Restaurant) => {
+    console.log('[RestaurantStore] addRestaurantToStore called with:', restaurant.name, restaurant.id);
+    
+    setRestaurants(prevRestaurants => {
+      // Check if restaurant already exists
+      const exists = prevRestaurants.find(r => r.id === restaurant.id);
+      if (exists) {
+        console.log('[RestaurantStore] Restaurant already exists in store:', restaurant.id);
+        return prevRestaurants;
+      }
+      
+      console.log('[RestaurantStore] Adding restaurant to store:', restaurant.id, restaurant.name);
+      console.log('[RestaurantStore] Previous restaurant count:', prevRestaurants.length);
+      const newRestaurants = [...prevRestaurants, restaurant];
+      console.log('[RestaurantStore] New restaurant count:', newRestaurants.length);
+      return newRestaurants;
+    });
+  }, []);
+
   // Debug logging for return values
   console.log('[RestaurantStore] Return values:');
   console.log('  - restaurants:', restaurants.length);
@@ -1299,7 +1380,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     getCollectionsByType,
     addMemberToCollection,
     removeMemberFromCollection,
-    updateCollectionType
+    updateCollectionType,
+    addRestaurantToStore
   };
 });
 
@@ -1457,7 +1539,17 @@ export function useRestaurantById(id: string | undefined) {
   const { restaurants } = useRestaurants();
   
   return useMemo(() => {
-    if (!id || id === '') return null;
-    return restaurants.find((r: any) => r.id === id);
+    if (!id || id === '') {
+      console.log('[useRestaurantById] No ID provided');
+      return null;
+    }
+    
+    console.log(`[useRestaurantById] Looking for restaurant ID: ${id}`);
+    console.log(`[useRestaurantById] Available restaurant IDs:`, restaurants.map(r => r.id));
+    
+    const found = restaurants.find((r: any) => r.id === id);
+    console.log(`[useRestaurantById] Found restaurant:`, found?.name || 'NOT FOUND');
+    
+    return found;
   }, [restaurants, id]);
 }

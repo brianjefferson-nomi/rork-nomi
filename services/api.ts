@@ -8,11 +8,14 @@ const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '20963faf74mshd7e2b
 const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
 // Foursquare API keys with fallback mechanism
-const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'DGV1DNHVYV2EGZY1ZRHVP4EMS2PA052UJ4IXX1WAQRKUSWTT';
-const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || '05GWIV2KWFUNMNVOYS3CRWDGIA3TISMBGDP3W3CZ5IYEXCOE';
+const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'EAAKV5FPOD1JMYUGWSULS1C05H1M4GVHPWFEPREMTT3MP5SU';
+const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || 'VUKNP0GPD5N15RZDEJVWQH0JOWKGX5GJL42NJIOSFKQERMMX';
 const FOURSQUARE_FALLBACK_KEY = 'fsq3iPnP2vBvgyThDFd5/cawBsDYxFPf37L6rOvnZjA7zvM=';
 const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
 const FOURSQUARE_NEW_BASE_URL = 'https://api.foursquare.com/v2';
+const FOURSQUARE_PLACES_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_PLACES_API_KEY || FOURSQUARE_FALLBACK_KEY;
+const FOURSQUARE_PLACES_BASE_URL = 'https://places-api.foursquare.com';
+const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_API_KEY || 'sk.eyJ1Ijoibm9taS1icmlhbiIsImEiOiJjbWV0aW5hcTEwZnM2Mmlwb2cweGxkc3pwIn0.-I4ZJXTfYnJwr8bOvt9JhQ';
 const STOCK_PHOTOS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const STOCK_PHOTOS_HOST = 'stock-photos-and-videos.p.rapidapi.com';
 const RESTAURANTS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
@@ -31,6 +34,10 @@ const YELP_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const YELP_HOST = 'yelp-business-api.p.rapidapi.com';
 const YELP_API3_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const YELP_API3_HOST = 'yelp-api3.p.rapidapi.com';
+
+// Yelp Fusion API configuration (direct Yelp API)
+const YELP_FUSION_API_KEY = process.env.EXPO_PUBLIC_YELP_FUSION_API_KEY || '';
+const YELP_FUSION_BASE_URL = 'https://api.yelp.com/v3';
 const WORLDWIDE_RESTAURANTS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const WORLDWIDE_RESTAURANTS_HOST = 'worldwide-restaurants.p.rapidapi.com';
 const UBER_EATS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
@@ -2079,7 +2086,7 @@ export const searchFoursquareAutocomplete = async (
   }
 };
 
-// Search for restaurants using Foursquare API v3 with fallback keys
+// Search for restaurants using Foursquare API (v2 as primary, Places API as fallback)
 export const searchFoursquareRestaurants = async (
   query: string, 
   lat?: number, 
@@ -2089,54 +2096,17 @@ export const searchFoursquareRestaurants = async (
   try {
     console.log('[Foursquare] Searching for restaurants:', query);
     
-    // Use the new v2 endpoint format
-    const url = `${FOURSQUARE_NEW_BASE_URL}/venues/search`;
+    // Try v2 API first (more reliable)
+    console.log('[Foursquare] Using v2 API as primary method');
+    const v2Results = await searchFoursquareRestaurantsV2(query, lat, lng, radius);
     
-    // Build query parameters for v2 API
-    const params = new URLSearchParams({
-      query: query,
-      categoryId: '4d4b7105d754a06374d81259', // Food category ID for restaurants
-      limit: '50',
-      radius: radius.toString(),
-      sort: 'rating',
-      v: '20231201' // API version
-    });
-    
-    if (lat && lng) {
-      params.append('ll', `${lat},${lng}`);
+    if (v2Results.length > 0) {
+      console.log(`[Foursquare v2] ✅ Success - Found ${v2Results.length} restaurants for query: "${query}"`);
+      return v2Results;
     }
     
-    // Build URL with v2 authentication
-    const fullUrl = buildFoursquareV2Url('/venues/search', params);
-    
-    console.log('[Foursquare] Using v2 API with client_id/client_secret authentication');
-    
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const results = data.response?.venues || data.venues || [];
-        
-        console.log(`[Foursquare] ✅ Success - Found ${results.length} restaurants for query: "${query}"`);
-        return results;
-      } else {
-        console.error(`[Foursquare] ❌ API failed: ${response.status} ${response.statusText}`);
-        
-        if (response.status === 401) {
-          console.error('[Foursquare] Authentication failed - check client_id and client_secret');
-        }
-      }
-    } catch (error) {
-      console.error('[Foursquare] Error searching restaurants:', error);
-    }
-    
-    console.error('[Foursquare] API failed for search - no restaurants found');
+    // Skip Places API due to CORS issues in browser environment
+    console.log('[Foursquare] v2 API failed, skipping Places API due to CORS restrictions');
     return [];
     
   } catch (error) {
@@ -2146,50 +2116,208 @@ export const searchFoursquareRestaurants = async (
   }
 };
 
-// Get detailed information about a specific restaurant with fallback keys
+// Places API implementation (as fallback)
+const searchFoursquareRestaurantsPlaces = async (
+  query: string, 
+  lat?: number, 
+  lng?: number, 
+  radius: number = 5000
+): Promise<any[]> => {
+  try {
+    console.log('[Foursquare Places] Trying Places API as fallback');
+    
+    // Use the new Places API endpoint
+    const url = `${FOURSQUARE_PLACES_BASE_URL}/places/search`;
+    
+    // Build query parameters for Places API
+    const params = new URLSearchParams({
+      query: query,
+      categories: '13065', // Food category
+      limit: '50',
+      radius: radius.toString(),
+      v: '20241201' // Required version parameter in YYYYMMDD format
+    });
+    
+    if (lat && lng) {
+      params.append('ll', `${lat},${lng}`);
+    }
+    
+    console.log('[Foursquare Places] Using Places API with Bearer token authentication');
+    
+    const response = await fetch(`${url}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${FOURSQUARE_PLACES_API_KEY}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const results = data.results || [];
+      
+      console.log(`[Foursquare Places] ✅ Success - Found ${results.length} restaurants for query: "${query}"`);
+      return results;
+    } else {
+      console.error(`[Foursquare Places] ❌ API failed: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Fallback function using Foursquare v2 API
+const searchFoursquareRestaurantsV2 = async (
+  query: string, 
+  lat?: number, 
+  lng?: number, 
+  radius: number = 5000
+): Promise<any[]> => {
+  try {
+    console.log('[Foursquare v2] Fallback search for restaurants:', query);
+    
+    // Use the v2 endpoint format
+    const url = `${FOURSQUARE_NEW_BASE_URL}/venues/search`;
+    
+    // Build query parameters for v2 API
+    const params = new URLSearchParams({
+      query: query,
+      categoryId: '4d4b7105d754a06374d81259', // Food category ID for restaurants
+      limit: '50',
+      radius: radius.toString(),
+      sort: 'rating',
+      v: '20241201' // API version in YYYYMMDD format
+    });
+    
+    if (lat && lng) {
+      params.append('ll', `${lat},${lng}`);
+    }
+    
+    // Build URL with v2 authentication
+    const fullUrl = buildFoursquareV2Url('/venues/search', params);
+    
+    console.log('[Foursquare v2] Using v2 API with client_id/client_secret authentication');
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const results = data.response?.venues || data.venues || [];
+      
+      console.log(`[Foursquare v2] ✅ Success - Found ${results.length} restaurants for query: "${query}"`);
+      return results;
+    } else {
+      console.error(`[Foursquare v2] ❌ API failed: ${response.status} ${response.statusText}`);
+    }
+    
+    return [];
+    
+  } catch (error) {
+    console.error('[Foursquare v2] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Get detailed information about a specific restaurant using Foursquare API (v2 as primary, Places API as fallback)
 export const getFoursquareRestaurantDetails = async (fsqId: string): Promise<any> => {
   try {
     console.log('[Foursquare] Getting details for restaurant:', fsqId);
+    
+    // Try v2 API first (more reliable)
+    console.log('[Foursquare] Using v2 API as primary method');
+    const v2Details = await getFoursquareRestaurantDetailsV2(fsqId);
+    
+    if (v2Details) {
+      console.log('[Foursquare v2] ✅ Success - Retrieved restaurant details');
+      return v2Details;
+    }
+    
+    // Skip Places API due to CORS issues in browser environment
+    console.log('[Foursquare] v2 API failed, skipping Places API due to CORS restrictions');
+    return null;
+    
+  } catch (error) {
+    console.error('[Foursquare] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Places API implementation for restaurant details (as fallback)
+const getFoursquareRestaurantDetailsPlaces = async (fsqId: string): Promise<any> => {
+  try {
+    console.log('[Foursquare Places] Trying Places API as fallback for details');
+    
+    // Use the new Places API endpoint
+    const url = `${FOURSQUARE_PLACES_BASE_URL}/places/${fsqId}`;
+    
+    console.log('[Foursquare Places] Using Places API with Bearer token authentication');
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${FOURSQUARE_PLACES_API_KEY}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Foursquare Places] ✅ Success - Retrieved restaurant details');
+      return data;
+    } else {
+      console.error(`[Foursquare Places] ❌ API failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Fallback function using Foursquare v2 API
+const getFoursquareRestaurantDetailsV2 = async (fsqId: string): Promise<any> => {
+  try {
+    console.log('[Foursquare v2] Fallback getting details for restaurant:', fsqId);
     
     const url = `${FOURSQUARE_NEW_BASE_URL}/venues/${fsqId}`;
     
     // Build URL with v2 authentication
     const params = new URLSearchParams({
-      v: '20231201' // API version
+      v: '20241201' // API version in YYYYMMDD format
     });
     const fullUrl = buildFoursquareV2Url(`/venues/${fsqId}`, params);
     
-    console.log('[Foursquare] Using v2 API with client_id/client_secret authentication');
+    console.log('[Foursquare v2] Using v2 API with client_id/client_secret authentication');
     
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Rork-Nomi-App/1.0'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Foursquare] ✅ Success - Retrieved restaurant details');
-        return data.response?.venue || data.venue;
-      } else {
-        console.error(`[Foursquare] ❌ API failed: ${response.status} ${response.statusText}`);
-        
-        if (response.status === 401) {
-          console.error('[Foursquare] Authentication failed - check client_id and client_secret');
-        }
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Rork-Nomi-App/1.0'
       }
-    } catch (error) {
-      console.error('[Foursquare] Error getting restaurant details:', error);
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Foursquare v2] ✅ Success - Retrieved restaurant details');
+      return data.response?.venue || data.venue;
+    } else {
+      console.error(`[Foursquare v2] ❌ API failed: ${response.status} ${response.statusText}`);
     }
     
-    console.error('[Foursquare] API failed for details - no restaurant details available');
     return null;
     
   } catch (error) {
-    console.error('[Foursquare] Error getting restaurant details:', error);
+    console.error('[Foursquare v2] Error getting restaurant details:', error);
     return null;
   }
 };
@@ -2258,68 +2386,133 @@ export const getFoursquareNearbyRestaurants = async (
   }
 };
 
-// Get photos for a restaurant using Foursquare API v3 with fallback keys
+// Get photos for a restaurant using Foursquare API (v2 as primary, Places API as fallback)
 export const getFoursquareRestaurantPhotos = async (fsqId: string, limit: number = 10): Promise<string[]> => {
   try {
     console.log('[Foursquare] Getting photos for restaurant:', fsqId);
     
-    // Use the new v2 endpoint format
+    // Try v2 API first (more reliable)
+    console.log('[Foursquare] Using v2 API as primary method');
+    const v2Photos = await getFoursquareRestaurantPhotosV2(fsqId, limit);
+    
+    if (v2Photos.length > 0) {
+      console.log(`[Foursquare v2] ✅ Success - Retrieved ${v2Photos.length} photos for ${fsqId}`);
+      return v2Photos;
+    }
+    
+    // Skip Places API due to CORS issues in browser environment
+    console.log('[Foursquare] v2 API returned no photos, skipping Places API due to CORS restrictions');
+    return [];
+    
+  } catch (error) {
+    console.error('[Foursquare] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Places API implementation for restaurant photos (as fallback)
+const getFoursquareRestaurantPhotosPlaces = async (fsqId: string, limit: number = 10): Promise<string[]> => {
+  try {
+    console.log('[Foursquare Places] Trying Places API as fallback for photos');
+    
+    // Use the new Places API endpoint
+    const url = `${FOURSQUARE_PLACES_BASE_URL}/places/${fsqId}/photos`;
+    
+    console.log('[Foursquare Places] Using Places API with Bearer token authentication');
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${FOURSQUARE_PLACES_API_KEY}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const photos = data.results || [];
+      
+      // Extract photo URLs from Places API response
+      const photoUrls = photos.map((photo: any) => {
+        // Handle Places API format
+        if (photo.prefix && photo.suffix) {
+          return `${photo.prefix}original${photo.suffix}`;
+        }
+        
+        // Handle other formats
+        if (photo.original && photo.original.url) {
+          return photo.original.url;
+        }
+        
+        return null;
+      }).filter(Boolean);
+      
+      console.log(`[Foursquare Places] ✅ Success - Retrieved ${photoUrls.length} photos for ${fsqId}`);
+      return photoUrls;
+    } else {
+      console.error(`[Foursquare Places] ❌ API failed: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Fallback function using Foursquare v2 API
+const getFoursquareRestaurantPhotosV2 = async (fsqId: string, limit: number = 10): Promise<string[]> => {
+  try {
+    console.log('[Foursquare v2] Fallback getting photos for restaurant:', fsqId);
+    
+    // Use the v2 endpoint format
     const url = `${FOURSQUARE_NEW_BASE_URL}/venues/${fsqId}/photos`;
     
     // Build URL with v2 authentication
     const params = new URLSearchParams({
       limit: limit.toString(),
-      v: '20231201' // API version
+      v: '20241201' // API version in YYYYMMDD format
     });
     const fullUrl = buildFoursquareV2Url(`/venues/${fsqId}/photos`, params);
     
-    console.log('[Foursquare] Using v2 API with client_id/client_secret authentication');
+    console.log('[Foursquare v2] Using v2 API with client_id/client_secret authentication');
     
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const photos = data.response?.photos?.items || data.photos?.items || [];
-        
-        // Extract photo URLs - handle v2 response format
-        const photoUrls = photos.map((photo: any) => {
-          // Handle v2 format (prefix + suffix)
-          if (photo.prefix && photo.suffix) {
-            return `${photo.prefix}original${photo.suffix}`;
-          }
-          
-          // Handle other formats
-          if (photo.original && photo.original.url) {
-            return photo.original.url;
-          }
-          
-          return null;
-        }).filter(Boolean);
-        
-        console.log(`[Foursquare] ✅ Success - Retrieved ${photoUrls.length} photos for ${fsqId}`);
-        return photoUrls;
-      } else {
-        console.error(`[Foursquare] ❌ API failed: ${response.status} ${response.statusText}`);
-        
-        if (response.status === 401) {
-          console.error('[Foursquare] Authentication failed - check client_id and client_secret');
-        }
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
       }
-    } catch (error) {
-      console.error('[Foursquare] Error getting restaurant photos:', error);
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const photos = data.response?.photos?.items || data.photos?.items || [];
+      
+      // Extract photo URLs - handle v2 response format
+      const photoUrls = photos.map((photo: any) => {
+        // Handle v2 format (prefix + suffix)
+        if (photo.prefix && photo.suffix) {
+          return `${photo.prefix}original${photo.suffix}`;
+        }
+        
+        // Handle other formats
+        if (photo.original && photo.original.url) {
+          return photo.original.url;
+        }
+        
+        return null;
+      }).filter(Boolean);
+      
+      console.log(`[Foursquare v2] ✅ Success - Retrieved ${photoUrls.length} photos for ${fsqId}`);
+      return photoUrls;
+    } else {
+      console.error(`[Foursquare v2] ❌ API failed: ${response.status} ${response.statusText}`);
     }
     
-    console.error('[Foursquare] API failed for photos - no photos available');
     return [];
     
   } catch (error) {
-    console.error('[Foursquare] Error getting restaurant photos:', error);
+    console.error('[Foursquare v2] Error getting restaurant photos:', error);
     return [];
   }
 };
@@ -2332,7 +2525,7 @@ export const getFoursquareRestaurantTips = async (fsqId: string, limit: number =
     const params = new URLSearchParams({
       limit: limit.toString(),
       sort: 'popular',
-      v: '20231201' // API version
+      v: '20241201' // API version in YYYYMMDD format
     });
     
     const url = `${FOURSQUARE_NEW_BASE_URL}/venues/${fsqId}/tips?${params}`;
@@ -2693,53 +2886,184 @@ export const transformRestaurantsAPIData = (apiData: any): any => {
   }
 };
 
-// Enhanced restaurant search with Restaurants API
+// Geocode location using Mapbox Geocoding API v6
+const geocodeLocation = async (location: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    console.log('[Mapbox Geocoding v6] Geocoding location:', location);
+    
+    const params = new URLSearchParams({
+      access_token: MAPBOX_API_KEY,
+      q: location,
+      limit: '1',
+      types: 'place,locality,neighborhood',
+      autocomplete: 'true'
+    });
+    
+    const url = `https://api.mapbox.com/search/geocode/v6/forward?${params.toString()}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const features = data.features || [];
+      
+      if (features.length > 0) {
+        const coordinates = features[0].geometry?.coordinates;
+        if (coordinates && coordinates.length >= 2) {
+          const [lng, lat] = coordinates;
+          console.log('[Mapbox Geocoding v6] Found coordinates:', lat, lng);
+          return { lat, lng };
+        }
+      }
+    } else {
+      console.error('[Mapbox Geocoding v6] API error:', response.status, response.statusText);
+    }
+    
+    console.log('[Mapbox Geocoding v6] No coordinates found for:', location);
+    return null;
+  } catch (error) {
+    console.error('[Mapbox Geocoding v6] Error geocoding location:', error);
+    return null;
+  }
+};
+
+// Reverse geocode coordinates to location name using Mapbox Geocoding API v6
+export const reverseGeocodeLocation = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    console.log('[Mapbox Geocoding v6] Reverse geocoding coordinates:', lat, lng);
+    
+    const params = new URLSearchParams({
+      access_token: MAPBOX_API_KEY,
+      longitude: lng.toString(),
+      latitude: lat.toString(),
+      type: 'place'
+    });
+    
+    const url = `https://api.mapbox.com/search/geocode/v6/reverse?${params.toString()}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const features = data.features || [];
+      
+      if (features.length > 0) {
+        // Try to get the most relevant place name
+        const feature = features[0];
+        const placeName = feature.properties?.name || 
+                         feature.properties?.place_name || 
+                         feature.properties?.text ||
+                         feature.properties?.address;
+        console.log('[Mapbox Geocoding v6] Found location name:', placeName);
+        return placeName;
+      }
+    } else {
+      console.error('[Mapbox Geocoding v6] Reverse geocoding API error:', response.status, response.statusText);
+    }
+    
+    console.log('[Mapbox Geocoding v6] No location name found for coordinates:', lat, lng);
+    return null;
+  } catch (error) {
+    console.error('[Mapbox Geocoding v6] Error reverse geocoding:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with Mapbox Search Box API and Geocoding API
 export const searchRestaurantsWithAPI = async (
   query: string, 
   location?: string, 
   limit: number = 20
 ): Promise<any[]> => {
   try {
-    console.log('[API] Searching restaurants with Restaurants API');
+    console.log('[API] Searching restaurants with Mapbox APIs');
+    console.log('[API] Query:', query);
+    console.log('[API] Location:', location);
     
-    // Search using Restaurants API
-    const apiResults = await searchRestaurantsAPI(query, location, limit);
+    // Get user location coordinates
+    let lat = 40.7128; // Default to NYC
+    let lng = -74.0060;
     
-    // Transform results
-    const transformedResults = apiResults
-      .map(transformRestaurantsAPIData)
-      .filter(Boolean);
-    
-    // Enhance with additional data for top results
-    const enhancedResults = await Promise.all(
-      transformedResults.slice(0, 10).map(async (restaurant) => {
-        try {
-          // Get photos
-          const photos = await getRestaurantPhotosAPI(restaurant.id, 5);
-          const photoUrls = photos.map((photo: any) => photo.url || photo.image_url || photo.src).filter(Boolean);
-          
-          // Get reviews for description
-          const reviews = await getRestaurantReviewsAPI(restaurant.id, 5);
-          const reviewTexts = reviews.map((review: any) => review.text || review.comment || review.review).filter(Boolean);
-          
-          return {
-            ...restaurant,
-            photos: photoUrls,
-            reviews: reviewTexts,
-            description: reviewTexts.length > 0 ? reviewTexts[0] : 'A great dining experience awaits.'
-          };
-        } catch (error) {
-          console.error('[Restaurants API] Error enhancing restaurant:', error);
-          return restaurant;
+    // If location is provided, geocode it to get coordinates
+    if (location) {
+      try {
+        const geocodedLocation = await geocodeLocation(location);
+        if (geocodedLocation) {
+          lat = geocodedLocation.lat;
+          lng = geocodedLocation.lng;
         }
-      })
-    );
+      } catch (error) {
+        console.error('[API] Error geocoding location:', error);
+      }
+    }
     
-    console.log(`[API] Enhanced ${enhancedResults.length} restaurants with Restaurants API data`);
-    return enhancedResults;
+    console.log('[API] Using coordinates:', lat, lng);
+    
+    // Search using Mapbox Search Box API
+    console.log('[API] Calling searchMapboxRestaurants...');
+    const mapboxResults = await searchMapboxRestaurants(query, lat, lng, 5000, limit);
+    console.log('[API] Mapbox results:', mapboxResults?.length || 0);
+    console.log('[API] First few Mapbox results:', mapboxResults?.slice(0, 2));
+    
+    const transformedMapbox = mapboxResults.map((result, index) => {
+      console.log(`[API] Transforming Mapbox result ${index}:`, result?.name || result?.properties?.name || 'Unknown');
+      const transformed = transformMapboxToRestaurant(result);
+      if (!transformed) {
+        console.log(`[API] Transformation failed for result ${index}`);
+      }
+      return transformed;
+    }).filter(Boolean);
+    console.log('[API] Transformed Mapbox results:', transformedMapbox?.length || 0);
+    
+    // Also try nearby search for more variety
+    console.log('[API] Calling getMapboxNearbyRestaurants...');
+    const nearbyResults = await getMapboxNearbyRestaurants(lat, lng, 5000, Math.floor(limit / 2));
+    console.log('[API] Nearby results:', nearbyResults?.length || 0);
+    
+    const transformedNearby = nearbyResults.map((result, index) => {
+      console.log(`[API] Transforming nearby result ${index}:`, result?.name || result?.properties?.name || 'Unknown');
+      const transformed = transformMapboxToRestaurant(result);
+      if (!transformed) {
+        console.log(`[API] Transformation failed for nearby result ${index}`);
+      }
+      return transformed;
+    }).filter(Boolean);
+    console.log('[API] Transformed nearby results:', transformedNearby?.length || 0);
+    
+    // Combine and deduplicate results
+    const allResults = [...transformedMapbox, ...transformedNearby];
+    console.log('[API] Combined results:', allResults?.length || 0);
+    
+    const uniqueResults = allResults.filter((restaurant, index, self) => 
+      index === self.findIndex(r => r.id === restaurant.id)
+    ).slice(0, limit);
+    
+    console.log(`[API] Final unique results: ${uniqueResults.length} restaurants`);
+    console.log('[API] First few final results:', uniqueResults?.slice(0, 2));
+    return uniqueResults;
   } catch (error) {
-    console.error('[API] Error in Restaurants API search:', error);
-    return [];
+    console.error('[API] Error in Mapbox API search:', error);
+    
+    // Fallback to Restaurants API
+    try {
+      console.log('[API] Falling back to Restaurants API');
+      const apiResults = await searchRestaurantsAPI(query, location, limit);
+      const transformedResults = apiResults.map(transformRestaurantsAPIData).filter(Boolean);
+      return transformedResults;
+    } catch (fallbackError) {
+      console.error('[API] Fallback API also failed:', fallbackError);
+      return [];
+    }
   }
 };
 
@@ -4525,4 +4849,1213 @@ export const getCollectionCoverImageFallback = (occasion: string): string => {
   
   // Default fallback
   return 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop&q=80';
+};
+
+// ============================================================================
+// FOURSQUARE PLACES API v3 - NEW RESTAURANT SEARCH AND DETAILS
+// ============================================================================
+
+// Search restaurants using Foursquare Places API v3 (with fallback to v2)
+export const searchFoursquarePlacesRestaurants = async (
+  query: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Foursquare Places] Searching restaurants for: "${query}"`);
+    
+    // Try v3 Places API first
+    const params = new URLSearchParams({
+      query: query,
+      limit: limit.toString(),
+      radius: radius.toString(),
+      categories: '13065', // Food & Drink category
+      sort: 'rating',
+      'X-Places-Api-Version': '2025-08-01'
+    });
+    
+    if (lat && lng) {
+      params.append('ll', `${lat},${lng}`);
+    }
+    
+    const url = `https://api.foursquare.com/v3/places/search?${params.toString()}`;
+    
+    console.log('[Foursquare Places] Trying v3 Places API with API key authentication');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': FOURSQUARE_PLACES_API_KEY,
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const results = data.results || [];
+        
+        console.log(`[Foursquare Places] ✅ v3 Success - Found ${results.length} restaurants for query: "${query}"`);
+        return results;
+      } else {
+        console.log(`[Foursquare Places] v3 API failed: ${response.status} ${response.statusText}, falling back to v2`);
+      }
+    } catch (error) {
+      console.log('[Foursquare Places] v3 API error, falling back to v2:', error instanceof Error ? error.message : String(error));
+    }
+    
+    // Fallback to working v2 API
+    console.log('[Foursquare Places] Using v2 API fallback with client_id/client_secret authentication');
+    
+    const v2Params = new URLSearchParams({
+      query: query,
+      categoryId: '4d4b7105d754a06374d81259', // Food category ID for restaurants
+      limit: limit.toString(),
+      radius: radius.toString(),
+      sort: 'rating',
+      v: '20231201' // API version
+    });
+    
+    if (lat && lng) {
+      v2Params.append('ll', `${lat},${lng}`);
+    }
+    
+    // Build URL with v2 authentication
+    const fullUrl = buildFoursquareV2Url('/venues/search', v2Params);
+    
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const results = data.response?.venues || data.venues || [];
+        
+        console.log(`[Foursquare Places] ✅ v2 Success - Found ${results.length} restaurants for query: "${query}"`);
+        return results;
+      } else {
+        console.error(`[Foursquare Places] ❌ v2 API failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[Foursquare Places] v2 API error:', error);
+    }
+    
+    console.error('[Foursquare Places] All APIs failed for search - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Get detailed information about a specific restaurant using Foursquare Places API v3 (with fallback to v2)
+export const getFoursquarePlacesRestaurantDetails = async (fsqPlaceId: string): Promise<any> => {
+  try {
+    console.log('[Foursquare Places] Getting details for restaurant:', fsqPlaceId);
+    
+    // Try v3 Places API first
+    const url = `https://api.foursquare.com/v3/places/${fsqPlaceId}`;
+    
+    console.log('[Foursquare Places] Trying v3 Places API with API key authentication');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': FOURSQUARE_PLACES_API_KEY,
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Foursquare Places] ✅ v3 Success - Retrieved restaurant details');
+        return data;
+      } else {
+        console.log(`[Foursquare Places] v3 API failed: ${response.status} ${response.statusText}, falling back to v2`);
+      }
+    } catch (error) {
+      console.log('[Foursquare Places] v3 API error, falling back to v2:', error instanceof Error ? error.message : String(error));
+    }
+    
+    // Fallback to working v2 API
+    console.log('[Foursquare Places] Using v2 API fallback with client_id/client_secret authentication');
+    
+    const params = new URLSearchParams({
+      v: '20231201' // API version
+    });
+    const fullUrl = buildFoursquareV2Url(`/venues/${fsqPlaceId}`, params);
+    
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Foursquare Places] ✅ v2 Success - Retrieved restaurant details');
+        return data.response?.venue || data.venue;
+      } else {
+        console.error(`[Foursquare Places] ❌ v2 API failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[Foursquare Places] v2 API error:', error);
+    }
+    
+    console.error('[Foursquare Places] All APIs failed for details - no restaurant details available');
+    return null;
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Get nearby restaurants using Foursquare Places API v3 (with fallback to v2)
+export const getFoursquarePlacesNearbyRestaurants = async (
+  lat: number,
+  lng: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Foursquare Places] Getting nearby restaurants at ${lat}, ${lng}`);
+    
+    // Try v3 Places API first
+    const params = new URLSearchParams({
+      ll: `${lat},${lng}`,
+      radius: radius.toString(),
+      limit: limit.toString(),
+      categories: '13065', // Food & Drink category
+      sort: 'rating',
+      'X-Places-Api-Version': '2025-08-01'
+    });
+    
+    const url = `https://api.foursquare.com/v3/places/search?${params.toString()}`;
+    
+    console.log('[Foursquare Places] Trying v3 Places API with API key authentication');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': FOURSQUARE_PLACES_API_KEY,
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const results = data.results || [];
+        
+        console.log(`[Foursquare Places] ✅ v3 Success - Found ${results.length} nearby restaurants`);
+        return results;
+      } else {
+        console.log(`[Foursquare Places] v3 API failed: ${response.status} ${response.statusText}, falling back to v2`);
+      }
+    } catch (error) {
+      console.log('[Foursquare Places] v3 API error, falling back to v2:', error instanceof Error ? error.message : String(error));
+    }
+    
+    // Fallback to working v2 API
+    console.log('[Foursquare Places] Using v2 API fallback with client_id/client_secret authentication');
+    
+    const v2Params = new URLSearchParams({
+      ll: `${lat},${lng}`,
+      radius: radius.toString(),
+      limit: limit.toString(),
+      categoryId: '4d4b7105d754a06374d81259', // Food category ID for restaurants
+      sort: 'rating',
+      v: '20231201' // API version
+    });
+    
+    // Build URL with v2 authentication
+    const fullUrl = buildFoursquareV2Url('/venues/search', v2Params);
+    
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const results = data.response?.venues || data.venues || [];
+        
+        console.log(`[Foursquare Places] ✅ v2 Success - Found ${results.length} nearby restaurants`);
+        return results;
+      } else {
+        console.error(`[Foursquare Places] ❌ v2 API failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[Foursquare Places] v2 API error:', error);
+    }
+    
+    console.error('[Foursquare Places] All APIs failed for nearby search - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error getting nearby restaurants:', error);
+    return [];
+  }
+};
+
+// Get restaurant photos using Foursquare Places API v3 (with fallback to v2)
+export const getFoursquarePlacesRestaurantPhotos = async (fsqPlaceId: string, limit: number = 10): Promise<any[]> => {
+  try {
+    console.log('[Foursquare Places] Getting photos for restaurant:', fsqPlaceId);
+    
+    // Try v3 Places API first with correct structure
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      'X-Places-Api-Version': '2025-06-17'
+    });
+    
+    const url = `https://api.foursquare.com/v3/places/${fsqPlaceId}/photos?${params.toString()}`;
+    
+    console.log('[Foursquare Places] Trying v3 Places API with API key authentication');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': FOURSQUARE_PLACES_API_KEY,
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Handle the correct response structure based on your API documentation
+        const photos = data.results || data || [];
+        
+        console.log(`[Foursquare Places] ✅ v3 Success - Retrieved ${photos.length} photos`);
+        return photos;
+      } else {
+        console.log(`[Foursquare Places] v3 API failed: ${response.status} ${response.statusText}, falling back to v2`);
+      }
+    } catch (error) {
+      console.log('[Foursquare Places] v3 API error, falling back to v2:', error instanceof Error ? error.message : String(error));
+    }
+    
+    // Fallback to working v2 API
+    console.log('[Foursquare Places] Using v2 API fallback with client_id/client_secret authentication');
+    
+    const v2Params = new URLSearchParams({
+      limit: limit.toString(),
+      v: '20231201' // API version
+    });
+    const fullUrl = buildFoursquareV2Url(`/venues/${fsqPlaceId}/photos`, v2Params);
+    
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const photos = data.response?.photos?.items || data.photos?.items || [];
+        
+        console.log(`[Foursquare Places] ✅ v2 Success - Retrieved ${photos.length} photos`);
+        return photos;
+      } else {
+        console.error(`[Foursquare Places] ❌ v2 API failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[Foursquare Places] v2 API error:', error);
+    }
+    
+    console.error('[Foursquare Places] All APIs failed for photos - no photos available');
+    return [];
+    
+  } catch (error) {
+    console.error('[Foursquare Places] Error getting restaurant photos:', error);
+    return [];
+  }
+};
+
+// Transform Foursquare Places API data to match your app's Restaurant type
+export const transformFoursquarePlacesToRestaurant = (fsqPlace: any): any => {
+  try {
+    const restaurant = {
+      id: fsqPlace.fsq_place_id,
+      name: fsqPlace.name,
+      cuisine: fsqPlace.categories?.[0]?.name || 'Restaurant',
+      location: {
+        address: fsqPlace.location?.address || '',
+        city: fsqPlace.location?.locality || '',
+        state: fsqPlace.location?.region || '',
+        zipCode: fsqPlace.location?.postcode || '',
+        country: fsqPlace.location?.country || '',
+        formattedAddress: fsqPlace.location?.formatted_address || ''
+      },
+      coordinates: {
+        latitude: fsqPlace.latitude,
+        longitude: fsqPlace.longitude
+      },
+      rating: fsqPlace.rating || 0,
+      price: fsqPlace.price || 0,
+      photos: fsqPlace.photos?.map((photo: any) => ({
+        id: photo.fsq_photo_id,
+        url: `${photo.prefix}${photo.width}x${photo.height}${photo.suffix}`,
+        width: photo.width,
+        height: photo.height
+      })) || [],
+      hours: fsqPlace.hours?.display || '',
+      isOpenNow: fsqPlace.hours?.open_now || false,
+      phone: fsqPlace.tel || '',
+      website: fsqPlace.website || '',
+      description: fsqPlace.description || '',
+      popularity: fsqPlace.popularity || 0,
+      verified: fsqPlace.verified || false,
+      distance: fsqPlace.distance || 0,
+      attributes: fsqPlace.attributes || {},
+      tips: fsqPlace.tips?.map((tip: any) => ({
+        id: tip.fsq_tip_id,
+        text: tip.text,
+        agreeCount: tip.agree_count,
+        disagreeCount: tip.disagree_count
+      })) || [],
+      // Add source information
+      source: 'foursquare_places',
+      sourceId: fsqPlace.fsq_place_id
+    };
+    
+    return restaurant;
+  } catch (error) {
+    console.error('[Foursquare Places] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+// ============================================================================
+// MAPBOX SEARCH BOX API - MAIN RESTAURANT SEARCH API
+// ============================================================================
+
+// Generate a session token for Search Box API
+const generateSessionToken = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Search restaurants using Mapbox Search Box API
+export const searchMapboxRestaurants = async (
+  query: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Mapbox Search Box] Searching restaurants for: "${query}"`);
+    
+    const sessionToken = generateSessionToken();
+    const proximity = lat && lng ? `${lng},${lat}` : undefined;
+    
+    // Build search queries to try
+    const searchQueries = [
+      query,
+      `${query} restaurant`,
+      `restaurant ${query}`
+    ];
+    
+    for (const searchQuery of searchQueries) {
+      // Use Search Box API /suggest endpoint for autocomplete search
+      const suggestParams = new URLSearchParams({
+        q: searchQuery,
+        access_token: MAPBOX_API_KEY,
+        session_token: sessionToken,
+        limit: Math.min(limit, 10).toString(), // Search Box API limit is 10
+        language: 'en'
+      });
+      
+      if (proximity) {
+        suggestParams.append('proximity', proximity);
+      }
+      
+      const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?${suggestParams.toString()}`;
+      console.log('[Mapbox Search Box] Trying suggest URL:', suggestUrl);
+      
+      try {
+        const suggestResponse = await fetch(suggestUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Rork-Nomi-App/1.0'
+          }
+        });
+        
+        if (suggestResponse.ok) {
+          const suggestData = await suggestResponse.json();
+          const suggestions = suggestData.suggestions || [];
+          
+          // Filter for restaurants and POIs
+          const restaurantSuggestions = suggestions.filter((place: any) => {
+            // Skip if no name
+            if (!place.name) return false;
+            
+            const placeName = place.name.toLowerCase();
+            const placeType = place.properties?.category?.toLowerCase() || '';
+            const poiCategory = place.properties?.poi_category?.toLowerCase() || '';
+            const poiType = place.properties?.poi_type?.toLowerCase() || '';
+            
+            // Check if it's a restaurant or food-related POI
+            const isRestaurant = 
+              placeName.includes('restaurant') || 
+              placeName.includes('cafe') || 
+              placeName.includes('bar') || 
+              placeName.includes('pizza') ||
+              placeName.includes('diner') ||
+              placeName.includes('bistro') ||
+              placeName.includes('grill') ||
+              placeName.includes('kitchen') ||
+              placeType.includes('restaurant') ||
+              placeType.includes('food') ||
+              placeType.includes('dining') ||
+              poiCategory.includes('restaurant') ||
+              poiCategory.includes('food') ||
+              poiCategory.includes('dining') ||
+              poiType.includes('restaurant') ||
+              poiType.includes('food') ||
+              poiType.includes('dining');
+              
+            return isRestaurant;
+          });
+          
+          if (restaurantSuggestions.length > 0) {
+            console.log(`[Mapbox Search Box] ✅ Found ${restaurantSuggestions.length} restaurant suggestions`);
+            
+            // Get full details for each suggestion using /retrieve endpoint
+            const detailedResults = [];
+            for (const suggestion of restaurantSuggestions.slice(0, 5)) { // Limit to 5 to avoid too many API calls
+              try {
+                const retrieveParams = new URLSearchParams({
+                  access_token: MAPBOX_API_KEY,
+                  session_token: sessionToken
+                });
+                
+                const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?${retrieveParams.toString()}`;
+                console.log('[Mapbox Search Box] Retrieving details for:', suggestion.name);
+                
+                const retrieveResponse = await fetch(retrieveUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Rork-Nomi-App/1.0'
+                  }
+                });
+                
+                if (retrieveResponse.ok) {
+                  const retrieveData = await retrieveResponse.json();
+                  detailedResults.push(retrieveData);
+                } else {
+                  console.log(`[Mapbox Search Box] Retrieve failed for ${suggestion.name}: ${retrieveResponse.status}`);
+                }
+              } catch (error) {
+                console.log(`[Mapbox Search Box] Error retrieving details for ${suggestion.name}:`, error);
+              }
+            }
+            
+            if (detailedResults.length > 0) {
+              console.log(`[Mapbox Search Box] ✅ Success - Retrieved ${detailedResults.length} detailed restaurant results`);
+              // Extract features from each detailed result (they are FeatureCollections)
+              const allFeatures = [];
+              for (const result of detailedResults) {
+                if (result.features && Array.isArray(result.features)) {
+                  allFeatures.push(...result.features);
+                }
+              }
+              console.log(`[Mapbox Search Box] Extracted ${allFeatures.length} features from detailed results`);
+              return allFeatures;
+            }
+          }
+        } else {
+          console.log(`[Mapbox Search Box] Suggest URL failed: ${suggestResponse.status} ${suggestResponse.statusText}`);
+          const errorText = await suggestResponse.text();
+          console.log('[Mapbox Search Box] Error details:', errorText);
+        }
+      } catch (error) {
+        console.log('[Mapbox Search Box] Error with suggest URL:', error instanceof Error ? error.message : String(error));
+      }
+    }
+    
+    console.error('[Mapbox Search Box] API failed for search - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Mapbox Search Box] Error searching restaurants:', error);
+    return [];
+  }
+};
+
+// Get nearby restaurants using Mapbox Search Box API
+export const getMapboxNearbyRestaurants = async (
+  lat: number,
+  lng: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Mapbox Search Box] Getting nearby restaurants at ${lat}, ${lng}`);
+    
+    const sessionToken = generateSessionToken();
+    const proximity = `${lng},${lat}`;
+    
+    const searchQueries = [
+      'restaurant',
+      'food',
+      'dining',
+      'cafe'
+    ];
+    
+    for (const query of searchQueries) {
+      // Use Search Box API /suggest endpoint for nearby search
+      const suggestParams = new URLSearchParams({
+        q: query,
+        access_token: MAPBOX_API_KEY,
+        session_token: sessionToken,
+        limit: Math.min(limit, 10).toString(), // Search Box API limit is 10
+        language: 'en',
+        proximity: proximity
+      });
+      
+      const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?${suggestParams.toString()}`;
+      console.log('[Mapbox Search Box] Trying nearby suggest URL:', suggestUrl);
+      
+      try {
+        const suggestResponse = await fetch(suggestUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Rork-Nomi-App/1.0'
+          }
+        });
+        
+        if (suggestResponse.ok) {
+          const suggestData = await suggestResponse.json();
+          const suggestions = suggestData.suggestions || [];
+          
+          // Filter for restaurants and POIs
+          const restaurantSuggestions = suggestions.filter((place: any) => {
+            // Skip if no name
+            if (!place.name) return false;
+            
+            const placeName = place.name.toLowerCase();
+            const placeType = place.properties?.category?.toLowerCase() || '';
+            const poiCategory = place.properties?.poi_category?.toLowerCase() || '';
+            const poiType = place.properties?.poi_type?.toLowerCase() || '';
+            
+            // Check if it's a restaurant or food-related POI
+            const isRestaurant = 
+              placeName.includes('restaurant') || 
+              placeName.includes('cafe') || 
+              placeName.includes('bar') || 
+              placeName.includes('pizza') ||
+              placeName.includes('diner') ||
+              placeName.includes('bistro') ||
+              placeName.includes('grill') ||
+              placeName.includes('kitchen') ||
+              placeName.includes('food') ||
+              placeType.includes('restaurant') ||
+              placeType.includes('food') ||
+              placeType.includes('dining') ||
+              poiCategory.includes('restaurant') ||
+              poiCategory.includes('food') ||
+              poiCategory.includes('dining') ||
+              poiType.includes('restaurant') ||
+              poiType.includes('food') ||
+              poiType.includes('dining');
+              
+            return isRestaurant;
+          });
+          
+          if (restaurantSuggestions.length > 0) {
+            console.log(`[Mapbox Search Box] ✅ Found ${restaurantSuggestions.length} nearby restaurant suggestions`);
+            
+            // Get full details for each suggestion using /retrieve endpoint
+            const detailedResults = [];
+            for (const suggestion of restaurantSuggestions.slice(0, 5)) { // Limit to 5 to avoid too many API calls
+              try {
+                const retrieveParams = new URLSearchParams({
+                  access_token: MAPBOX_API_KEY,
+                  session_token: sessionToken
+                });
+                
+                const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?${retrieveParams.toString()}`;
+                console.log('[Mapbox Search Box] Retrieving nearby details for:', suggestion.name);
+                
+                const retrieveResponse = await fetch(retrieveUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Rork-Nomi-App/1.0'
+                  }
+                });
+                
+                if (retrieveResponse.ok) {
+                  const retrieveData = await retrieveResponse.json();
+                  detailedResults.push(retrieveData);
+                } else {
+                  console.log(`[Mapbox Search Box] Retrieve failed for ${suggestion.name}: ${retrieveResponse.status}`);
+                }
+              } catch (error) {
+                console.log(`[Mapbox Search Box] Error retrieving nearby details for ${suggestion.name}:`, error);
+              }
+            }
+            
+            if (detailedResults.length > 0) {
+              console.log(`[Mapbox Search Box] ✅ Success - Retrieved ${detailedResults.length} detailed nearby restaurant results`);
+              // Extract features from each detailed result (they are FeatureCollections)
+              const allFeatures = [];
+              for (const result of detailedResults) {
+                if (result.features && Array.isArray(result.features)) {
+                  allFeatures.push(...result.features);
+                }
+              }
+              console.log(`[Mapbox Search Box] Extracted ${allFeatures.length} features from detailed results`);
+              return allFeatures;
+            }
+          }
+        } else {
+          console.log(`[Mapbox Search Box] Nearby suggest URL failed: ${suggestResponse.status} ${suggestResponse.statusText}`);
+          const errorText = await suggestResponse.text();
+          console.log('[Mapbox Search Box] Error details:', errorText);
+        }
+      } catch (error) {
+        console.log('[Mapbox Search Box] Error with nearby suggest URL:', error instanceof Error ? error.message : String(error));
+      }
+    }
+    
+    console.error('[Mapbox Search Box] API failed for nearby search - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Mapbox Search Box] Error getting nearby restaurants:', error);
+    return [];
+  }
+};
+
+// Get restaurant details using Mapbox Places API
+export const getMapboxRestaurantDetails = async (placeId: string): Promise<any> => {
+  try {
+    console.log('[Mapbox] Getting details for restaurant:', placeId);
+    
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${placeId}.json?access_token=${MAPBOX_API_KEY}`;
+    
+    console.log('[Mapbox] Using Places API for restaurant details');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const result = data.features?.[0];
+        
+        if (result) {
+          console.log('[Mapbox] ✅ Success - Retrieved restaurant details');
+          return result;
+        } else {
+          console.error('[Mapbox] No restaurant found with the provided ID');
+        }
+      } else {
+        console.error(`[Mapbox] ❌ API failed: ${response.status} ${response.statusText}`);
+        
+        if (response.status === 401) {
+          console.error('[Mapbox] Authentication failed - check API key');
+        }
+      }
+    } catch (error) {
+      console.error('[Mapbox] Error getting restaurant details:', error);
+    }
+    
+    console.error('[Mapbox] API failed for details - no restaurant details available');
+    return null;
+    
+  } catch (error) {
+    console.error('[Mapbox] Error getting restaurant details:', error);
+    return null;
+  }
+};
+
+// Search for restaurants by cuisine type using Mapbox
+export const searchMapboxRestaurantsByCuisine = async (
+  cuisine: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Mapbox] Searching ${cuisine} restaurants`);
+    
+    const query = `${cuisine} restaurant`;
+    const encodedQuery = encodeURIComponent(query);
+    const proximity = lat && lng ? `&proximity=${lng},${lat}` : '';
+    const limitParam = `&limit=${limit}`;
+    
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_API_KEY}&types=poi&poi_category=restaurant${proximity}${limitParam}`;
+    
+    console.log('[Mapbox] Using Places API for cuisine-specific restaurant search');
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Rork-Nomi-App/1.0'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const results = data.features || [];
+        
+        console.log(`[Mapbox] ✅ Success - Found ${results.length} ${cuisine} restaurants`);
+        return results;
+      } else {
+        console.error(`[Mapbox] ❌ API failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[Mapbox] Error searching restaurants by cuisine:', error);
+    }
+    
+    console.error('[Mapbox] API failed for cuisine search - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Mapbox] Error searching restaurants by cuisine:', error);
+    return [];
+  }
+};
+
+// Transform Mapbox Search Box API data to match your app's Restaurant type
+export const transformMapboxToRestaurant = (mapboxPlace: any): any => {
+  try {
+    // Handle Search Box API format (new format)
+    if (mapboxPlace.properties && mapboxPlace.geometry) {
+      const name = mapboxPlace.properties.name || 'Restaurant';
+      const fullAddress = mapboxPlace.properties.full_address || '';
+      const address = mapboxPlace.properties.address || '';
+      
+      // Extract location components from Search Box API context
+      const context = mapboxPlace.properties.context || {};
+      const city = context.place?.name || context.locality?.name || '';
+      const state = context.region?.name || '';
+      const zipCode = context.postcode?.name || '';
+      const country = context.country?.name || '';
+      const neighborhood = context.neighborhood?.name || '';
+      
+      // Build comprehensive address
+      const addressComponents = [];
+      if (address) addressComponents.push(address);
+      if (neighborhood) addressComponents.push(neighborhood);
+      if (city) addressComponents.push(city);
+      if (state) addressComponents.push(state);
+      if (zipCode) addressComponents.push(zipCode);
+      
+      const formattedAddress = addressComponents.length > 0 
+        ? addressComponents.join(', ')
+        : fullAddress;
+      
+      // Get coordinates from Search Box API format
+      const coordinates = mapboxPlace.geometry.coordinates || [];
+      const latitude = coordinates[1] || 0;
+      const longitude = coordinates[0] || 0;
+      
+      // Extract cuisine from POI categories
+      const poiCategories = mapboxPlace.properties.poi_category || [];
+      let cuisine = 'Restaurant'; // Default
+      
+      if (poiCategories.length > 0) {
+        // Try to find a more specific cuisine type
+        const cuisineKeywords = {
+          'italian': 'Italian',
+          'pizza': 'Italian',
+          'sushi': 'Japanese',
+          'japanese': 'Japanese',
+          'chinese': 'Chinese',
+          'mexican': 'Mexican',
+          'thai': 'Thai',
+          'indian': 'Indian',
+          'french': 'French',
+          'american': 'American',
+          'mediterranean': 'Mediterranean',
+          'korean': 'Korean',
+          'vietnamese': 'Vietnamese',
+          'greek': 'Greek',
+          'spanish': 'Spanish',
+          'middle eastern': 'Middle Eastern',
+          'caribbean': 'Caribbean',
+          'latin': 'Latin American',
+          'seafood': 'Seafood',
+          'steakhouse': 'Steakhouse',
+          'barbecue': 'BBQ',
+          'burger': 'American',
+          'sandwich': 'American',
+          'cafe': 'Cafe',
+          'bakery': 'Bakery',
+          'dessert': 'Dessert'
+        };
+        
+        for (const category of poiCategories) {
+          const lowerCategory = category.toLowerCase();
+          for (const [keyword, cuisineType] of Object.entries(cuisineKeywords)) {
+            if (lowerCategory.includes(keyword)) {
+              cuisine = cuisineType;
+              break;
+            }
+          }
+          if (cuisine !== 'Restaurant') break;
+        }
+      }
+      
+      console.log('[Mapbox] Transforming restaurant:', {
+        name,
+        cuisine,
+        poiCategories: mapboxPlace.properties.poi_category,
+        properties: mapboxPlace.properties,
+        hasGeometry: !!mapboxPlace.geometry,
+        geometryType: mapboxPlace.geometry?.type
+      });
+      
+      const restaurant = {
+        id: mapboxPlace.properties.mapbox_id || `mapbox-${Date.now()}-${Math.random()}`,
+        name: name,
+        cuisine: cuisine,
+        location: {
+          address: address,
+          city: city,
+          state: state,
+          zipCode: zipCode,
+          country: country,
+          neighborhood: neighborhood,
+          formattedAddress: formattedAddress
+        },
+        coordinates: {
+          latitude: latitude,
+          longitude: longitude
+        },
+        rating: undefined, // Mapbox doesn't provide ratings
+        price: undefined, // Mapbox doesn't provide price levels
+        priceRange: '$$', // Default price range
+        photos: [], // Mapbox doesn't provide photos directly
+        hours: '', // Mapbox doesn't provide hours
+        isOpenNow: false, // Mapbox doesn't provide open status
+        phone: mapboxPlace.properties.tel || '',
+        website: mapboxPlace.properties.website || '',
+        description: mapboxPlace.properties.description || '',
+        popularity: 0, // Mapbox doesn't provide popularity
+        verified: false, // Mapbox doesn't provide verification status
+        distance: 0, // Calculate distance if needed
+        attributes: mapboxPlace.properties || {},
+        tips: [], // Mapbox doesn't provide tips
+        // Add source information
+        source: 'mapbox_searchbox',
+        sourceId: mapboxPlace.properties.mapbox_id
+      };
+      
+      return restaurant;
+    }
+    
+    // Handle old geocoding API format (fallback)
+    const name = mapboxPlace.name || mapboxPlace.text || mapboxPlace.place_name?.split(',')[0] || 'Restaurant';
+    const placeName = mapboxPlace.place_name || mapboxPlace.properties?.full_address || '';
+    
+    // Extract location components from old format
+    const locationComponents = mapboxPlace.properties?.context || mapboxPlace.context || [];
+    const city = locationComponents.find((ctx: any) => ctx.id?.startsWith('place') || ctx.id?.startsWith('locality'))?.text || 
+                 locationComponents.find((ctx: any) => ctx.id?.startsWith('city'))?.text || '';
+    const state = locationComponents.find((ctx: any) => ctx.id?.startsWith('region'))?.text || 
+                  locationComponents.find((ctx: any) => ctx.id?.startsWith('state'))?.text || '';
+    const zipCode = locationComponents.find((ctx: any) => ctx.id?.startsWith('postcode'))?.text || '';
+    const country = locationComponents.find((ctx: any) => ctx.id?.startsWith('country'))?.text || '';
+    
+    // Get coordinates from old format
+    const coordinates = mapboxPlace.geometry?.coordinates || mapboxPlace.center || [];
+    const latitude = coordinates[1] || 0;
+    const longitude = coordinates[0] || 0;
+    
+    const restaurant = {
+      id: mapboxPlace.id || `mapbox-${Date.now()}-${Math.random()}`,
+      name: name,
+      cuisine: 'Restaurant', // Default for old format
+      location: {
+        address: placeName,
+        city: city,
+        state: state,
+        zipCode: zipCode,
+        country: country,
+        formattedAddress: placeName
+      },
+      coordinates: {
+        latitude: latitude,
+        longitude: longitude
+      },
+                      rating: undefined, // Mapbox doesn't provide ratings
+        price: undefined, // Mapbox doesn't provide price levels
+        priceRange: '$$', // Default price range
+        photos: [], // Mapbox doesn't provide photos directly
+      hours: '', // Mapbox doesn't provide hours
+      isOpenNow: false, // Mapbox doesn't provide open status
+      phone: mapboxPlace.properties?.tel || mapboxPlace.properties?.phone || '',
+      website: mapboxPlace.properties?.website || '',
+      description: mapboxPlace.properties?.description || '',
+      popularity: 0, // Mapbox doesn't provide popularity
+      verified: false, // Mapbox doesn't provide verification status
+      distance: 0, // Calculate distance if needed
+      attributes: mapboxPlace.properties || {},
+      tips: [], // Mapbox doesn't provide tips
+      // Add source information
+      source: 'mapbox_geocoding',
+      sourceId: mapboxPlace.id
+    };
+    
+    return restaurant;
+  } catch (error) {
+    console.error('[Mapbox Search Box] Error transforming restaurant data:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant search with multiple APIs (Mapbox as primary)
+export const searchRestaurantsEnhanced = async (
+  query: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000,
+  limit: number = 50
+): Promise<any[]> => {
+  try {
+    console.log(`[Enhanced Search] Searching restaurants for: "${query}"`);
+    
+    // Try Mapbox first (primary API)
+    console.log('[Enhanced Search] Trying Mapbox API first...');
+    const mapboxResults = await searchMapboxRestaurants(query, lat, lng, radius, limit);
+    
+    if (mapboxResults.length > 0) {
+      console.log(`[Enhanced Search] ✅ Mapbox found ${mapboxResults.length} results`);
+      return mapboxResults.map(transformMapboxToRestaurant).filter(Boolean);
+    }
+    
+    // Fallback to Foursquare if Mapbox fails
+    console.log('[Enhanced Search] Mapbox returned no results, trying Foursquare...');
+    const foursquareResults = await searchFoursquarePlacesRestaurants(query, lat, lng, radius, limit);
+    
+    if (foursquareResults.length > 0) {
+      console.log(`[Enhanced Search] ✅ Foursquare found ${foursquareResults.length} results`);
+      return foursquareResults.map(transformFoursquarePlacesToRestaurant).filter(Boolean);
+    }
+    
+    // Fallback to Yelp if both fail
+    console.log('[Enhanced Search] Both Mapbox and Foursquare failed, trying Yelp...');
+    const location = lat && lng ? `${lat},${lng}` : 'New York, NY';
+    const yelpResults = await searchYelpRestaurants(location, 'Restaurants', limit);
+    
+    if (yelpResults.length > 0) {
+      console.log(`[Enhanced Search] ✅ Yelp found ${yelpResults.length} results`);
+      return yelpResults;
+    }
+    
+    console.log('[Enhanced Search] All APIs failed - no restaurants found');
+    return [];
+    
+  } catch (error) {
+    console.error('[Enhanced Search] Error in enhanced restaurant search:', error);
+    return [];
+  }
+};
+
+// ============================================================================
+// YELP FUSION API - DIRECT YELP API INTEGRATION
+// ============================================================================
+
+// Yelp Fusion API functions for business details, reviews, and photos
+export const getYelpBusinessDetails = async (businessId: string): Promise<any> => {
+  try {
+    console.log('[Yelp Fusion] Getting business details for:', businessId);
+    
+    if (!YELP_FUSION_API_KEY) {
+      console.warn('[Yelp Fusion] No API key provided - skipping Yelp enhancement');
+      return null;
+    }
+    
+    const response = await fetch(`${YELP_FUSION_BASE_URL}/businesses/${businessId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${YELP_FUSION_API_KEY}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Yelp Fusion] ✅ Successfully retrieved business details');
+      return data;
+    } else {
+      console.error(`[Yelp Fusion] ❌ API failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+  } catch (error) {
+    console.error('[Yelp Fusion] Error getting business details:', error);
+    return null;
+  }
+};
+
+export const getYelpBusinessReviews = async (businessId: string): Promise<any> => {
+  try {
+    console.log('[Yelp Fusion] Getting business reviews for:', businessId);
+    
+    if (!YELP_FUSION_API_KEY) {
+      console.warn('[Yelp Fusion] No API key provided - skipping Yelp reviews');
+      return null;
+    }
+    
+    const response = await fetch(`${YELP_FUSION_BASE_URL}/businesses/${businessId}/reviews`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${YELP_FUSION_API_KEY}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Yelp Fusion] ✅ Successfully retrieved business reviews');
+      return data;
+    } else {
+      console.error(`[Yelp Fusion] ❌ API failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+  } catch (error) {
+    console.error('[Yelp Fusion] Error getting business reviews:', error);
+    return null;
+  }
+};
+
+// Enhanced restaurant data with Yelp integration
+export const enhanceRestaurantWithYelp = async (restaurant: any): Promise<any> => {
+  try {
+    // Try to find Yelp business ID from restaurant data
+    const yelpId = restaurant.yelpId || restaurant.attributes?.yelp_id || restaurant.sourceId;
+    
+    if (!yelpId) {
+      console.log('[Yelp Fusion] No Yelp ID found for restaurant:', restaurant.name);
+      return restaurant;
+    }
+    
+    console.log('[Yelp Fusion] Enhancing restaurant with Yelp data:', restaurant.name);
+    
+    // Get business details and reviews in parallel
+    const [details, reviews] = await Promise.all([
+      getYelpBusinessDetails(yelpId),
+      getYelpBusinessReviews(yelpId)
+    ]);
+    
+    // Enhance restaurant with Yelp data
+    const enhancedRestaurant = { ...restaurant };
+    
+    if (details) {
+      enhancedRestaurant.rating = details.rating || restaurant.rating;
+      enhancedRestaurant.price = details.price ? details.price.length : restaurant.price;
+      enhancedRestaurant.photos = details.photos || restaurant.photos;
+      enhancedRestaurant.hours = details.hours?.display || restaurant.hours;
+      enhancedRestaurant.phone = details.phone || restaurant.phone;
+      enhancedRestaurant.website = details.website || restaurant.website;
+      enhancedRestaurant.isOpenNow = details.hours?.is_open_now || restaurant.isOpenNow;
+      
+      // Update location if Yelp has better data
+      if (details.location) {
+        enhancedRestaurant.location = {
+          ...enhancedRestaurant.location,
+          address: details.location.address1 || enhancedRestaurant.location.address,
+          city: details.location.city || enhancedRestaurant.location.city,
+          state: details.location.state || enhancedRestaurant.location.state,
+          zipCode: details.location.zip_code || enhancedRestaurant.location.zipCode,
+          formattedAddress: details.location.display_address?.join(', ') || enhancedRestaurant.location.formattedAddress
+        };
+      }
+    }
+    
+    if (reviews && reviews.reviews) {
+      enhancedRestaurant.reviews = reviews.reviews.map((review: any) => ({
+        id: review.id,
+        text: review.text,
+        rating: review.rating,
+        timeCreated: review.time_created,
+        user: {
+          name: review.user.name,
+          imageUrl: review.user.image_url
+        }
+      }));
+    }
+    
+    console.log('[Yelp Fusion] ✅ Successfully enhanced restaurant with Yelp data');
+    return enhancedRestaurant;
+  } catch (error) {
+    console.error('[Yelp Fusion] Error enhancing restaurant:', error);
+    return restaurant;
+  }
+};
+
+// Deduplicate restaurants based on name and address
+export const deduplicateRestaurants = (restaurants: any[]): any[] => {
+  const seen = new Map<string, any>();
+  
+  return restaurants.filter(restaurant => {
+    if (!restaurant || !restaurant.name) return false;
+    
+    // Create a key based on name and address
+    const address = restaurant.location?.formattedAddress || restaurant.location?.address || '';
+    const key = `${restaurant.name.toLowerCase()}-${address.toLowerCase()}`;
+    
+    if (seen.has(key)) {
+      // If we've seen this restaurant before, only keep it if the address is different
+      const existing = seen.get(key);
+      const existingAddress = existing.location?.formattedAddress || existing.location?.address || '';
+      const currentAddress = restaurant.location?.formattedAddress || restaurant.location?.address || '';
+      
+      if (existingAddress !== currentAddress) {
+        // Different address, keep both
+        return true;
+      } else {
+        // Same address, skip duplicate
+        console.log('[Deduplication] Skipping duplicate:', restaurant.name, 'at', currentAddress);
+        return false;
+      }
+    } else {
+      // First time seeing this restaurant
+      seen.set(key, restaurant);
+      return true;
+    }
+  });
 };

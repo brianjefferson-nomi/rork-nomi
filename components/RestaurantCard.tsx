@@ -338,8 +338,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         <View style={styles.locationRow}>
           <MapPin size={14} color="#666" />
           <Text style={styles.locationText} numberOfLines={1}>
-            {restaurant.neighborhood}
-            {restaurant.distance && ` • ${restaurant.distance}`}
+            {`${restaurant.location?.formattedAddress || restaurant.location?.address || restaurant.neighborhood || 'Location not available'}${restaurant.distance ? ` • ${restaurant.distance}` : ''}`}
           </Text>
         </View>
         
@@ -404,7 +403,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
                   .filter(Boolean)
                   .map((item, index) => (
                     <Text key={index} style={styles.topPickText} numberOfLines={1}>
-                      • {item}
+                      {`• ${item}`}
                     </Text>
                   ))}
               </View>

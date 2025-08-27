@@ -4,7 +4,7 @@ import { Mic, Search, ChevronDown, SlidersHorizontal, X, MapPin, Clock, Trending
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
 import { router } from 'expo-router';
-import { getYelpAutocompleteSuggestions, getYelpPopularSearches } from '@/services/api';
+import { getYelpAutocompleteSuggestions, getYelpPopularSearches, searchMapboxRestaurants, deduplicateRestaurants } from '@/services/api';
 
 interface SearchWizardProps {
   testID?: string;
@@ -17,7 +17,7 @@ interface SuggestionItem {
 }
 
 export function SearchWizard({ testID }: SearchWizardProps) {
-  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity, searchResults } = useRestaurants();
+  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity, searchResults, addRestaurantToStore } = useRestaurants();
   const [query, setQuery] = useState<string>('');
   const [openFilters, setOpenFilters] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
@@ -31,23 +31,42 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const [isLoadingYelpSuggestions, setIsLoadingYelpSuggestions] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Load Yelp popular searches on component mount
+  // Load Mapbox popular searches on component mount
   useEffect(() => {
-    const loadYelpPopularSearches = async () => {
+    const loadMapboxPopularSearches = async () => {
       try {
-        const popularSearches = await getYelpPopularSearches(userLocation?.city === 'New York' ? 'NY' : 'CA');
-        setYelpPopularSearches(popularSearches);
+        // For popular searches, always use user location for relevance
+        const lat = userLocation?.lat || 40.7128;
+        const lng = userLocation?.lng || -74.0060;
+        
+        console.log('[SearchWizard] Loading popular searches with user location:', lat, lng);
+        
+        // Search for popular cuisines
+        const popularQueries = ['pizza', 'sushi', 'italian', 'chinese', 'mexican', 'burger'];
+        const allResults: string[] = [];
+        
+        for (const cuisine of popularQueries) {
+          try {
+            const results = await searchMapboxRestaurants(cuisine, lat, lng, 5000, 2);
+            const names = results.map((restaurant: any) => restaurant.name).filter(Boolean);
+            allResults.push(...names);
+          } catch (error) {
+            console.error('[SearchWizard] Error loading cuisine:', cuisine, error);
+          }
+        }
+        
+        setYelpPopularSearches(allResults.slice(0, 6));
       } catch (error) {
-        console.error('[SearchWizard] Error loading Yelp popular searches:', error);
+        console.error('[SearchWizard] Error loading Mapbox popular searches:', error);
       }
     };
     
-    loadYelpPopularSearches();
-  }, [userLocation?.city]);
+    loadMapboxPopularSearches();
+  }, [userLocation]);
 
-  // Get Yelp autocomplete suggestions when query changes
+  // Get Mapbox autocomplete suggestions when query changes
   useEffect(() => {
-    const getYelpSuggestions = async () => {
+    const getMapboxSuggestions = async () => {
       if (query.length < 2) {
         setYelpSuggestions([]);
         return;
@@ -55,10 +74,31 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       
       setIsLoadingYelpSuggestions(true);
       try {
-        const suggestions = await getYelpAutocompleteSuggestions(query, userLocation?.city === 'New York' ? 'NY' : 'CA');
+        // Check if query is a neighborhood search (contains neighborhood keywords)
+        const neighborhoodKeywords = ['soho', 'tribeca', 'chelsea', 'west village', 'east village', 'upper east side', 'upper west side', 'midtown', 'downtown', 'brooklyn', 'queens', 'bronx', 'manhattan', 'hollywood', 'beverly hills', 'santa monica', 'venice', 'downtown la', 'koreatown', 'silver lake'];
+        const isNeighborhoodSearch = neighborhoodKeywords.some(keyword => 
+          query.toLowerCase().includes(keyword.toLowerCase())
+        );
+        
+        let lat, lng;
+        
+        if (isNeighborhoodSearch) {
+          // For neighborhood searches, ignore user location and use city center
+          console.log('[SearchWizard] Neighborhood search detected, using city center');
+          lat = 40.7128; // NYC center
+          lng = -74.0060;
+        } else {
+          // For generic searches, use user location
+          console.log('[SearchWizard] Generic search detected, using user location');
+          lat = userLocation?.lat || 40.7128;
+          lng = userLocation?.lng || -74.0060;
+        }
+        
+        const results = await searchMapboxRestaurants(query, lat, lng, 5000, 5);
+        const suggestions = results.map((restaurant: any) => restaurant.name).filter(Boolean);
         setYelpSuggestions(suggestions);
       } catch (error) {
-        console.error('[SearchWizard] Error getting Yelp suggestions:', error);
+        console.error('[SearchWizard] Error getting Mapbox suggestions:', error);
         setYelpSuggestions([]);
       } finally {
         setIsLoadingYelpSuggestions(false);
@@ -66,9 +106,9 @@ export function SearchWizard({ testID }: SearchWizardProps) {
     };
 
     // Debounce the API call
-    const timeoutId = setTimeout(getYelpSuggestions, 300);
+    const timeoutId = setTimeout(getMapboxSuggestions, 300);
     return () => clearTimeout(timeoutId);
-  }, [query, userLocation?.city]);
+  }, [query, userLocation]);
 
   const suggestions: SuggestionItem[] = useMemo(() => {
     const historySuggestions = searchHistory.slice(0, 3).map((label, idx) => ({
@@ -110,7 +150,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       type: 'cuisine' as const
     }));
     
-    const neighborhoodSuggestions = [...new Set(restaurants.map(r => r.neighborhood))]
+    const neighborhoodSuggestions = [...new Set(restaurants.map(r => r.neighborhood).filter(Boolean))]
       .slice(0, 4)
       .map((label, idx) => ({
         id: `neighborhood-${idx}`,
@@ -124,37 +164,52 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     
+    console.log(`[SearchWizard] Filtering with query: "${q}"`);
+    console.log(`[SearchWizard] Search results length: ${searchResults.length}`);
+    console.log(`[SearchWizard] Restaurants length: ${restaurants.length}`);
+    console.log(`[SearchWizard] Filters - price: ${price}, rating: ${rating}, isOpenNow: ${isOpenNow}`);
+    
     // If we have a query and search results, show search results
     if (q && searchResults.length > 0) {
       console.log(`[SearchWizard] Using search results: ${searchResults.length} results`);
-      return searchResults.filter(r => {
+      const filteredResults = searchResults.filter(r => {
         const matchPrice = price === 'All' || r.priceRange === price;
-        const matchRating = r.rating >= rating;
+        const matchRating = !r.rating || r.rating >= rating;
         const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
-        return matchPrice && matchRating && matchHours;
+        const matches = matchPrice && matchRating && matchHours;
+        if (!matches) {
+          console.log(`[SearchWizard] Filtered out restaurant "${r.name}" - price: ${matchPrice}, rating: ${matchRating}, hours: ${matchHours}`);
+        }
+        return matches;
       });
+      console.log(`[SearchWizard] After filtering search results: ${filteredResults.length} results`);
+      return filteredResults;
     }
     
     // If we have a query but no search results, filter from all restaurants
     if (q) {
       console.log(`[SearchWizard] Filtering from all restaurants for query: ${q}`);
-      return restaurants.filter(r => {
-        const matchQuery = r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) || r.neighborhood.toLowerCase().includes(q);
+      const filteredRestaurants = restaurants.filter(r => {
+        const matchQuery = r.name.toLowerCase().includes(q) || (r.cuisine && r.cuisine.toLowerCase().includes(q)) || (r.neighborhood && r.neighborhood.toLowerCase().includes(q));
         const matchPrice = price === 'All' || r.priceRange === price;
-        const matchRating = r.rating >= rating;
+        const matchRating = !r.rating || r.rating >= rating;
         const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
         return matchQuery && matchPrice && matchRating && matchHours;
       });
+      console.log(`[SearchWizard] After filtering restaurants: ${filteredRestaurants.length} results`);
+      return filteredRestaurants;
     }
     
     // If no query, show all restaurants
     console.log(`[SearchWizard] Showing all restaurants: ${restaurants.length} results`);
-    return restaurants.filter(r => {
+    const allFiltered = restaurants.filter(r => {
       const matchPrice = price === 'All' || r.priceRange === price;
-      const matchRating = r.rating >= rating;
+      const matchRating = !r.rating || r.rating >= rating;
       const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
       return matchPrice && matchRating && matchHours;
     });
+    console.log(`[SearchWizard] After filtering all restaurants: ${allFiltered.length} results`);
+    return allFiltered;
   }, [restaurants, searchResults, query, price, rating, isOpenNow]);
 
   const performSearch = useCallback(async (searchQuery: string) => {
@@ -162,23 +217,27 @@ export function SearchWizard({ testID }: SearchWizardProps) {
     
     setIsSearching(true);
     try {
-      console.log(`Performing search for: ${searchQuery}`);
+      console.log(`[SearchWizard] Performing search for: ${searchQuery}`);
+      console.log(`[SearchWizard] User location:`, userLocation);
       
       // Get user location for proximity-based search
       const location = userLocation;
       if (!location) {
-        console.log('No user location available, using default search');
-        await searchRestaurants(searchQuery);
+        console.log('[SearchWizard] No user location available, using default search');
+        const results = await searchRestaurants(searchQuery);
+        console.log(`[SearchWizard] Search results:`, results?.length || 0);
         addSearchQuery(searchQuery);
         return;
       }
       
       // Use location-based search with user coordinates
-      await searchRestaurants(searchQuery);
+      const results = await searchRestaurants(searchQuery);
+      console.log(`[SearchWizard] Search results:`, results?.length || 0);
+      console.log(`[SearchWizard] Search results details:`, results?.slice(0, 3));
       addSearchQuery(searchQuery);
-      console.log(`Search completed for: ${searchQuery}`);
+      console.log(`[SearchWizard] Search completed for: ${searchQuery}`);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('[SearchWizard] Search error:', error);
       Alert.alert('Search Error', 'Failed to search restaurants. Please try again.');
     } finally {
       setIsSearching(false);
@@ -375,31 +434,48 @@ export function SearchWizard({ testID }: SearchWizardProps) {
             </View>
           ) : (
             <>
-              {filtered.slice(0, 8).map(r => (
-                <TouchableOpacity 
-                  key={r.id} 
-                  style={styles.resultItem}
-                  onPress={() => {
-                    router.push({ pathname: '/restaurant/[id]', params: { id: r.id } });
-                    setShowSuggestions(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.resultContent}>
-                    <Text style={styles.resultName}>{r.name}</Text>
-                    <Text style={styles.resultMeta}>{r.cuisine} • {r.neighborhood}</Text>
-                    {r.rating && (
-                      <View style={styles.resultRating}>
-                        <Text style={styles.ratingText}>★ {r.rating.toFixed(1)}</Text>
-                        <Text style={styles.priceText}>{r.priceRange}</Text>
-                      </View>
+              {filtered.slice(0, 8).map(r => {
+                console.log('[SearchWizard] Rendering result:', {
+                  name: r.name,
+                  cuisine: r.cuisine,
+                  rating: r.rating,
+                  priceRange: r.priceRange,
+                  price: r.price,
+                  location: r.location,
+                  neighborhood: r.neighborhood,
+                  address: r.address
+                });
+                return (
+                  <TouchableOpacity 
+                    key={r.id} 
+                    style={styles.resultItem}
+                    onPress={() => {
+                      // Add restaurant to store before navigating
+                      console.log('[SearchWizard] Adding restaurant to store before navigation:', r.name, r.id);
+                      addRestaurantToStore(r);
+                      router.push({ pathname: '/restaurant/[id]', params: { id: r.id } });
+                      setShowSuggestions(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.resultContent}>
+                      <Text style={styles.resultName}>{r.name}</Text>
+                      <Text style={styles.resultMeta}>
+                        {`${r.cuisine || 'Restaurant'} • ${r.location?.formattedAddress || r.location?.address || r.neighborhood || 'Location not available'}`}
+                      </Text>
+                      {(r.rating && r.rating > 0) && (
+                        <View style={styles.resultRating}>
+                          <Text style={styles.ratingText}>★ {r.rating.toFixed(1)}</Text>
+                          <Text style={styles.priceText}>{r.priceRange || '$$'}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {r.aiDescription && (
+                      <Text style={styles.aiDescription} numberOfLines={2}>{r.aiDescription}</Text>
                     )}
-                  </View>
-                  {r.aiDescription && (
-                    <Text style={styles.aiDescription} numberOfLines={2}>{r.aiDescription}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
               {filtered.length === 0 && (
                 <View style={styles.noResultsContainer}>
                   <Text style={styles.noResults}>No matches found.</Text>

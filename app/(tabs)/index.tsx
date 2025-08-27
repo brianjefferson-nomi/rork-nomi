@@ -9,6 +9,7 @@ import { ContributorCard } from '@/components/ContributorCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
+import { searchMapboxRestaurants, getMapboxNearbyRestaurants, transformMapboxToRestaurant, searchFoursquareRestaurants, deduplicateRestaurants } from '@/services/api';
 
 
 export default function HomeScreen() {
@@ -16,8 +17,12 @@ export default function HomeScreen() {
   const restaurantsData = useRestaurants();
   const authData = useAuth();
   
+  // Destructure addRestaurantToStore from the store
+  const { addRestaurantToStore } = restaurantsData;
+  
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [mapboxRestaurants, setMapboxRestaurants] = useState<any[]>([]);
 
   // Destructure with defaults and null checks - ensure these are always defined
   const restaurants = restaurantsData?.restaurants || [];
@@ -52,16 +57,25 @@ export default function HomeScreen() {
     return cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
   }, [cityRestaurants, restaurants]);
 
-  const trendingRestaurants = useMemo(() => availableRestaurants.slice(0, 6), [availableRestaurants]);
+  // Use Mapbox restaurants when available, fallback to existing restaurants
+  const trendingRestaurants = useMemo(() => {
+    if (mapboxRestaurants.length > 0) {
+      return mapboxRestaurants.slice(0, 6);
+    }
+    return availableRestaurants.slice(0, 6);
+  }, [mapboxRestaurants, availableRestaurants]);
+  
+  // For New York, prioritize local restaurants over trending
+  const shouldPrioritizeLocal = city === 'New York';
   
   // Convert plans to collections format for display
   const planCollections: Collection[] = useMemo(() => safeCollections.map(plan => ({
     id: plan.id,
     name: plan.name,
     description: plan.description || 'A collaborative dining plan',
-    cover_image: plan.cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+    cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
     created_by: plan.created_by,
-    creator_id: plan.creator_id,
+    creator_id: (plan as any).creator_id,
     occasion: plan.occasion,
     is_public: plan.is_public,
     likes: plan.likes || 0,
@@ -69,43 +83,133 @@ export default function HomeScreen() {
     admin_weighted: plan.admin_weighted,
     expertise_weighted: plan.expertise_weighted,
     minimum_participation: plan.minimum_participation,
-    voting_deadline: plan.voting_deadline,
+    voting_deadline: (plan as any).voting_deadline,
     allow_vote_changes: plan.allow_vote_changes,
     anonymous_voting: plan.anonymous_voting,
-    vote_visibility: plan.vote_visibility,
+    vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
     discussion_enabled: plan.discussion_enabled,
     auto_ranking_enabled: plan.auto_ranking_enabled,
     consensus_threshold: plan.consensus_threshold,
     restaurant_ids: plan.restaurant_ids || [],
-    collaborators: plan.collaborators || [],
+    collaborators: (plan as any).collaborators || [],
     created_at: plan.created_at,
     updated_at: plan.updated_at
   })), [safeCollections]);
   
   const displayCollections = useMemo(() => planCollections || [], [planCollections]);
   const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
-  const newRestaurants = useMemo(() => availableRestaurants.slice(6, 10), [availableRestaurants]);
-  const localHighlights = useMemo(() => availableRestaurants.slice(0, 4), [availableRestaurants]);
+  
+  // Use Mapbox restaurants for new restaurants section
+  const newRestaurants = useMemo(() => {
+    if (mapboxRestaurants.length > 6) {
+      return mapboxRestaurants.slice(6, 10);
+    }
+    return availableRestaurants.slice(6, 10);
+  }, [mapboxRestaurants, availableRestaurants]);
+  
+  // Use Mapbox restaurants for local highlights
+  const localHighlights = useMemo(() => {
+    if (mapboxRestaurants.length > 0) {
+      return mapboxRestaurants.slice(0, 4);
+    }
+    return availableRestaurants.slice(0, 4);
+  }, [mapboxRestaurants, availableRestaurants]);
 
-  // Show local restaurants
+  // Load Mapbox restaurants
   useEffect(() => {
-    const loadLocalRestaurants = () => {
-      setNearbyLoading(true);
+    if (!userLocation) return;
+
+    const loadRealRestaurants = async () => {
       try {
-        // Always show local restaurants from available data
+        const lat = userLocation?.lat || 40.7128;
+        const lng = userLocation?.lng || -74.0060;
+        
+        console.log('[HomeScreen] Loading real restaurants for location:', lat, lng);
+        
+        // Try multiple APIs to get the best restaurant data
+        const allRestaurants: any[] = [];
+        
+        // 1. Try Mapbox first (most reliable currently) - use user location for generic searches
+        try {
+          const mapboxResults = await getMapboxNearbyRestaurants(lat, lng, 5000, 20);
+          console.log('[HomeScreen] Raw Mapbox results:', mapboxResults.length, 'items');
+          console.log('[HomeScreen] First raw Mapbox result:', mapboxResults[0]);
+          
+          // mapboxResults already contains detailed restaurant objects from retrieve endpoint
+          const transformedMapbox = mapboxResults.map(transformMapboxToRestaurant).filter(Boolean);
+          allRestaurants.push(...transformedMapbox);
+          console.log('[HomeScreen] Loaded', transformedMapbox.length, 'Mapbox restaurants');
+          console.log('[HomeScreen] First transformed Mapbox restaurant:', transformedMapbox[0]);
+        } catch (error) {
+          console.error('[HomeScreen] Mapbox API error:', error);
+        }
+        
+        // 2. Try Foursquare as backup (may have credit limits or CORS issues)
+        if (allRestaurants.length < 10) { // Only try if we need more data
+          try {
+            const foursquareResults = await searchFoursquareRestaurants('restaurant', lat, lng, 5000);
+            const transformedFoursquare = foursquareResults.map((place: any) => ({
+              id: place.fsq_id || place.id,
+              name: place.name,
+              cuisine: place.categories?.[0]?.name || 'Restaurant',
+              location: {
+                address: place.location?.address || '',
+                city: place.location?.locality || '',
+                state: place.location?.region || '',
+                zipCode: place.location?.postcode || '',
+                country: place.location?.country || '',
+                formattedAddress: place.location?.formatted_address || ''
+              },
+              coordinates: {
+                latitude: place.latitude || place.location?.lat,
+                longitude: place.longitude || place.location?.lng
+              },
+              rating: place.rating || 0,
+              price: place.price || 0,
+              photos: [],
+              hours: place.hours?.display || '',
+              isOpenNow: place.hours?.open_now || false,
+              phone: place.tel || '',
+              website: place.website || '',
+              description: place.description || '',
+              popularity: place.popularity || 0,
+              verified: place.verified || false,
+              distance: place.distance || 0,
+              source: 'foursquare',
+              sourceId: place.fsq_id || place.id
+            })).filter(Boolean);
+            
+            allRestaurants.push(...transformedFoursquare);
+            console.log('[HomeScreen] Loaded', transformedFoursquare.length, 'Foursquare restaurants');
+          } catch (error) {
+            console.error('[HomeScreen] Foursquare API error:', error);
+          }
+        }
+        
+        // 3. Use available restaurants as final fallback
+        if (allRestaurants.length === 0 && availableRestaurants.length > 0) {
+          allRestaurants.push(...availableRestaurants);
+          console.log('[HomeScreen] Using fallback restaurants:', availableRestaurants.length);
+        }
+        
+        // Deduplicate and limit results
+        const uniqueResults = deduplicateRestaurants(allRestaurants).slice(0, 20); // Limit to 20 restaurants
+        
+        setMapboxRestaurants(uniqueResults);
+        setNearbyRestaurants(uniqueResults.slice(0, 4)); // Use first 4 for nearby section
+        
+        console.log('[HomeScreen] Total loaded restaurants:', uniqueResults.length);
+      } catch (error) {
+        console.error('[HomeScreen] Error loading restaurants:', error);
+        // Fallback to existing restaurants
         const localRestaurants = availableRestaurants.slice(0, 4);
         setNearbyRestaurants(localRestaurants);
-        console.log('[HomeScreen] Loaded', localRestaurants.length, 'local restaurants');
-      } catch (error) {
-        console.error('[HomeScreen] Error loading local restaurants:', error);
-        setNearbyRestaurants([]);
-      } finally {
-        setNearbyLoading(false);
+        setMapboxRestaurants(availableRestaurants);
       }
     };
 
-    loadLocalRestaurants();
-  }, [availableRestaurants]);
+    loadRealRestaurants();
+  }, [userLocation, availableRestaurants]);
 
   // Debug logging with error handling
   try {
@@ -114,7 +218,9 @@ export default function HomeScreen() {
     console.log('[HomeScreen] Collections count:', collections?.length || 0);
     console.log('[HomeScreen] Collections data:', collections?.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_public: c.is_public })));
     console.log('[HomeScreen] Is loading:', isLoading);
+    console.log('[HomeScreen] Mapbox restaurants:', mapboxRestaurants.length);
     console.log('[HomeScreen] Nearby restaurants:', nearbyRestaurants.length);
+    console.log('[HomeScreen] User location:', userLocation);
   } catch (error) {
     console.error('[HomeScreen] Error in debug logging:', error);
   }
@@ -133,6 +239,7 @@ export default function HomeScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF6B6B" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -215,6 +322,47 @@ export default function HomeScreen() {
           <SearchWizard testID="search-wizard" />
         </View>
 
+        {/* Local Restaurants Section - Show first in New York */}
+        {shouldPrioritizeLocal && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Navigation size={20} color="#FF6B6B" />
+              <Text style={styles.sectionTitle}>Local Restaurants</Text>
+              <TouchableOpacity onPress={() => router.push('/discover' as any)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            {nearbyLoading ? (
+              <View style={styles.nearbyLoadingContainer}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.nearbyLoadingText}>
+                  Loading local restaurants...
+                </Text>
+              </View>
+            ) : nearbyRestaurants.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                {nearbyRestaurants.map(restaurant => (
+                  <View key={restaurant.id} style={styles.cardWrapper}>
+                    <RestaurantCard
+                      restaurant={restaurant}
+                      onPress={() => {
+                        // Add restaurant to store before navigating
+                        addRestaurantToStore(restaurant);
+                        router.push(`/restaurant/${restaurant.id}` as any);
+                      }}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.nearbyEmptyContainer}>
+                <Text style={styles.nearbyEmptyText}>No local restaurants found</Text>
+                <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <TrendingUp size={20} color="#FF6B6B" />
@@ -228,7 +376,11 @@ export default function HomeScreen() {
               <View key={restaurant.id} style={styles.cardWrapper}>
                 <RestaurantCard
                   restaurant={restaurant}
-                  onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
+                  onPress={() => {
+                    // Add restaurant to store before navigating
+                    addRestaurantToStore(restaurant);
+                    router.push(`/restaurant/${restaurant.id}` as any);
+                  }}
                 />
               </View>
             ))}
@@ -248,45 +400,57 @@ export default function HomeScreen() {
               <View key={restaurant.id} style={styles.cardWrapper}>
                 <RestaurantCard
                   restaurant={restaurant}
-                  onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
+                  onPress={() => {
+                    // Add restaurant to store before navigating
+                    addRestaurantToStore(restaurant);
+                    router.push(`/restaurant/${restaurant.id}` as any);
+                  }}
                 />
               </View>
             ))}
           </ScrollView>
         </View>
 
-        {/* Local Restaurants Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Navigation size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Local Restaurants</Text>
-            <TouchableOpacity onPress={() => router.push('/discover' as any)}>
-              <Text style={styles.seeAll}>See all</Text>
-            </TouchableOpacity>
+        {/* Local Restaurants Section - Show after trending for other cities */}
+        {!shouldPrioritizeLocal && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Navigation size={20} color="#FF6B6B" />
+              <Text style={styles.sectionTitle}>Local Restaurants</Text>
+              <TouchableOpacity onPress={() => router.push('/discover' as any)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            {nearbyLoading ? (
+              <View style={styles.nearbyLoadingContainer}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.nearbyLoadingText}>
+                  Loading local restaurants...
+                </Text>
+              </View>
+            ) : nearbyRestaurants.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                {nearbyRestaurants.map(restaurant => (
+                  <View key={restaurant.id} style={styles.cardWrapper}>
+                    <RestaurantCard
+                      restaurant={restaurant}
+                      onPress={() => {
+                        // Add restaurant to store before navigating
+                        addRestaurantToStore(restaurant);
+                        router.push(`/restaurant/${restaurant.id}` as any);
+                      }}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.nearbyEmptyContainer}>
+                <Text style={styles.nearbyEmptyText}>No local restaurants found</Text>
+                <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
+              </View>
+            )}
           </View>
-          {nearbyLoading ? (
-            <View style={styles.nearbyLoadingContainer}>
-              <ActivityIndicator size="small" color="#FF6B6B" />
-              <Text style={styles.nearbyLoadingText}>Loading local restaurants...</Text>
-            </View>
-          ) : nearbyRestaurants.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-              {nearbyRestaurants.map(restaurant => (
-                <View key={restaurant.id} style={styles.cardWrapper}>
-                  <RestaurantCard
-                    restaurant={restaurant}
-                    onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.nearbyEmptyContainer}>
-              <Text style={styles.nearbyEmptyText}>No local restaurants found</Text>
-              <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
-            </View>
-          )}
-        </View>
+        )}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -357,6 +521,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FAFAFA',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+    textAlign: 'center',
   },
   header: {
     padding: 16,
