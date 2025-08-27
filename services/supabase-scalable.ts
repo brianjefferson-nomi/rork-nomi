@@ -276,7 +276,7 @@ export const scalableDbHelpers = {
         .from('restaurant_votes')
         .select(includeUserData ? `
           *,
-          users:user_id (
+          users!user_id (
             id,
             name,
             email
@@ -294,7 +294,7 @@ export const scalableDbHelpers = {
       }
 
       // Transform data to include user names
-      const transformedData = (data || []).map(vote => ({
+      const transformedData = (data || []).map((vote: any) => ({
         ...vote,
         userName: vote.users?.name || 'Unknown User',
         userEmail: vote.users?.email || ''
@@ -385,7 +385,7 @@ export const scalableDbHelpers = {
         .from('restaurant_discussions')
         .select(includeUserData ? `
           *,
-          users:user_id (
+          users!user_id (
             id,
             name,
             email
@@ -407,7 +407,7 @@ export const scalableDbHelpers = {
       }
 
       // Transform data to include user names
-      const transformedData = (data || []).map(discussion => ({
+      const transformedData = (data || []).map((discussion: any) => ({
         ...discussion,
         userName: discussion.users?.name || 'Unknown User',
         userEmail: discussion.users?.email || ''

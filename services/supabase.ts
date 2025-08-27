@@ -1134,6 +1134,30 @@ export const dbHelpers = {
     }
   },
 
+  async updateDiscussion(discussionId: string, newMessage: string) {
+    const { data, error } = await supabase
+      .from('restaurant_discussions')
+      .update({ 
+        message: newMessage,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', discussionId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteDiscussion(discussionId: string) {
+    const { error } = await supabase
+      .from('restaurant_discussions')
+      .delete()
+      .eq('id', discussionId);
+    
+    if (error) throw error;
+  },
+
   async getRestaurantComments(collectionId: string, restaurantId: string) {
     try {
       const { data, error } = await supabase
@@ -1177,6 +1201,9 @@ export const dbHelpers = {
 
   // User favorites operations
   async updateUserFavorites(userId: string, favoriteRestaurants: string[]) {
+    console.log('[updateUserFavorites] Updating favorites for user:', userId);
+    console.log('[updateUserFavorites] Favorites to save:', favoriteRestaurants);
+    
     const { data, error } = await supabase
       .from('users')
       .update({ favorite_restaurants: favoriteRestaurants })
@@ -1184,13 +1211,21 @@ export const dbHelpers = {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[updateUserFavorites] Database error:', error);
+      throw error;
+    }
+    
+    console.log('[updateUserFavorites] Successfully updated favorites:', data);
     return data;
   },
 
   async getUserFavorites(userId: string) {
     try {
+      console.log('[getUserFavorites] Fetching favorites for user:', userId);
+      
       if (!userId) {
+        console.log('[getUserFavorites] No user ID provided, returning empty array');
         return [];
       }
       
@@ -1201,11 +1236,15 @@ export const dbHelpers = {
         .single();
       
       if (error) {
+        console.error('[getUserFavorites] Database error:', error);
         return [];
       }
       
-      return data?.favorite_restaurants || [];
+      const favorites = data?.favorite_restaurants || [];
+      console.log('[getUserFavorites] Retrieved favorites:', favorites);
+      return favorites;
     } catch (error) {
+      console.error('[getUserFavorites] Exception:', error);
       return [];
     }
   },

@@ -26,9 +26,26 @@ interface InsightsTabProps {
   collectionMembers: string[];
   styles: any;
   setShowCommentModal: (restaurantId: string | null) => void;
+  user: any;
+  handleEditDiscussion: (discussionId: string, newMessage: string) => Promise<void>;
+  handleDeleteDiscussion: (discussionId: string) => Promise<void>;
+  setEditDiscussionMessage: (message: string) => void;
+  setShowEditDiscussionModal: (modal: { discussionId: string; currentMessage: string } | null) => void;
 }
 
-function InsightsTab({ collection, rankedRestaurants, discussions, collectionMembers, styles, setShowCommentModal }: InsightsTabProps) {
+function InsightsTab({ 
+  collection, 
+  rankedRestaurants, 
+  discussions, 
+  collectionMembers, 
+  styles, 
+  setShowCommentModal,
+  user,
+  handleEditDiscussion,
+  handleDeleteDiscussion,
+  setEditDiscussionMessage,
+  setShowEditDiscussionModal
+}: InsightsTabProps) {
   console.log('[InsightsTab] Component received props:', {
     collectionId: collection?.id,
     rankedRestaurantsLength: rankedRestaurants?.length || 0,
@@ -293,7 +310,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   if (!collectionMembers.includes(voteUserIdShort)) {
                     return false;
                   }
-                  return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
+                  // Show all votes from members, even if name is 'Unknown'
+                  return true;
                 });
 
                 const filteredDislikeVoters = meta.voteDetails.dislikeVoters.filter((voter: any) => {
@@ -303,15 +321,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   if (!collectionMembers.includes(voteUserIdShort)) {
                     return false;
                   }
-                  return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
+                  // Show all votes from members, even if name is 'Unknown'
+                  return true;
                 });
-
-                // Get discussions for this restaurant
-                const restaurantDiscussions = discussions.filter((discussion: any) => {
-                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
-                  return discussion.restaurantId === restaurant.id && collectionMembers.includes(discussionUserIdShort);
-                });
-
+                
                 return (
                   <View style={styles.memberVotesSection}>
                     <Text style={styles.memberVotesTitle}>Member Activity for {restaurant.name}</Text>
@@ -324,28 +337,26 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                           <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
                             <View style={styles.memberVoteAvatar}>
                               <Text style={styles.memberVoteInitial}>
-                                {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                                {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
                               </Text>
                             </View>
-                            <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                            <Text style={styles.memberVoteName}>
+                              {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
+                            </Text>
                             <ThumbsUp size={16} color="#10B981" />
-                            {voter.reason && (
-                              <Text style={styles.voteReason}>"{voter.reason}"</Text>
-                            )}
                           </View>
                         ))}
                         {filteredDislikeVoters.map((voter: any, index: number) => (
                           <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
                             <View style={styles.memberVoteAvatar}>
                               <Text style={styles.memberVoteInitial}>
-                                {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                                {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
                               </Text>
                             </View>
-                            <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                            <Text style={styles.memberVoteName}>
+                              {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
+                            </Text>
                             <ThumbsDown size={16} color="#EF4444" />
-                            {voter.reason && (
-                              <Text style={styles.voteReason}>"{voter.reason}"</Text>
-                            )}
                           </View>
                         ))}
                         {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
@@ -354,38 +365,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                       </View>
                     </View>
 
-                    {/* Discussions Section */}
-                    <View style={styles.activitySection}>
-                      <Text style={styles.activitySectionTitle}>Discussions ({restaurantDiscussions.length})</Text>
-                      <View style={styles.discussionsList}>
-                        {restaurantDiscussions.map((discussion: any, index: number) => (
-                          <View key={`${restaurant.id}-discussion-${discussion.id}-${index}`} style={styles.discussionItem}>
-                            <View style={styles.discussionHeader}>
-                              <View style={styles.memberVoteAvatar}>
-                                <Text style={styles.memberVoteInitial}>
-                                  {discussion.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
-                                </Text>
-                              </View>
-                              <Text style={styles.memberVoteName}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
-                              <MessageCircle size={16} color="#6B7280" />
-                            </View>
-                            <Text style={styles.discussionMessage}>"{discussion.message}"</Text>
-                            <Text style={styles.discussionTime}>
-                              {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
-                            </Text>
-                          </View>
-                        ))}
-                        {restaurantDiscussions.length === 0 && (
-                          <Text style={styles.noVotes}>No discussions yet</Text>
-                        )}
-                      </View>
-                    </View>
+
                   </View>
                 );
               })()}
 
               {/* User Discussions */}
               {(() => {
+                // Get discussions
                 const filteredDiscussions = discussions.filter((discussion: any) => {
                   const matchesRestaurant = discussion.restaurantId === restaurant.id;
                   // Extract first 8 characters from discussion user IDs to match collection member format
@@ -399,11 +386,52 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return hasValidName;
                 });
 
+                // Get vote reasons from the voting breakdown
+                const voteReasons: any[] = [];
+                if (meta?.voteDetails) {
+                  // Add like vote reasons
+                  meta.voteDetails.likeVoters.forEach((voter: any) => {
+                    const voteUserIdShort = voter.userId?.substring(0, 8);
+                    if (collectionMembers.includes(voteUserIdShort) && voter.reason) {
+                      voteReasons.push({
+                        id: `vote-${voter.userId}-${restaurant.id}`,
+                        userId: voter.userId,
+                        userName: voter.name && voter.name !== 'Unknown' ? voter.name : `User ${voter.userId?.substring(0, 8)}`,
+                        message: voter.reason,
+                        timestamp: voter.timestamp,
+                        type: 'like',
+                        isVoteReason: true
+                      });
+                    }
+                  });
+
+                  // Add dislike vote reasons
+                  meta.voteDetails.dislikeVoters.forEach((voter: any) => {
+                    const voteUserIdShort = voter.userId?.substring(0, 8);
+                    if (collectionMembers.includes(voteUserIdShort) && voter.reason) {
+                      voteReasons.push({
+                        id: `vote-${voter.userId}-${restaurant.id}`,
+                        userId: voter.userId,
+                        userName: voter.name && voter.name !== 'Unknown' ? voter.name : `User ${voter.userId?.substring(0, 8)}`,
+                        message: voter.reason,
+                        timestamp: voter.timestamp,
+                        type: 'dislike',
+                        isVoteReason: true
+                      });
+                    }
+                  });
+                }
+
+                // Combine discussions and vote reasons, sorted by timestamp
+                const allContent = [...filteredDiscussions, ...voteReasons].sort((a, b) => 
+                  new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                );
+
                 return (
                   <View style={styles.discussionsSection}>
                     <View style={styles.discussionsHeader}>
                       <MessageCircle size={14} color="#6B7280" />
-                      <Text style={styles.discussionsLabel}>Discussions ({filteredDiscussions.length})</Text>
+                      <Text style={styles.discussionsLabel}>Discussions & Comments ({allContent.length})</Text>
                       <TouchableOpacity 
                         style={styles.addCommentButton}
                         onPress={() => setShowCommentModal(restaurant.id)}
@@ -411,22 +439,65 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                         <Text style={styles.addCommentButtonText}>Add Comment</Text>
                       </TouchableOpacity>
                     </View>
-                    {filteredDiscussions.length > 0 ? (
-                      filteredDiscussions.slice(0, 3).map((discussion: any) => (
-                        <View key={discussion.id} style={styles.discussionItem}>
+                    {allContent.length > 0 ? (
+                      allContent.slice(0, 5).map((item: any) => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[styles.discussionItem, item.isVoteReason && styles.voteReasonItem]}
+                          onLongPress={() => {
+                            // Only allow edit/delete for own discussions (not vote reasons)
+                            if (!item.isVoteReason && item.userId === user?.id) {
+                              Alert.alert(
+                                'Discussion Options',
+                                'What would you like to do?',
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Edit',
+                                    onPress: () => {
+                                      setEditDiscussionMessage(item.message);
+                                      setShowEditDiscussionModal({
+                                        discussionId: item.id,
+                                        currentMessage: item.message
+                                      });
+                                    }
+                                  },
+                                  {
+                                    text: 'Delete',
+                                    style: 'destructive',
+                                    onPress: () => handleDeleteDiscussion(item.id)
+                                  }
+                                ]
+                              );
+                            }
+                          }}
+                          activeOpacity={(!item.isVoteReason && item.userId === user?.id) ? 0.7 : 1}
+                        >
                           <View style={styles.discussionHeader}>
                             <View style={styles.discussionAvatar}>
                               <Text style={styles.discussionInitial}>
-                                {discussion.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                                {item.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
                               </Text>
                             </View>
-                            <Text style={styles.discussionAuthor}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
+                            <Text style={styles.discussionAuthor}>{item.userName?.split(' ')[0] || 'Unknown'}</Text>
+                            {item.isVoteReason && (
+                              <View style={styles.voteReasonBadge}>
+                                {item.type === 'like' ? (
+                                  <ThumbsUp size={12} color="#10B981" />
+                                ) : (
+                                  <ThumbsDown size={12} color="#EF4444" />
+                                )}
+                              </View>
+                            )}
                             <Text style={styles.discussionTime}>
-                              {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
+                              {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : 'Unknown date'}
                             </Text>
+                            {!item.isVoteReason && item.userId === user?.id && (
+                              <Text style={styles.ownDiscussionIndicator}>•</Text>
+                            )}
                           </View>
-                          <Text style={styles.discussionText} numberOfLines={3}>{discussion.message}</Text>
-                        </View>
+                          <Text style={styles.discussionText} numberOfLines={3}>{item.message}</Text>
+                        </TouchableOpacity>
                       ))
                     ) : (
                       <Text style={styles.noDiscussions}>No discussions yet</Text>
@@ -496,6 +567,54 @@ export default function CollectionDetailScreen() {
     // Trigger ranking update
     setRankingUpdateTrigger(prev => prev + 1);
   }, [originalAddDiscussion]);
+
+  // Handle editing discussion
+  const handleEditDiscussion = useCallback(async (discussionId: string, newMessage: string) => {
+    try {
+      // Update discussion in database
+      await dbHelpers.updateDiscussion(discussionId, newMessage);
+      
+      // Update local state
+      setDiscussions(prev => prev.map(discussion => 
+        discussion.id === discussionId 
+          ? { ...discussion, message: newMessage, updated_at: new Date().toISOString() }
+          : discussion
+      ));
+      
+      setShowEditDiscussionModal(null);
+      setEditDiscussionMessage('');
+    } catch (error) {
+      console.error('[handleEditDiscussion] Error:', error);
+      Alert.alert('Error', 'Failed to update discussion');
+    }
+  }, []);
+
+  // Handle deleting discussion
+  const handleDeleteDiscussion = useCallback(async (discussionId: string) => {
+    Alert.alert(
+      'Delete Discussion',
+      'Are you sure you want to delete this discussion?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete discussion from database
+              await dbHelpers.deleteDiscussion(discussionId);
+              
+              // Update local state
+              setDiscussions(prev => prev.filter(discussion => discussion.id !== discussionId));
+            } catch (error) {
+              console.error('[handleDeleteDiscussion] Error:', error);
+              Alert.alert('Error', 'Failed to delete discussion');
+            }
+          }
+        }
+      ]
+    );
+  }, []);
   
   const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
   const [voteReason, setVoteReason] = useState('');
@@ -503,6 +622,8 @@ export default function CollectionDetailScreen() {
   const [discussionMessage, setDiscussionMessage] = useState('');
   const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
   const [commentMessage, setCommentMessage] = useState('');
+  const [showEditDiscussionModal, setShowEditDiscussionModal] = useState<{ discussionId: string; currentMessage: string } | null>(null);
+  const [editDiscussionMessage, setEditDiscussionMessage] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
@@ -1373,6 +1494,11 @@ export default function CollectionDetailScreen() {
                collectionMembers={collectionMembers}
                styles={styles}
                setShowCommentModal={setShowCommentModal}
+               user={user}
+               handleEditDiscussion={handleEditDiscussion}
+               handleDeleteDiscussion={handleDeleteDiscussion}
+               setEditDiscussionMessage={setEditDiscussionMessage}
+               setShowEditDiscussionModal={setShowEditDiscussionModal}
              />
            ) : (
              <View style={styles.insightsContainer}>
@@ -1509,6 +1635,44 @@ export default function CollectionDetailScreen() {
                   setShowInviteModal(false);
                   setInviteEmail('');
                   setInviteMessage('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Discussion Modal */}
+      <Modal visible={!!showEditDiscussionModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Discussion</Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Edit your message..."
+              multiline
+              value={editDiscussionMessage}
+              onChangeText={setEditDiscussionMessage}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalButton}
+                onPress={() => {
+                  if (showEditDiscussionModal && editDiscussionMessage.trim()) {
+                    handleEditDiscussion(showEditDiscussionModal.discussionId, editDiscussionMessage);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Update</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowEditDiscussionModal(null);
+                  setEditDiscussionMessage('');
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -2214,6 +2378,18 @@ const styles = StyleSheet.create({
   discussionTime: {
     fontSize: 10,
     color: '#9CA3AF',
+  },
+  ownDiscussionIndicator: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: 'bold',
+  },
+  voteReasonItem: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#E0F2FE',
+  },
+  voteReasonBadge: {
+    marginLeft: 4,
   },
   discussionText: {
     fontSize: 13,

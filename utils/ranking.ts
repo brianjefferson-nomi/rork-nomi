@@ -183,15 +183,41 @@ export function computeRankings(
             return m.userId === v.userId;
           }
         });
-        
+
         const memberWeight = (typeof collaborator === 'string' ? 1 : collaborator?.voteWeight) ?? 1;
         const finalWeight = (v.weight ?? 1) * weight * memberWeight;
         
         if (weight !== 1 || memberWeight !== 1) authorityApplied = true;
         
+        // Try to get user name from multiple sources
+        let userName = 'Unknown';
+        
+        // First priority: use userName from vote data (from database join)
+        if ((v as any).userName && (v as any).userName !== 'Unknown User') {
+          userName = (v as any).userName;
+        } else if (typeof collaborator === 'string') {
+          // If collaborator is a string (user ID), try to extract a readable name
+          userName = `User ${collaborator.substring(0, 8)}`;
+        } else if (collaborator?.name) {
+          userName = collaborator.name;
+        } else {
+          // Last resort: use user ID prefix
+          userName = `User ${v.userId.substring(0, 8)}`;
+        }
+
+        console.log('[ranking] Voter lookup:', {
+          userId: v.userId,
+          voteUserName: (v as any).userName,
+          collaborators: options?.collection?.collaborators?.length || 0,
+          foundCollaborator: !!collaborator,
+          collaboratorType: typeof collaborator,
+          collaboratorName: typeof collaborator === 'string' ? 'string' : collaborator?.name,
+          finalUserName: userName
+        });
+
         const voterInfo: VoterInfo = {
           userId: v.userId,
-          name: (typeof collaborator === 'string' ? 'Unknown' : collaborator?.name) ?? 'Unknown',
+          name: userName,
           avatar: (typeof collaborator === 'string' ? '' : collaborator?.avatar) ?? '',
           timestamp: new Date(v.timestamp ?? Date.now()),
           weight: finalWeight,

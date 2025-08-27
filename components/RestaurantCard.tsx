@@ -351,12 +351,18 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
         )}
 
         {/* User Notes */}
-        {restaurant.userNotes && (
-          <View style={styles.noteContainer}>
-            <Text style={styles.noteLabel}>Your note:</Text>
-            <Text style={styles.noteText}>{restaurant.userNotes}</Text>
-          </View>
-        )}
+        {(() => {
+          const userNotes = restaurant.userNotes;
+          if (userNotes && typeof userNotes === 'string' && userNotes.trim() !== '') {
+            return (
+              <View style={styles.noteContainer}>
+                <Text style={styles.noteLabel}>Your note:</Text>
+                <Text style={styles.noteText}>{userNotes}</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
 
         {/* Top Picks - only show if there are actual menu highlights */}
         {(() => {
@@ -413,25 +419,25 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
     width: '100%',
   },
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 200,
+    height: 140,
   },
   image: {
     width: '100%',
-    height: 200,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    height: 140,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   imageNavButton: {
     position: 'absolute',
@@ -477,24 +483,24 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   content: {
-    padding: 16,
+    padding: 12,
   },
   header: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   name: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#222222',
     flex: 1,
     marginRight: 8,
-    lineHeight: 24,
+    lineHeight: 20,
   },
   ratingRow: {
     flexDirection: 'row',
@@ -511,15 +517,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cuisine: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#717171',
     fontWeight: '400',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   locationText: {
     fontSize: 13,
@@ -530,69 +536,69 @@ const styles = StyleSheet.create({
   vibeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 6,
+    gap: 3,
+    marginBottom: 4,
   },
   vibeTag: {
     backgroundColor: '#F0F8FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E6F3FF',
   },
   vibeText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#0066CC',
     fontWeight: '600',
   },
   description: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#717171',
-    lineHeight: 20,
-    marginBottom: 8,
+    lineHeight: 18,
+    marginBottom: 6,
   },
   topPicksContainer: {
-    marginTop: 8,
-    marginBottom: 8,
-    padding: 12,
+    marginTop: 6,
+    marginBottom: 6,
+    padding: 10,
     backgroundColor: '#F8F9FA',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E9ECEF',
   },
   topPicksLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#222222',
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   topPicksList: {
     flexDirection: 'column',
   },
   topPickText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#717171',
     fontWeight: '400',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   noteContainer: {
-    marginTop: 8,
-    padding: 12,
+    marginTop: 6,
+    padding: 10,
     backgroundColor: '#F7F7F7',
-    borderRadius: 12,
+    borderRadius: 10,
   },
   noteLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#222222',
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   noteText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#717171',
     fontStyle: 'italic',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   // Compact card styles
   compactCard: {

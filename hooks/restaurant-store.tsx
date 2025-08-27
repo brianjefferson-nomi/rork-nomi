@@ -122,7 +122,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     phone: dbRestaurant.phone,
     website: dbRestaurant.website,
     priceLevel: dbRestaurant.price_level,
-    userNotes: dbRestaurant.userNotes || []
+    userNotes: dbRestaurant.userNotes || ''
   }), []);
 
   // Load restaurants from database
@@ -533,10 +533,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async ({ userId, favoriteRestaurants }: { userId: string; favoriteRestaurants: string[] }) => {
-      return await dbHelpers.updateUserFavorites(userId, favoriteRestaurants);
+      console.log('[toggleFavoriteMutation] Starting database update...');
+      console.log('[toggleFavoriteMutation] User ID:', userId);
+      console.log('[toggleFavoriteMutation] Favorites to save:', favoriteRestaurants);
+      
+      const result = await dbHelpers.updateUserFavorites(userId, favoriteRestaurants);
+      console.log('[toggleFavoriteMutation] Database update successful:', result);
+      return result;
     },
     onSuccess: () => {
+      console.log('[toggleFavoriteMutation] Success callback - invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['userFavorites'] });
+    },
+    onError: (error) => {
+      console.error('[toggleFavoriteMutation] Error updating favorites:', error);
     }
   });
 
@@ -648,14 +658,25 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, [deletePlanMutation, user?.id]);
 
   const toggleFavorite = useCallback((restaurantId: string) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('[toggleFavorite] No user ID available');
+      return;
+    }
+
+    console.log('[toggleFavorite] Toggling favorite for restaurant:', restaurantId);
+    console.log('[toggleFavorite] Current favorites:', favoriteRestaurants);
+    console.log('[toggleFavorite] User ID:', user.id);
 
     const newFavorites = favoriteRestaurants.includes(restaurantId)
       ? favoriteRestaurants.filter(id => id !== restaurantId)
       : [...favoriteRestaurants, restaurantId];
 
+    console.log('[toggleFavorite] New favorites array:', newFavorites);
+
     setFavoriteRestaurants(newFavorites);
     toggleFavoriteMutation.mutate({ userId: user.id, favoriteRestaurants: newFavorites });
+    
+    console.log('[toggleFavorite] Mutation triggered for database update');
   }, [favoriteRestaurants, user?.id, toggleFavoriteMutation]);
 
   const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
