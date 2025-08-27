@@ -6,7 +6,7 @@ import { RestaurantCard } from '@/components/RestaurantCard';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/services/supabase';
+import { supabase, dbHelpers } from '@/services/supabase';
 
 function getConsensusStyle(consensus: string) {
   switch (consensus) {
@@ -644,6 +644,7 @@ export default function CollectionDetailScreen() {
   
   // Load discussions asynchronously
   useEffect(() => {
+    const loadDiscussions = async () => {
     if (id) {
       setIsLoadingDiscussions(true);
       console.log('[CollectionDetail] Loading discussions for collection:', id);
@@ -660,6 +661,28 @@ export default function CollectionDetailScreen() {
         console.error('[CollectionDetail] getCollectionDiscussions is not a function!');
         setIsLoadingDiscussions(false);
         return;
+      }
+      
+      console.log('[CollectionDetail] About to call getCollectionDiscussions with id:', id);
+      
+      // Test direct service call
+      console.log('[CollectionDetail] Testing direct service call...');
+      try {
+        const directResult = await dbHelpers.getCollectionDiscussions(id);
+        console.log('[CollectionDetail] Direct service call result:', {
+          length: directResult?.length || 0,
+          sample: directResult?.[0] ? {
+            id: directResult[0].id,
+            userId: directResult[0].userId,
+            collectionId: directResult[0].collectionId,
+            restaurantId: directResult[0].restaurantId,
+            rawUserId: directResult[0].user_id,
+            rawCollectionId: directResult[0].collection_id,
+            rawRestaurantId: directResult[0].restaurant_id
+          } : null
+        });
+      } catch (error) {
+        console.error('[CollectionDetail] Direct service call failed:', error);
       }
       
       getCollectionDiscussions(id)
@@ -707,6 +730,9 @@ export default function CollectionDetailScreen() {
     } else {
       console.log('[CollectionDetail] No collection ID provided for discussions loading');
     }
+    };
+    
+    loadDiscussions();
   }, [id, getCollectionDiscussions]);
 
   // Fetch real discussion data from database
