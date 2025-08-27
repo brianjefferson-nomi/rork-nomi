@@ -127,28 +127,31 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
               {(() => {
+                // For group insights, show ALL discussions for the collection
+                // Don't filter by collection members since discussions should be visible to all members
                 const filteredDiscussions = discussions.filter((discussion: any) => {
-                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
-                  return collectionMembers.includes(discussionUserIdShort);
+                  // Only filter by collection ID to ensure it's for this collection
+                  return discussion.collectionId === collection.id;
                 });
                 
                 console.log('[InsightsTab] Discussions calculation:', {
                   totalDiscussions: discussions.length,
                   filteredDiscussions: filteredDiscussions.length,
-                  collectionMembers,
+                  collectionId: collection.id,
                   allDiscussions: discussions.map(d => ({
                     userId: d.userId,
                     userName: d.userName,
                     message: d.message?.substring(0, 50),
                     collectionId: d.collectionId,
-                    restaurantId: d.restaurantId
+                    restaurantId: d.restaurantId,
+                    matchesCollection: d.collectionId === collection.id
                   })),
                   sampleDiscussion: discussions[0] ? {
                     userId: discussions[0].userId,
                     userName: discussions[0].userName,
                     message: discussions[0].message,
-                    userIdShort: discussions[0].userId?.substring(0, 8),
-                    isInCollection: collectionMembers.includes(discussions[0].userId?.substring(0, 8))
+                    collectionId: discussions[0].collectionId,
+                    matchesCollection: discussions[0].collectionId === collection.id
                   } : null
                 });
                 
