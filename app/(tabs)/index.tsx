@@ -580,26 +580,29 @@ export default function HomeScreen() {
                 console.log('[Neighborhood Highlights] All neighborhoods with counts:', neighborhoodCounts);
                 console.log('[Neighborhood Highlights] Top 4 neighborhoods:', topNeighborhoods);
                 
-                // Neighborhood background images - each with unique images
+                // Neighborhood background images - city-specific photos
                 const neighborhoodImages = {
-                  'Midtown': 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400',
-                  'Greenwich Village': 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
-                  'Gramercy': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-                  'SoHo': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-                  'East Village': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
-                  'Upper East Side': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400',
-                  'Brooklyn': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-                  'Queens': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
-                  'Manhattan': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-                  'Los Angeles': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400',
-                  'Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
-                  'Beverly Hills': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400',
-                  'Santa Monica': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-                  'West Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
-                  'Downtown LA': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400',
-                  'Venice': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-                  'Koreatown': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
-                  'Silver Lake': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400'
+                  // New York City neighborhoods
+                  'Midtown': 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400', // NYC skyline
+                  'Greenwich Village': 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400', // Washington Square Park
+                  'Gramercy': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', // Gramercy Park area
+                  'SoHo': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400', // SoHo streets
+                  'East Village': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400', // East Village vibe
+                  'Upper East Side': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400', // UES elegance
+                  'Brooklyn': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400', // Brooklyn Bridge
+                  'Queens': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400', // Queens diversity
+                  'Manhattan': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400', // Manhattan skyline
+                  
+                  // Los Angeles neighborhoods
+                  'Los Angeles': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400', // LA skyline
+                  'Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400', // Hollywood sign
+                  'Beverly Hills': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400', // Beverly Hills luxury
+                  'Santa Monica': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400', // Santa Monica pier
+                  'West Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400', // WeHo nightlife
+                  'Downtown LA': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400', // DTLA skyline
+                  'Venice': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400', // Venice Beach
+                  'Koreatown': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400', // K-town culture
+                  'Silver Lake': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400' // Silver Lake hipster vibe
                 };
                 
                 return topNeighborhoods.map(({ neighborhood, count }) => (
@@ -612,7 +615,7 @@ export default function HomeScreen() {
                     }}
                   >
                     <Image
-                      source={{ uri: neighborhoodImages[neighborhood as keyof typeof neighborhoodImages] || 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400' }}
+                      source={{ uri: neighborhoodImages[neighborhood as keyof typeof neighborhoodImages] || (city === 'Los Angeles' ? 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400' : 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400') }}
                       style={styles.localImage}
                       resizeMode="cover"
                     />
