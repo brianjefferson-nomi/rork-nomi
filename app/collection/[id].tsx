@@ -140,7 +140,15 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     voteUserIdType: typeof v.userId,
                     isInCollection: collectionMembers.includes(v.userId),
                     collectionMembersType: typeof collectionMembers[0]
-                  }))
+                  })),
+                  // Add specific debugging for the first vote
+                  firstVoteDetails: meta.voteDetails.likeVoters.length > 0 ? {
+                    voteUserId: meta.voteDetails.likeVoters[0].userId,
+                    voteUserIdLength: meta.voteDetails.likeVoters[0].userId?.length,
+                    voteUserIdStartsWith: meta.voteDetails.likeVoters[0].userId?.substring(0, 10),
+                    isInCollection: collectionMembers.includes(meta.voteDetails.likeVoters[0].userId),
+                    collectionMembersSample: collectionMembers.slice(0, 2)
+                  } : null
                 });
                 
                 const totalVotes = memberLikeVoters.length + memberDislikeVoters.length;
@@ -551,8 +559,18 @@ export default function CollectionDetailScreen() {
     collaborators: effectiveCollection?.collaborators,
     collectionMembers,
     sampleVoteData: effectiveRankedRestaurants[0]?.meta?.voteDetails ? {
-      likeVoters: effectiveRankedRestaurants[0].meta.voteDetails.likeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
-      dislikeVoters: effectiveRankedRestaurants[0].meta.voteDetails.dislikeVoters.map((v: any) => ({ userId: v.userId, name: v.name }))
+      likeVoters: effectiveRankedRestaurants[0].meta.voteDetails.likeVoters.map((v: any) => ({ 
+        userId: v.userId, 
+        name: v.name,
+        userIdLength: v.userId?.length,
+        userIdStartsWith: v.userId?.substring(0, 10)
+      })),
+      dislikeVoters: effectiveRankedRestaurants[0].meta.voteDetails.dislikeVoters.map((v: any) => ({ 
+        userId: v.userId, 
+        name: v.name,
+        userIdLength: v.userId?.length,
+        userIdStartsWith: v.userId?.substring(0, 10)
+      }))
     } : null
   });
 
