@@ -128,6 +128,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
                 const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
                 
+                console.log('[InsightsTab] Vote filtering for restaurant:', restaurant.name, {
+                  allLikeVoters: meta.voteDetails.likeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
+                  allDislikeVoters: meta.voteDetails.dislikeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
+                  collectionMembers,
+                  filteredLikeVoters: memberLikeVoters.length,
+                  filteredDislikeVoters: memberDislikeVoters.length
+                });
+                
                 const totalVotes = memberLikeVoters.length + memberDislikeVoters.length;
                 const approvalRate = totalVotes > 0 ? Math.round((memberLikeVoters.length / totalVotes) * 100) : 0;
 
@@ -524,6 +532,15 @@ export default function CollectionDetailScreen() {
   const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
     ? effectiveCollection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
     : [];
+  
+  console.log('[CollectionDetail] Collection members calculation:', {
+    collaborators: effectiveCollection?.collaborators,
+    collectionMembers,
+    sampleVoteData: effectiveRankedRestaurants[0]?.meta?.voteDetails ? {
+      likeVoters: effectiveRankedRestaurants[0].meta.voteDetails.likeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
+      dislikeVoters: effectiveRankedRestaurants[0].meta.voteDetails.dislikeVoters.map((v: any) => ({ userId: v.userId, name: v.name }))
+    } : null
+  });
 
   // Determine collection type
   const getCollectionType = () => {
