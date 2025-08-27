@@ -608,21 +608,31 @@ export default function CollectionDetailScreen() {
     if (id) {
       setIsLoadingDiscussions(true);
       console.log('[CollectionDetail] Loading discussions for collection:', id);
+      console.log('[CollectionDetail] getCollectionDiscussions function:', typeof getCollectionDiscussions);
+      
       getCollectionDiscussions(id)
         .then((data) => {
           console.log('[CollectionDetail] Loaded discussions:', data?.length || 0);
+          console.log('[CollectionDetail] Raw discussions data:', data);
           if (data && data.length > 0) {
             console.log('[CollectionDetail] Sample discussion:', {
               id: data[0].id,
               message: data[0].message,
               userName: data[0].userName,
-              restaurantId: data[0].restaurantId
+              restaurantId: data[0].restaurantId,
+              collectionId: data[0].collectionId,
+              userId: data[0].userId
             });
           }
           setDiscussions(data || []);
         })
         .catch((error) => {
           console.error('[CollectionDetail] Error loading discussions:', error);
+          console.error('[CollectionDetail] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
           setDiscussions([]);
         })
         .finally(() => {

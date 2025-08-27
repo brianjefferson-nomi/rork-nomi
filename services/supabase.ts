@@ -1057,6 +1057,8 @@ export const dbHelpers = {
 
   async getCollectionDiscussions(collectionId: string, restaurantId?: string) {
     try {
+      console.log('[getCollectionDiscussions] Starting query for collectionId:', collectionId);
+      
       let query = supabase
         .from('restaurant_discussions')
         .select(`
@@ -1075,6 +1077,18 @@ export const dbHelpers = {
       
       const { data, error } = await query.order('created_at', { ascending: false });
       
+      console.log('[getCollectionDiscussions] Query result:', {
+        dataLength: data?.length || 0,
+        error: error,
+        sampleData: data?.[0] ? {
+          id: data[0].id,
+          message: data[0].message?.substring(0, 50),
+          userName: data[0].users?.name,
+          userId: data[0].user_id,
+          collectionId: data[0].collection_id
+        } : null
+      });
+      
       if (error) {
         console.error('[getCollectionDiscussions] Error:', error);
         return [];
@@ -1088,6 +1102,17 @@ export const dbHelpers = {
         // Keep the original message field
         message: discussion.message
       }));
+      
+      console.log('[getCollectionDiscussions] Transformed data:', {
+        transformedLength: transformedData.length,
+        sampleTransformed: transformedData[0] ? {
+          id: transformedData[0].id,
+          userName: transformedData[0].userName,
+          message: transformedData[0].message?.substring(0, 50),
+          userId: transformedData[0].user_id,
+          collectionId: transformedData[0].collection_id
+        } : null
+      });
       
       return transformedData;
     } catch (error) {
