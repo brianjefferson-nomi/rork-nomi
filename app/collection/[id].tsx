@@ -41,16 +41,34 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
                 const participatingMembers = rankedRestaurants.reduce((total, { meta }, restaurantIndex) => {
                   // Filter votes to only include collection members
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
-                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  // Extract first 8 characters from vote user IDs to match collection member format
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+                  });
+                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+                  });
                   
                   const uniqueVoters = new Set([
-                    ...memberLikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`),
-                    ...memberDislikeVoters.map((v: any, index: number) => `${v.userId}-${restaurantIndex}-${index}`)
+                    ...memberLikeVoters.map((v: any, index: number) => `${v.userId?.substring(0, 8)}-${restaurantIndex}-${index}`),
+                    ...memberDislikeVoters.map((v: any, index: number) => `${v.userId?.substring(0, 8)}-${restaurantIndex}-${index}`)
                   ]);
                   return total + uniqueVoters.size;
                 }, 0);
-                return totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
+                
+                const participationRate = totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
+                
+                console.log('[InsightsTab] Participation rate calculation:', {
+                  totalMembers,
+                  participatingMembers,
+                  participationRate,
+                  collectionMembers,
+                  rankedRestaurantsCount: rankedRestaurants.length
+                });
+                
+                return participationRate;
               })()}%
             </Text>
             <Text style={styles.analyticLabel}>Participation Rate</Text>
@@ -108,10 +126,25 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
-              {discussions.filter((discussion: any) => {
-                const discussionUserIdShort = discussion.userId?.substring(0, 8);
-                return collectionMembers.includes(discussionUserIdShort);
-              }).length}
+              {(() => {
+                const filteredDiscussions = discussions.filter((discussion: any) => {
+                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
+                  return collectionMembers.includes(discussionUserIdShort);
+                });
+                
+                console.log('[InsightsTab] Discussions calculation:', {
+                  totalDiscussions: discussions.length,
+                  filteredDiscussions: filteredDiscussions.length,
+                  collectionMembers,
+                  sampleDiscussion: discussions[0] ? {
+                    userId: discussions[0].userId,
+                    userIdShort: discussions[0].userId?.substring(0, 8),
+                    isInCollection: collectionMembers.includes(discussions[0].userId?.substring(0, 8))
+                  } : null
+                });
+                
+                return filteredDiscussions.length;
+              })()}
             </Text>
             <Text style={styles.analyticLabel}>Discussions</Text>
           </View>
@@ -174,7 +207,8 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                     voteUserId: meta.voteDetails.likeVoters[0].userId,
                     voteUserIdLength: meta.voteDetails.likeVoters[0].userId?.length,
                     voteUserIdStartsWith: meta.voteDetails.likeVoters[0].userId?.substring(0, 10),
-                    isInCollection: collectionMembers.includes(meta.voteDetails.likeVoters[0].userId),
+                    voteUserIdShort: meta.voteDetails.likeVoters[0].userId?.substring(0, 8),
+                    isInCollection: collectionMembers.includes(meta.voteDetails.likeVoters[0].userId?.substring(0, 8)),
                     collectionMembersSample: collectionMembers.slice(0, 2)
                   } : null
                 });
