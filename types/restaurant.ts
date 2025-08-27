@@ -74,6 +74,7 @@ export interface Collection {
 
 export interface CollectionMember {
   userId: string;
+  memberId?: string; // For backward compatibility with different ID formats
   name: string;
   avatar: string;
   role: 'admin' | 'member';

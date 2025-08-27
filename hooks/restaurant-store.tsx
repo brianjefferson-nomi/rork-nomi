@@ -875,8 +875,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         collaborators: plan.collaborators || []
       };
 
-      // Get collection member IDs
-      const collectionMemberIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
+      // Get collection member IDs - handle different ID formats
+      const collectionMemberIds = new Set(updatedPlan.collaborators.map((c: any) => {
+        if (typeof c === 'string') return c;
+        // Handle different ID formats - extract the actual user ID from memberId or userId
+        if (c?.memberId && c.memberId.startsWith('member_')) {
+          return c.memberId.replace('member_', '');
+        }
+        return c?.userId || c?.id;
+      }));
       
       // Filter votes to only include collection members
       const memberVotes = transformedVotes.filter(vote => collectionMemberIds.has(vote.userId));
@@ -884,7 +891,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
       // Add any users from votes who aren't in collaborators (but only if they're supposed to be members)
       const voteUserIds = new Set(transformedVotes.map(v => v.userId));
-      const existingCollaboratorIds = new Set(updatedPlan.collaborators.map((c: any) => typeof c === 'string' ? c : c.userId || c.id));
+      const existingCollaboratorIds = new Set(updatedPlan.collaborators.map((c: any) => {
+        if (typeof c === 'string') return c;
+        // Handle different ID formats - extract the actual user ID from memberId or userId
+        if (c?.memberId && c.memberId.startsWith('member_')) {
+          return c.memberId.replace('member_', '');
+        }
+        return c?.userId || c?.id;
+      }));
       
       voteUserIds.forEach(userId => {
         if (!existingCollaboratorIds.has(userId)) {

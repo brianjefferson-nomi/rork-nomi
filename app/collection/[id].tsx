@@ -530,7 +530,14 @@ export default function CollectionDetailScreen() {
 
   // Calculate collection members for privacy filtering
   const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
-    ? effectiveCollection.collaborators.map((member: any) => typeof member === 'string' ? member : member?.userId || member?.id)
+    ? effectiveCollection.collaborators.map((member: any) => {
+        if (typeof member === 'string') return member;
+        // Handle different ID formats - extract the actual user ID from memberId or userId
+        if (member?.memberId && member.memberId.startsWith('member_')) {
+          return member.memberId.replace('member_', '');
+        }
+        return member?.userId || member?.id;
+      })
     : [];
   
   console.log('[CollectionDetail] Collection members calculation:', {

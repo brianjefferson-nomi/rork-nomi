@@ -175,6 +175,11 @@ export function computeRankings(
           if (typeof m === 'string') {
             return m === v.userId;
           } else {
+            // Handle different ID formats - check both userId and memberId
+            if (m.memberId && m.memberId.startsWith('member_')) {
+              const memberUserId = m.memberId.replace('member_', '');
+              return memberUserId === v.userId;
+            }
             return m.userId === v.userId;
           }
         });
