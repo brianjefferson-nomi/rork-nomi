@@ -1115,7 +1115,15 @@ export const dbHelpers = {
           message: transformedData[0].message?.substring(0, 50),
           userId: transformedData[0].userId,
           collectionId: transformedData[0].collectionId,
-          restaurantId: transformedData[0].restaurantId
+          restaurantId: transformedData[0].restaurantId,
+          // Test if transformation worked
+          hasUserId: !!transformedData[0].userId,
+          hasCollectionId: !!transformedData[0].collectionId,
+          hasRestaurantId: !!transformedData[0].restaurantId,
+          // Show raw fields for comparison
+          rawUserId: transformedData[0].user_id,
+          rawCollectionId: transformedData[0].collection_id,
+          rawRestaurantId: transformedData[0].restaurant_id
         } : null
       });
       
