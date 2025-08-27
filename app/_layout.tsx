@@ -23,16 +23,9 @@ function RootLayoutNav() {
         }} 
       />
       <Stack.Screen 
-        name="(tabs)/ai/index" 
+        name="collection/[id]" 
         options={{ 
-          title: "Ask AI",
-          headerShown: false
-        }} 
-      />
-      <Stack.Screen 
-        name="plan/[id]" 
-        options={{ 
-          title: "Plan",
+          title: "Collection",
           headerStyle: { backgroundColor: '#FFF' },
           headerTintColor: '#1A1A1A',
         }} 

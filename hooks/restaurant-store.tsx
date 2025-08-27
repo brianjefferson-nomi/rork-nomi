@@ -197,7 +197,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         if (user?.id) {
           const favorites = await dbHelpers.getUserFavorites(user.id);
           console.log('[favoritesQuery] Fetched favorites from database:', favorites);
-          return favorites;
+        return favorites;
         } else {
           console.log('[favoritesQuery] No user ID, falling back to AsyncStorage');
           // Fallback to AsyncStorage when no user ID
@@ -392,7 +392,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
             
             console.log('[RestaurantStore] ✅ Mapped public collections:', mappedCollections.length);
             return mappedCollections;
-          } catch (error) {
+              } catch (error) {
             console.error('[RestaurantStore] ❌ Error loading public collections:', error);
             throw new Error(`Failed to load public collections: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
@@ -430,7 +430,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         })));
         
         return mappedPlans;
-      } catch (error) {
+    } catch (error) {
         console.error('[RestaurantStore] ❌ Critical error in plans query:', error);
         
         // Enhanced error handling with fallback
@@ -460,8 +460,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         } catch (fallbackError) {
           console.error('[RestaurantStore] ❌ Enhanced fallback also failed:', fallbackError);
           console.log('[RestaurantStore] 🚨 Returning empty array as last resort');
-          return [];
-        }
+      return [];
+    }
       }
     },
     enabled: true, // Always enabled to ensure collections load
@@ -764,8 +764,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
     // Then send to server
     voteRestaurantMutation.mutate({
-      restaurant_id: restaurantId,
-      user_id: user.id,
+        restaurant_id: restaurantId,
+        user_id: user.id,
       collection_id: planId || 'default',
       vote,
       reason
@@ -795,8 +795,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     // Optimistic update - immediately update local discussions state
     const optimisticDiscussion: RestaurantDiscussion = {
       id: `temp-discussion-${Date.now()}`,
-      restaurantId,
-      collectionId: planId,
+        restaurantId, 
+        collectionId: planId,
       userId: user.id,
       userName: user.email?.split('@')[0] || 'User', // Use email prefix as fallback name
       userAvatar: '', // Empty avatar for optimistic update
@@ -1131,7 +1131,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
       if (collectionError) {
         console.error('[getCollectionRestaurantsFromDatabase] Error fetching collection:', collectionError);
-        return [];
+    return [];
       }
 
       console.log('[getCollectionRestaurantsFromDatabase] Collection data:', collection);
@@ -1192,7 +1192,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, []);
 
   const shareablePlanUrl = useCallback((planId: string) => {
-    return `https://yourapp.com/plan/${planId}`;
+    return `https://yourapp.com/collection/${planId}`;
   }, []);
 
   // Collection operations (aliases for backward compatibility)
@@ -1390,7 +1390,7 @@ export function usePlanById(id: string | undefined) {
   const { plans } = useRestaurants();
   return useMemo(() => {
     if (!id || id === '') return null;
-    return plans.find((p: any) => p.id === id);
+  return plans.find((p: any) => p.id === id);
   }, [plans, id]);
 }
 
@@ -1416,17 +1416,17 @@ export function useRestaurantVotes(restaurantId: string | undefined, planId?: st
       };
     }
     
-    const votes = userVotes.filter((v: any) => 
-      v.restaurantId === restaurantId && 
-      (!planId || v.collectionId === planId)
-    );
-    
-    return {
-      likes: votes.filter((v: any) => v.vote === 'like').length,
-      dislikes: votes.filter((v: any) => v.vote === 'dislike').length,
-      userVote: votes.find((v: any) => v.userId === 'currentUser')?.vote,
-      allVotes: votes
-    };
+  const votes = userVotes.filter((v: any) => 
+    v.restaurantId === restaurantId && 
+    (!planId || v.collectionId === planId)
+  );
+  
+  return {
+    likes: votes.filter((v: any) => v.vote === 'like').length,
+    dislikes: votes.filter((v: any) => v.vote === 'dislike').length,
+    userVote: votes.find((v: any) => v.userId === 'currentUser')?.vote,
+    allVotes: votes
+  };
   }, [userVotes, restaurantId, planId]);
 }
 
@@ -1527,7 +1527,7 @@ export function useCollectionById(id: string | undefined) {
       // Use fetched members data
       collaborators: membersQuery.data && Array.isArray(membersQuery.data) && membersQuery.data.length > 0 
         ? membersQuery.data
-        : [],
+          : [],
       // Add loading state for members
       membersLoading: membersQuery.isLoading
     };

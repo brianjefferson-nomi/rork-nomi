@@ -55,7 +55,7 @@ export default function HomeScreen() {
   // Use city-specific restaurants when available, otherwise show all
   const availableRestaurants = useMemo(() => {
     return cityRestaurants.length > 0 ? cityRestaurants : (restaurants || []);
-  }, [cityRestaurants, restaurants]);
+  }, [cityRestaurants, restaurants, city]);
 
   // Use Mapbox restaurants when available, fallback to existing restaurants
   const trendingRestaurants = useMemo(() => {
@@ -192,8 +192,14 @@ export default function HomeScreen() {
           console.log('[HomeScreen] Using fallback restaurants:', availableRestaurants.length);
         }
         
-        // Deduplicate and limit results
-        const uniqueResults = deduplicateRestaurants(allRestaurants).slice(0, 20); // Limit to 20 restaurants
+        // Always ensure we have some data to show
+        let uniqueResults = deduplicateRestaurants(allRestaurants).slice(0, 20);
+        
+        // If we still don't have any results, use availableRestaurants
+        if (uniqueResults.length === 0 && availableRestaurants.length > 0) {
+          uniqueResults = availableRestaurants.slice(0, 20);
+          console.log('[HomeScreen] Using availableRestaurants as final fallback:', uniqueResults.length);
+        }
         
         setMapboxRestaurants(uniqueResults);
         setNearbyRestaurants(uniqueResults.slice(0, 4)); // Use first 4 for nearby section
@@ -205,6 +211,7 @@ export default function HomeScreen() {
         const localRestaurants = availableRestaurants.slice(0, 4);
         setNearbyRestaurants(localRestaurants);
         setMapboxRestaurants(availableRestaurants);
+        console.log('[HomeScreen] Error fallback - using availableRestaurants:', availableRestaurants.length);
       }
     };
 
@@ -411,6 +418,102 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
+        {/* Neighborhood Highlights Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MapPin size={20} color="#FF6B6B" />
+            <Text style={styles.sectionTitle}>Neighborhood Highlights</Text>
+            <TouchableOpacity onPress={() => router.push('/discover' as any)}>
+              <Text style={styles.seeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.localGrid}>
+            {isLoading ? (
+              <View style={styles.nearbyEmptyContainer}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+                <Text style={styles.nearbyEmptyText}>Loading neighborhoods...</Text>
+              </View>
+            ) : restaurants.length > 0 ? (
+              // Get unique neighborhoods from the database and sort by restaurant count
+              (() => {
+                // Use the complete restaurant dataset (not filtered by city) to get neighborhoods with most restaurants
+                const allRestaurants = [...restaurants, ...mapboxRestaurants];
+                const uniqueRestaurants = deduplicateRestaurants(allRestaurants);
+                
+                const neighborhoodCounts = uniqueRestaurants.reduce((acc, restaurant) => {
+                  const neighborhood = restaurant.neighborhood;
+                  if (neighborhood) {
+                    acc[neighborhood] = (acc[neighborhood] || 0) + 1;
+                  }
+                  return acc;
+                }, {} as Record<string, number>);
+                
+                // Sort neighborhoods by restaurant count (descending) and take top 4
+                // Only include neighborhoods with at least 2 restaurants
+                const topNeighborhoods = Object.entries(neighborhoodCounts)
+                  .filter(([, count]) => (count as number) >= 2) // Minimum 2 restaurants
+                  .sort(([,a], [,b]) => (b as number) - (a as number))
+                  .slice(0, 4)
+                  .map(([neighborhood, count]) => ({ neighborhood, count }));
+                
+                // Debug logging to verify sorting
+                console.log('[Neighborhood Highlights] All neighborhoods with counts:', neighborhoodCounts);
+                console.log('[Neighborhood Highlights] Top 4 neighborhoods:', topNeighborhoods);
+                
+                // Neighborhood background images - each with unique images
+                const neighborhoodImages = {
+                  'Midtown': 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400',
+                  'Greenwich Village': 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
+                  'Gramercy': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+                  'SoHo': 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+                  'East Village': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
+                  'Upper East Side': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400',
+                  'Brooklyn': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+                  'Queens': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+                  'Manhattan': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+                  'Los Angeles': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400',
+                  'Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
+                  'Beverly Hills': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400',
+                  'Santa Monica': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                  'West Hollywood': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
+                  'Downtown LA': 'https://images.unsplash.com/photo-1546412414-e1885d3d8d6a?w=400',
+                  'Venice': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                  'Koreatown': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400',
+                  'Silver Lake': 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400'
+                };
+                
+                return topNeighborhoods.map(({ neighborhood, count }) => (
+                  <TouchableOpacity 
+                    key={neighborhood} 
+                    style={styles.localCard}
+                    onPress={() => {
+                      // Navigate to discover page with neighborhood filter
+                      router.push(`/discover?neighborhood=${encodeURIComponent(neighborhood)}` as any);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: neighborhoodImages[neighborhood as keyof typeof neighborhoodImages] || 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400' }}
+                      style={styles.localImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.localOverlay}>
+                      <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
+                      <Text style={styles.localNeighborhood}>
+                        {count as number} restaurant{(count as number) !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ));
+              })()
+            ) : (
+              <View style={styles.nearbyEmptyContainer}>
+                <Text style={styles.nearbyEmptyText}>No neighborhoods found</Text>
+                <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Local Restaurants Section - Show after trending for other cities */}
         {!shouldPrioritizeLocal && (
           <View style={styles.section}>
@@ -452,30 +555,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MapPin size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>{city} Highlights</Text>
-            <TouchableOpacity onPress={() => router.push('/discover' as any)}>
-              <Text style={styles.seeAll}>See all</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.localGrid}>
-            {localHighlights.map(restaurant => (
-              <TouchableOpacity 
-                key={restaurant.id} 
-                style={styles.localCard}
-                onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
-              >
-                <Image source={{ uri: restaurant.imageUrl }} style={styles.localImage} />
-                <View style={styles.localOverlay}>
-                  <Text style={styles.localName} numberOfLines={1}>{restaurant.name}</Text>
-                  <Text style={styles.localNeighborhood}>{restaurant.neighborhood}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+
 
 
 
@@ -651,6 +731,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFF',
     opacity: 0.9,
+  },
+  neighborhoodCard: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  neighborhoodCount: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
   contributorsContainer: {
     paddingHorizontal: 16,

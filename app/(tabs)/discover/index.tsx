@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
@@ -10,9 +10,18 @@ const priceRanges = ['All', '$', '$$', '$$$', '$$$$'];
 
 export default function DiscoverScreen() {
   const { restaurants, userLocation } = useRestaurants();
+  const params = useLocalSearchParams();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState(params.neighborhood as string || 'All');
+
+  // Get unique neighborhoods from restaurants
+  const availableNeighborhoods = useMemo(() => {
+    const neighborhoods = [...new Set(restaurants.map(r => r.neighborhood).filter(Boolean))];
+    return ['All', ...neighborhoods.sort()];
+  }, [restaurants]);
 
   const filteredRestaurants = useMemo(() => {
     return restaurants.filter(restaurant => {
@@ -26,9 +35,12 @@ export default function DiscoverScreen() {
       const matchesPrice = selectedPrice === 'All' || 
                           restaurant.priceRange === selectedPrice;
       
-      return matchesSearch && matchesCuisine && matchesPrice;
+      const matchesNeighborhood = selectedNeighborhood === 'All' || 
+                                 restaurant.neighborhood === selectedNeighborhood;
+      
+      return matchesSearch && matchesCuisine && matchesPrice && matchesNeighborhood;
     });
-  }, [restaurants, searchQuery, selectedCuisine, selectedPrice]);
+  }, [restaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhood]);
 
   return (
     <View style={styles.container}>
@@ -89,6 +101,31 @@ export default function DiscoverScreen() {
                     selectedPrice === price && styles.filterChipTextActive
                   ]}>
                     {price}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterLabel}>Neighborhood</Text>
+            <View style={styles.filterOptions}>
+              {availableNeighborhoods.map(neighborhood => (
+                <TouchableOpacity
+                  key={neighborhood}
+                  style={[
+                    styles.filterChip,
+                    selectedNeighborhood === neighborhood && styles.filterChipActive
+                  ]}
+                  onPress={() => setSelectedNeighborhood(neighborhood)}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    selectedNeighborhood === neighborhood && styles.filterChipTextActive
+                  ]}>
+                    {neighborhood}
                   </Text>
                 </TouchableOpacity>
               ))}

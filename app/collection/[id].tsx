@@ -324,7 +324,7 @@ function InsightsTab({
                   // Show all votes from members, even if name is 'Unknown'
                   return true;
                 });
-                
+
                 return (
                   <View style={styles.memberVotesSection}>
                     <Text style={styles.memberVotesTitle}>{`Member Activity for ${restaurant.name}`}</Text>
@@ -332,37 +332,37 @@ function InsightsTab({
                     {/* Votes Section */}
                     <View style={styles.activitySection}>
                       <Text style={styles.activitySectionTitle}>{`Votes (${filteredLikeVoters.length + filteredDislikeVoters.length})`}</Text>
-                      <View style={styles.memberVotesList}>
-                        {filteredLikeVoters.map((voter: any, index: number) => (
-                          <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                            <View style={styles.memberVoteAvatar}>
-                              <Text style={styles.memberVoteInitial}>
+                    <View style={styles.memberVotesList}>
+                      {filteredLikeVoters.map((voter: any, index: number) => (
+                        <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                          <View style={styles.memberVoteAvatar}>
+                            <Text style={styles.memberVoteInitial}>
                                 {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
-                              </Text>
-                            </View>
+                            </Text>
+                          </View>
                             <Text style={styles.memberVoteName}>
                               {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
                             </Text>
-                            <ThumbsUp size={16} color="#10B981" />
-                          </View>
-                        ))}
-                        {filteredDislikeVoters.map((voter: any, index: number) => (
-                          <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                            <View style={styles.memberVoteAvatar}>
-                              <Text style={styles.memberVoteInitial}>
+                          <ThumbsUp size={16} color="#10B981" />
+                        </View>
+                      ))}
+                      {filteredDislikeVoters.map((voter: any, index: number) => (
+                        <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                          <View style={styles.memberVoteAvatar}>
+                            <Text style={styles.memberVoteInitial}>
                                 {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
-                              </Text>
-                            </View>
+                            </Text>
+                          </View>
                             <Text style={styles.memberVoteName}>
                               {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
                             </Text>
-                            <ThumbsDown size={16} color="#EF4444" />
-                          </View>
-                        ))}
-                        {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
-                          <Text style={styles.noVotes}>No votes yet</Text>
-                        )}
-                      </View>
+                          <ThumbsDown size={16} color="#EF4444" />
+                        </View>
+                      ))}
+                      {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
+                        <Text style={styles.noVotes}>No votes yet</Text>
+                      )}
+                    </View>
                     </View>
 
 
@@ -1098,7 +1098,7 @@ export default function CollectionDetailScreen() {
       </View>
     );
   }
-  
+
   // Show error state if collection is not found
   if (!effectiveCollection) {
     return (
@@ -1377,16 +1377,16 @@ export default function CollectionDetailScreen() {
                   const isVerified = typeof member === 'string' ? false : member?.isVerified || false;
                   
                   return (
-                    <View key={memberId} style={styles.collaboratorItem}>
-                      <View style={styles.collaboratorAvatar}>
-                        <Text style={styles.collaboratorInitial}>
-                          {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
-                        </Text>
-                        {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                                          <View key={memberId} style={styles.collaboratorItem}>
+                        <View style={styles.collaboratorAvatar}>
+                          <Text style={styles.collaboratorInitial}>
+                            {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
+                          </Text>
+                          {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
+                        </View>
+                        <Text style={styles.collaboratorName}>{memberName || 'Unknown Member'}</Text>
+                        {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
                       </View>
-                      <Text style={styles.collaboratorName}>{memberName || 'Unknown Member'}</Text>
-                      {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
-                    </View>
                   );
                 })
               ) : (
@@ -1412,27 +1412,27 @@ export default function CollectionDetailScreen() {
             </Text>
           </TouchableOpacity>
           {isSharedCollection && (
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'insights' && styles.activeTab]}
-              onPress={() => setActiveTab('insights')}
-            >
-              <Text style={[styles.tabText, activeTab === 'insights' && styles.activeTabText]}>
-                Insights
-              </Text>
-            </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'insights' && styles.activeTab]}
+            onPress={() => setActiveTab('insights')}
+          >
+            <Text style={[styles.tabText, activeTab === 'insights' && styles.activeTabText]}>
+              Insights
+            </Text>
+          </TouchableOpacity>
           )}
         </View>
 
-        {/* Tab Content */}
+                {/* Tab Content */}
         {activeTab === 'restaurants' ? (
           <View style={styles.restaurantsList}>
             {restaurantsWithVotingData.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
-              </View>
-            ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
+            </View>
+          ) : (
               restaurantsWithVotingData.map(({ restaurant, meta }, index) => {
-                const isFavorite = favoriteRestaurants.includes(restaurant.id);
+              const isFavorite = favoriteRestaurants.includes(restaurant.id);
                 const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => {
                   const voteUserIdShort = v.userId?.substring(0, 8);
                   const userShort = user?.id?.substring(0, 8);
@@ -1448,12 +1448,12 @@ export default function CollectionDetailScreen() {
                 const shouldShowWinningStyles = isSharedCollection && 
                   effectiveParticipationData?.has75PercentParticipation && 
                   meta?.rank === 1;
-                
-                return (
+              
+              return (
                    <Animated.View 
                      key={restaurant?.id || index} 
                      style={[
-                       styles.restaurantItem,
+                  styles.restaurantItem,
                        shouldShowWinningStyles && styles.winningRestaurantItem,
                        animatedValues.current[restaurant.id] && {
                          transform: [{
@@ -1498,59 +1498,59 @@ export default function CollectionDetailScreen() {
                      )}
                      {/* Top Badges Row - Only for shared collections */}
                      {isSharedCollection && (
-                       <View style={styles.badgesRow}>
-                         <View style={[
-                           styles.rankBadge,
+                  <View style={styles.badgesRow}>
+                    <View style={[
+                      styles.rankBadge,
                            shouldShowWinningStyles && styles.winnerRankBadge,
-                           meta?.rank === 2 && styles.silverRankBadge,
-                           meta?.rank === 3 && styles.bronzeRankBadge
-                         ]}>
-                           <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
-                         </View>
-                         
+                      meta?.rank === 2 && styles.silverRankBadge,
+                      meta?.rank === 3 && styles.bronzeRankBadge
+                    ]}>
+                      <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
+                    </View>
+                    
                          {/* Top Choice Badge for Winner - Only with 75% participation */}
                          {shouldShowWinningStyles && (
-                           <View style={styles.topChoiceBadge}>
-                             <Crown size={12} color="#FFFFFF" />
-                             <Text style={styles.topChoiceText}>TOP CHOICE</Text>
-                           </View>
-                         )}
-                       </View>
+                      <View style={styles.topChoiceBadge}>
+                        <Crown size={12} color="#FFFFFF" />
+                        <Text style={styles.topChoiceText}>TOP CHOICE</Text>
+                      </View>
+                    )}
+                  </View>
                      )}
 
-                    {/* Restaurant Info Section */}
-                    <View style={styles.restaurantInfoSection}>
-                      <View style={styles.restaurantImageContainer}>
-                        <Image 
-                          source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
-                          style={styles.restaurantImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      
-                      <View style={styles.restaurantInfo}>
-                        <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                        <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
-                        <Text style={styles.restaurantDetails}>
-                          {`${restaurant.priceRange} • ${restaurant.neighborhood || 'Restaurant'}`}
-                        </Text>
-                      </View>
-                      
-                      <TouchableOpacity 
-                        style={styles.heartButton}
-                        onPress={() => toggleFavorite(restaurant.id)}
-                      >
-                        <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
-                          {isFavorite ? '♥' : '♡'}
-                        </Text>
-                      </TouchableOpacity>
+                  {/* Restaurant Info Section */}
+                  <View style={styles.restaurantInfoSection}>
+                    <View style={styles.restaurantImageContainer}>
+                      <Image 
+                        source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
+                        style={styles.restaurantImage}
+                        resizeMode="cover"
+                      />
                     </View>
+                    
+                    <View style={styles.restaurantInfo}>
+                      <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                      <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
+                      <Text style={styles.restaurantDetails}>
+                          {`${restaurant.priceRange} • ${restaurant.neighborhood || 'Restaurant'}`}
+                      </Text>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={styles.heartButton}
+                        onPress={() => toggleFavorite(restaurant.id)}
+                    >
+                      <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
+                        {isFavorite ? '♥' : '♡'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
                                          {/* Approval Section - Only for shared collections */}
                      {isSharedCollection && (
-                       <View style={styles.approvalSection}>
-                         <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                         <Text style={styles.voteBreakdown}>
+                  <View style={styles.approvalSection}>
+                    <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
+                    <Text style={styles.voteBreakdown}>
                            {`${meta.voteDetails?.likeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
@@ -1558,88 +1558,88 @@ export default function CollectionDetailScreen() {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
                            }).length || 0} dislikes`}
-                         </Text>
-                         {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
-                           <View style={styles.consensusBadge}>
-                             <Text style={styles.consensusBadgeText}>
-                               {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                             </Text>
-                           </View>
-                         )}
-                       </View>
+                    </Text>
+                    {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
+                      <View style={styles.consensusBadge}>
+                        <Text style={styles.consensusBadgeText}>
+                          {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                      )}
 
                                          {/* Vote Actions - Only for shared collections */}
                      {isSharedCollection && (
-                       <View style={styles.voteActions}>
-                         <TouchableOpacity 
-                           style={[
-                             styles.voteButton, 
-                             styles.likeButton,
-                             userLiked && styles.likeButtonActive
-                           ]}
+                  <View style={styles.voteActions}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.voteButton, 
+                        styles.likeButton,
+                        userLiked && styles.likeButtonActive
+                      ]}
                            onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
                            activeOpacity={0.7}
-                         >
-                           <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
+                    >
+                      <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
                            <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
                            }).length || 0}</Text>
-                         </TouchableOpacity>
-                         
-                         <TouchableOpacity 
-                           style={[
-                             styles.voteButton, 
-                             styles.dislikeButton,
-                             userDisliked && styles.dislikeButtonActive
-                           ]}
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[
+                        styles.voteButton, 
+                        styles.dislikeButton,
+                        userDisliked && styles.dislikeButtonActive
+                      ]}
                            onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
                            activeOpacity={0.7}
-                         >
-                           <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
+                    >
+                      <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
                            <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
                            }).length || 0}</Text>
-                         </TouchableOpacity>
-                         
-                         <TouchableOpacity 
-                           style={[styles.voteButton, styles.commentButton]}
-                           onPress={() => setShowDiscussionModal(restaurant.id)}
-                         >
-                           <MessageCircle size={16} color="#6B7280" />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.voteButton, styles.commentButton]}
+                           onPress={() => setShowCommentModal(restaurant.id)}
+                    >
+                      <MessageCircle size={16} color="#6B7280" />
                            <Text style={styles.voteCount}>{discussions.filter((d: any) => {
                              const discussionUserIdShort = d.userId?.substring(0, 8);
                              return d.restaurantId === restaurant.id && collectionMembers.includes(discussionUserIdShort);
                            }).length}</Text>
-                         </TouchableOpacity>
-                       </View>
+                    </TouchableOpacity>
+                  </View>
                      )}
 
                                          {/* Remove Button - Only for collection owners */}
                      {isCollectionOwner() && (
-                       <TouchableOpacity 
-                         style={styles.removeButton}
-                         onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
-                       >
-                         <Text style={styles.removeButtonText}>Remove</Text>
-                       </TouchableOpacity>
-                     )}
+                    <TouchableOpacity 
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
+                    >
+                      <Text style={styles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
                   </Animated.View>
-                );
-              })
-            )}
-          </View>
-                 ) : (
+              );
+            })
+          )}
+                </View>
+        ) : (
            isSharedCollection ? (
-             <InsightsTab 
+          <InsightsTab 
                collection={effectiveCollection}
                rankedRestaurants={effectiveRankedRestaurants}
                discussions={effectiveDiscussions}
-               collectionMembers={collectionMembers}
-               styles={styles}
-               setShowCommentModal={setShowCommentModal}
+            collectionMembers={collectionMembers}
+            styles={styles}
+            setShowCommentModal={setShowCommentModal}
                user={user}
                handleEditDiscussion={handleEditDiscussion}
                handleDeleteDiscussion={handleDeleteDiscussion}
@@ -1654,7 +1654,7 @@ export default function CollectionDetailScreen() {
                </Text>
              </View>
            )
-         )}
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -1830,36 +1830,48 @@ export default function CollectionDetailScreen() {
 
       {/* Comment Modal */}
       <Modal visible={!!showCommentModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add a Comment</Text>
+        <View style={styles.commentModalOverlay}>
+          {/* Comment Input Section - matches social media design */}
+          <View style={styles.commentInputSection}>
             <TextInput
-              style={styles.reasonInput}
-              placeholder="Share your thoughts about this restaurant..."
+              style={styles.commentInputField}
+              placeholder="Leave a comment"
+              placeholderTextColor="#9CA3AF"
               multiline
               value={commentMessage}
               onChangeText={setCommentMessage}
+              autoFocus
+              maxLength={500}
             />
             
-            <View style={styles.modalActions}>
+            {/* Action Buttons */}
+            <View style={styles.commentActions}>
               <TouchableOpacity 
-                style={styles.modalButton}
-                onPress={() => {
-                  if (showCommentModal) {
-                    handleAddComment(showCommentModal);
-                  }
-                }}
-              >
-                <Text style={styles.modalButtonText}>Add Comment</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.commentCancelButton}
                 onPress={() => {
                   setShowCommentModal(null);
                   setCommentMessage('');
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.commentCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.commentPostButton,
+                  !commentMessage.trim() && styles.commentPostButtonDisabled
+                ]}
+                onPress={() => {
+                  if (showCommentModal && commentMessage.trim()) {
+                    handleAddComment(showCommentModal);
+                  }
+                }}
+                disabled={!commentMessage.trim()}
+              >
+                <Text style={[
+                  styles.commentPostText,
+                  !commentMessage.trim() && styles.commentPostTextDisabled
+                ]}>Post</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2634,5 +2646,61 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // New simplified comment modal styles - matches the social media UI
+  commentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  commentInputSection: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 20,
+  },
+  commentInputField: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#1F2937',
+    minHeight: 60,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    textAlignVertical: 'top',
+  },
+  commentActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  commentCancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  commentCancelText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  commentPostButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 20,
+  },
+  commentPostButtonDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  commentPostText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  commentPostTextDisabled: {
+    color: '#9CA3AF',
   },
 });
