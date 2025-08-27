@@ -60,8 +60,15 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
             <Text style={styles.analyticValue}>
               {rankedRestaurants.reduce((total, { meta }) => {
                 // Filter votes to only include collection members
-                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
-                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                // Extract first 8 characters from vote user IDs to match collection member format
+                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  return collectionMembers.includes(voteUserIdShort);
+                });
+                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  return collectionMembers.includes(voteUserIdShort);
+                });
                 return total + memberLikeVoters.length + memberDislikeVoters.length;
               }, 0)}
             </Text>
@@ -73,13 +80,24 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {(() => {
                 const totalVotes = rankedRestaurants.reduce((total, { meta }) => {
                   // Filter votes to only include collection members
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
-                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  // Extract first 8 characters from vote user IDs to match collection member format
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+                  });
+                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+                  });
                   return total + memberLikeVoters.length + memberDislikeVoters.length;
                 }, 0);
                 const likeVotes = rankedRestaurants.reduce((total, { meta }) => {
                   // Filter votes to only include collection members
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                  // Extract first 8 characters from vote user IDs to match collection member format
+                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+                  });
                   return total + memberLikeVoters.length;
                 }, 0);
                 return totalVotes > 0 ? Math.round((likeVotes / totalVotes) * 100) : 0;
@@ -90,7 +108,10 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
-              {discussions.filter((discussion: any) => collectionMembers.includes(discussion.userId)).length}
+              {discussions.filter((discussion: any) => {
+                const discussionUserIdShort = discussion.userId?.substring(0, 8);
+                return collectionMembers.includes(discussionUserIdShort);
+              }).length}
             </Text>
             <Text style={styles.analyticLabel}>Discussions</Text>
           </View>
@@ -125,8 +146,15 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                 if (!meta?.voteDetails) return <></>;
 
                 // Filter votes to only include collection members
-                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => collectionMembers.includes(v.userId));
-                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => collectionMembers.includes(v.userId));
+                // Extract first 8 characters from vote user IDs to match collection member format
+                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  return collectionMembers.includes(voteUserIdShort);
+                });
+                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  return collectionMembers.includes(voteUserIdShort);
+                });
                 
                 console.log('[InsightsTab] Vote filtering for restaurant:', restaurant.name, {
                   allLikeVoters: meta.voteDetails.likeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
@@ -178,7 +206,9 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
                 const filteredLikeVoters = meta.voteDetails.likeVoters.filter((voter: any) => {
                   // Only show votes from collection members
-                  if (!collectionMembers.includes(voter.userId)) {
+                  // Extract first 8 characters from vote user IDs to match collection member format
+                  const voteUserIdShort = voter.userId?.substring(0, 8);
+                  if (!collectionMembers.includes(voteUserIdShort)) {
                     return false;
                   }
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
@@ -186,7 +216,9 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
 
                 const filteredDislikeVoters = meta.voteDetails.dislikeVoters.filter((voter: any) => {
                   // Only show votes from collection members
-                  if (!collectionMembers.includes(voter.userId)) {
+                  // Extract first 8 characters from vote user IDs to match collection member format
+                  const voteUserIdShort = voter.userId?.substring(0, 8);
+                  if (!collectionMembers.includes(voteUserIdShort)) {
                     return false;
                   }
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
@@ -230,7 +262,9 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
               {(() => {
                 const filteredDiscussions = discussions.filter((discussion: any) => {
                   const matchesRestaurant = discussion.restaurantId === restaurant.id;
-                  const isMember = collectionMembers.includes(discussion.userId);
+                  // Extract first 8 characters from discussion user IDs to match collection member format
+                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
+                  const isMember = collectionMembers.includes(discussionUserIdShort);
                   const hasValidName = discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
                   
                   if (!matchesRestaurant) return false;
@@ -949,8 +983,16 @@ export default function CollectionDetailScreen() {
             ) : (
               restaurantsWithVotingData.map(({ restaurant, meta }, index) => {
                 const isFavorite = favoriteRestaurants.includes(restaurant.id);
-                const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id);
-                const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id);
+                const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  const userShort = user?.id?.substring(0, 8);
+                  return voteUserIdShort === userShort;
+                });
+                const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  const userShort = user?.id?.substring(0, 8);
+                  return voteUserIdShort === userShort;
+                });
                 
                                  // Only show winning styles if there's 75% participation and this is the top-ranked restaurant
                 const shouldShowWinningStyles = isSharedCollection && 
@@ -1017,7 +1059,13 @@ export default function CollectionDetailScreen() {
                        <View style={styles.approvalSection}>
                          <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
                          <Text style={styles.voteBreakdown}>
-                           {meta.voteDetails?.likeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0} dislikes
+                           {meta.voteDetails?.likeVoters?.filter((v: any) => {
+                             const voteUserIdShort = v.userId?.substring(0, 8);
+                             return collectionMembers.includes(voteUserIdShort);
+                           }).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => {
+                             const voteUserIdShort = v.userId?.substring(0, 8);
+                             return collectionMembers.includes(voteUserIdShort);
+                           }).length || 0} dislikes
                          </Text>
                          {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
                            <View style={styles.consensusBadge}>
@@ -1041,7 +1089,10 @@ export default function CollectionDetailScreen() {
                            onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
                          >
                            <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
-                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0}</Text>
+                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => {
+                             const voteUserIdShort = v.userId?.substring(0, 8);
+                             return collectionMembers.includes(voteUserIdShort);
+                           }).length || 0}</Text>
                          </TouchableOpacity>
                          
                          <TouchableOpacity 
@@ -1053,7 +1104,10 @@ export default function CollectionDetailScreen() {
                            onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
                          >
                            <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
-                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => collectionMembers.includes(v.userId)).length || 0}</Text>
+                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => {
+                             const voteUserIdShort = v.userId?.substring(0, 8);
+                             return collectionMembers.includes(voteUserIdShort);
+                           }).length || 0}</Text>
                          </TouchableOpacity>
                          
                          <TouchableOpacity 
@@ -1061,7 +1115,10 @@ export default function CollectionDetailScreen() {
                            onPress={() => setShowDiscussionModal(restaurant.id)}
                          >
                            <MessageCircle size={16} color="#6B7280" />
-                           <Text style={styles.voteCount}>{discussions.filter((d: any) => d.restaurantId === restaurant.id && collectionMembers.includes(d.userId)).length}</Text>
+                           <Text style={styles.voteCount}>{discussions.filter((d: any) => {
+                             const discussionUserIdShort = d.userId?.substring(0, 8);
+                             return d.restaurantId === restaurant.id && collectionMembers.includes(discussionUserIdShort);
+                           }).length}</Text>
                          </TouchableOpacity>
                        </View>
                      )}
