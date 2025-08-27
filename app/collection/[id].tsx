@@ -133,7 +133,14 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   allDislikeVoters: meta.voteDetails.dislikeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
                   collectionMembers,
                   filteredLikeVoters: memberLikeVoters.length,
-                  filteredDislikeVoters: memberDislikeVoters.length
+                  filteredDislikeVoters: memberDislikeVoters.length,
+                  // Add detailed debugging for each vote
+                  voteDetails: meta.voteDetails.likeVoters.map((v: any) => ({
+                    voteUserId: v.userId,
+                    voteUserIdType: typeof v.userId,
+                    isInCollection: collectionMembers.includes(v.userId),
+                    collectionMembersType: typeof collectionMembers[0]
+                  }))
                 });
                 
                 const totalVotes = memberLikeVoters.length + memberDislikeVoters.length;

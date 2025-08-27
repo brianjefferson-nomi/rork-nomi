@@ -868,6 +868,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         timestamp: vote.created_at,
         userName: vote.userName
       }));
+      
+      console.log('[getRankedRestaurantsWithAllVotes] Vote transformation debugging:', {
+        sampleVote: transformedVotes[0] ? {
+          userId: transformedVotes[0].userId,
+          userName: transformedVotes[0].userName,
+          vote: transformedVotes[0].vote
+        } : null,
+        totalVotes: transformedVotes.length
+      });
 
       // Update the plan's collaborators to include user names from votes
       const updatedPlan = {
