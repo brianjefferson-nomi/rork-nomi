@@ -29,6 +29,21 @@ interface InsightsTabProps {
 }
 
 function InsightsTab({ collection, rankedRestaurants, discussions, collectionMembers, styles, setShowCommentModal }: InsightsTabProps) {
+  console.log('[InsightsTab] Component received props:', {
+    collectionId: collection?.id,
+    rankedRestaurantsLength: rankedRestaurants?.length || 0,
+    discussionsLength: discussions?.length || 0,
+    collectionMembersLength: collectionMembers?.length || 0,
+    discussions: discussions,
+    sampleDiscussion: discussions?.[0] ? {
+      id: discussions[0].id,
+      userId: discussions[0].userId,
+      userName: discussions[0].userName,
+      message: discussions[0].message?.substring(0, 50),
+      collectionId: discussions[0].collectionId,
+      keys: Object.keys(discussions[0])
+    } : null
+  });
   return (
     <View style={styles.insightsContainer}>
       {/* Group Insights */}
@@ -127,9 +142,21 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
               {(() => {
+                console.log('[InsightsTab] Starting discussions calculation with:', {
+                  discussionsLength: discussions?.length || 0,
+                  collectionId: collection?.id,
+                  discussions: discussions
+                });
+                
                 // For group insights, show ALL discussions for the collection
                 // Don't filter by collection members since discussions should be visible to all members
                 const filteredDiscussions = discussions.filter((discussion: any) => {
+                  console.log('[InsightsTab] Filtering discussion:', {
+                    discussionId: discussion?.id,
+                    discussionCollectionId: discussion?.collectionId,
+                    targetCollectionId: collection?.id,
+                    matches: discussion?.collectionId === collection?.id
+                  });
                   // Only filter by collection ID to ensure it's for this collection
                   return discussion.collectionId === collection.id;
                 });
@@ -612,11 +639,18 @@ export default function CollectionDetailScreen() {
       setIsLoadingDiscussions(true);
       console.log('[CollectionDetail] Loading discussions for collection:', id);
       console.log('[CollectionDetail] getCollectionDiscussions function:', typeof getCollectionDiscussions);
+      console.log('[CollectionDetail] getCollectionDiscussions function details:', {
+        name: getCollectionDiscussions.name,
+        toString: getCollectionDiscussions.toString().substring(0, 100)
+      });
       
       getCollectionDiscussions(id)
         .then((data) => {
           console.log('[CollectionDetail] Loaded discussions:', data?.length || 0);
           console.log('[CollectionDetail] Raw discussions data:', data);
+          console.log('[CollectionDetail] Data type:', typeof data);
+          console.log('[CollectionDetail] Is array:', Array.isArray(data));
+          
           if (data && data.length > 0) {
             console.log('[CollectionDetail] Sample discussion:', {
               id: data[0].id,
@@ -624,9 +658,14 @@ export default function CollectionDetailScreen() {
               userName: data[0].userName,
               restaurantId: data[0].restaurantId,
               collectionId: data[0].collectionId,
-              userId: data[0].userId
+              userId: data[0].userId,
+              keys: Object.keys(data[0])
             });
+          } else {
+            console.log('[CollectionDetail] No discussions found or empty array');
           }
+          
+          console.log('[CollectionDetail] Setting discussions state with:', data?.length || 0, 'items');
           setDiscussions(data || []);
         })
         .catch((error) => {
@@ -634,13 +673,17 @@ export default function CollectionDetailScreen() {
           console.error('[CollectionDetail] Error details:', {
             message: error.message,
             stack: error.stack,
-            name: error.name
+            name: error.name,
+            code: error.code
           });
           setDiscussions([]);
         })
         .finally(() => {
+          console.log('[CollectionDetail] Finished loading discussions');
           setIsLoadingDiscussions(false);
         });
+    } else {
+      console.log('[CollectionDetail] No collection ID provided for discussions loading');
     }
   }, [id, getCollectionDiscussions]);
 
@@ -680,13 +723,16 @@ export default function CollectionDetailScreen() {
   console.log('[CollectionDetail] Effective discussions for InsightsTab:', {
     discussionsLength: discussions.length,
     effectiveDiscussionsLength: effectiveDiscussions.length,
+    discussionsState: discussions,
+    effectiveDiscussionsState: effectiveDiscussions,
     sampleDiscussion: effectiveDiscussions[0] ? {
       id: effectiveDiscussions[0].id,
       userId: effectiveDiscussions[0].userId,
       userName: effectiveDiscussions[0].userName,
       message: effectiveDiscussions[0].message?.substring(0, 50),
       collectionId: effectiveDiscussions[0].collectionId,
-      restaurantId: effectiveDiscussions[0].restaurantId
+      restaurantId: effectiveDiscussions[0].restaurantId,
+      keys: Object.keys(effectiveDiscussions[0])
     } : null,
     allDiscussions: effectiveDiscussions.map(d => ({
       id: d.id,
