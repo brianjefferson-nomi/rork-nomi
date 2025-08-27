@@ -258,35 +258,79 @@ function InsightsTab({ collection, rankedRestaurants, discussions, collectionMem
                   return voter.name && voter.name !== 'Unknown' && voter.name !== 'Unknown User';
                 });
 
+                // Get discussions for this restaurant
+                const restaurantDiscussions = discussions.filter((discussion: any) => {
+                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
+                  return discussion.restaurantId === restaurant.id && collectionMembers.includes(discussionUserIdShort);
+                });
+
                 return (
                   <View style={styles.memberVotesSection}>
-                    <Text style={styles.memberVotesTitle}>Member Votes for {restaurant.name}</Text>
-                    <View style={styles.memberVotesList}>
-                      {filteredLikeVoters.map((voter: any, index: number) => (
-                        <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                          <View style={styles.memberVoteAvatar}>
-                            <Text style={styles.memberVoteInitial}>
-                              {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                    <Text style={styles.memberVotesTitle}>Member Activity for {restaurant.name}</Text>
+                    
+                    {/* Votes Section */}
+                    <View style={styles.activitySection}>
+                      <Text style={styles.activitySectionTitle}>Votes ({filteredLikeVoters.length + filteredDislikeVoters.length})</Text>
+                      <View style={styles.memberVotesList}>
+                        {filteredLikeVoters.map((voter: any, index: number) => (
+                          <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                            <View style={styles.memberVoteAvatar}>
+                              <Text style={styles.memberVoteInitial}>
+                                {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                              </Text>
+                            </View>
+                            <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                            <ThumbsUp size={16} color="#10B981" />
+                            {voter.reason && (
+                              <Text style={styles.voteReason}>"{voter.reason}"</Text>
+                            )}
+                          </View>
+                        ))}
+                        {filteredDislikeVoters.map((voter: any, index: number) => (
+                          <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
+                            <View style={styles.memberVoteAvatar}>
+                              <Text style={styles.memberVoteInitial}>
+                                {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                              </Text>
+                            </View>
+                            <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
+                            <ThumbsDown size={16} color="#EF4444" />
+                            {voter.reason && (
+                              <Text style={styles.voteReason}>"{voter.reason}"</Text>
+                            )}
+                          </View>
+                        ))}
+                        {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
+                          <Text style={styles.noVotes}>No votes yet</Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Discussions Section */}
+                    <View style={styles.activitySection}>
+                      <Text style={styles.activitySectionTitle}>Discussions ({restaurantDiscussions.length})</Text>
+                      <View style={styles.discussionsList}>
+                        {restaurantDiscussions.map((discussion: any, index: number) => (
+                          <View key={`${restaurant.id}-discussion-${discussion.id}-${index}`} style={styles.discussionItem}>
+                            <View style={styles.discussionHeader}>
+                              <View style={styles.memberVoteAvatar}>
+                                <Text style={styles.memberVoteInitial}>
+                                  {discussion.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
+                                </Text>
+                              </View>
+                              <Text style={styles.memberVoteName}>{discussion.userName?.split(' ')[0] || 'Unknown'}</Text>
+                              <MessageCircle size={16} color="#6B7280" />
+                            </View>
+                            <Text style={styles.discussionMessage}>"{discussion.message}"</Text>
+                            <Text style={styles.discussionTime}>
+                              {discussion.timestamp ? new Date(discussion.timestamp).toLocaleDateString() : 'Unknown date'}
                             </Text>
                           </View>
-                          <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                          <ThumbsUp size={16} color="#10B981" />
-                        </View>
-                      ))}
-                      {filteredDislikeVoters.map((voter: any, index: number) => (
-                        <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                          <View style={styles.memberVoteAvatar}>
-                            <Text style={styles.memberVoteInitial}>
-                              {voter.name?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
-                            </Text>
-                          </View>
-                          <Text style={styles.memberVoteName}>{voter.name?.split(' ')[0] || 'Unknown'}</Text>
-                          <ThumbsDown size={16} color="#EF4444" />
-                        </View>
-                      ))}
-                      {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
-                        <Text style={styles.noVotes}>No votes yet</Text>
-                      )}
+                        ))}
+                        {restaurantDiscussions.length === 0 && (
+                          <Text style={styles.noVotes}>No discussions yet</Text>
+                        )}
+                      </View>
                     </View>
                   </View>
                 );
@@ -1920,6 +1964,34 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1E293B',
     flex: 1,
+  },
+  voteReason: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginLeft: 8,
+    flex: 1,
+  },
+  activitySection: {
+    marginBottom: 16,
+  },
+  activitySectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  discussionsList: {
+    gap: 8,
+  },
+  discussionMessage: {
+    fontSize: 12,
+    color: '#374151',
+    marginLeft: 32,
+    marginBottom: 4,
   },
   noVotes: {
     fontSize: 12,
