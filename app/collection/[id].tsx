@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image, Animated, KeyboardAvoidingView } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -1532,7 +1532,7 @@ export default function CollectionDetailScreen() {
                       <Text style={styles.restaurantName}>{restaurant.name}</Text>
                       <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
                       <Text style={styles.restaurantDetails}>
-                          {`${restaurant.priceRange} • ${restaurant.neighborhood || 'Restaurant'}`}
+                          {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
                       </Text>
                     </View>
                     
@@ -1551,13 +1551,13 @@ export default function CollectionDetailScreen() {
                   <View style={styles.approvalSection}>
                     <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
                     <Text style={styles.voteBreakdown}>
-                           {`${meta.voteDetails?.likeVoters?.filter((v: any) => {
+                           {meta.voteDetails?.likeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} likes • ${meta.voteDetails?.dislikeVoters?.filter((v: any) => {
+                           }).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => {
                              const voteUserIdShort = v.userId?.substring(0, 8);
                              return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} dislikes`}
+                           }).length || 0} dislikes
                     </Text>
                     {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
                       <View style={styles.consensusBadge}>
@@ -1830,7 +1830,23 @@ export default function CollectionDetailScreen() {
 
       {/* Comment Modal */}
       <Modal visible={!!showCommentModal} transparent animationType="slide">
-        <View style={styles.commentModalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.commentModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          {/* Touchable overlay to close modal when tapping outside */}
+          <TouchableOpacity 
+            style={styles.commentModalBackground}
+            activeOpacity={1}
+            onPress={() => {
+              setShowCommentModal(null);
+              setCommentMessage('');
+            }}
+          >
+            <View style={{ flex: 1 }} />
+          </TouchableOpacity>
+          
           {/* Comment Input Section - matches social media design */}
           <View style={styles.commentInputSection}>
             <TextInput
@@ -1875,7 +1891,7 @@ export default function CollectionDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -2653,11 +2669,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  commentModalBackground: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   commentInputSection: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingBottom: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20, // Account for safe area on iOS
   },
   commentInputField: {
     backgroundColor: '#FFFFFF',
