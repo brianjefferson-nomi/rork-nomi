@@ -511,6 +511,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const allCollectionsQuery = useQuery({
     queryKey: ['allCollections'],
     queryFn: async () => {
+      console.log(`[allCollectionsQuery] Query function called at ${new Date().toISOString()}`);
       try {
         const collections = await dbHelpers.getAllCollections();
         console.log(`[RestaurantStore] Starting to process collections... (${new Date().toISOString()})`);
@@ -528,7 +529,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           
           const enhancedCollection = {
             ...collection,
-            collaborators: collection.collaborators || [],
+            collaborators: collection.collaborators && collection.collaborators.length > 0 ? collection.collaborators : [],
             views: collection.views || 0,
             settings: {
               voteVisibility: collection.vote_visibility || 'public',
@@ -546,7 +547,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           // Calculate member count after collaborators is properly set
           enhancedCollection.memberCount = getMemberCount(enhancedCollection);
           
-          console.log(`[RestaurantStore] Final "${enhancedCollection.name}": memberCount = ${enhancedCollection.memberCount}`);
+          console.log(`[RestaurantStore] Final "${enhancedCollection.name}" (${new Date().toISOString()}): memberCount = ${enhancedCollection.memberCount}`);
           
           return enhancedCollection;
         });
@@ -556,10 +557,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     retry: 2,
     retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: true,
-    refetchOnWindowFocus: false
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
 
   // Mutations

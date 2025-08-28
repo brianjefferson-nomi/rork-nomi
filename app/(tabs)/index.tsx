@@ -53,6 +53,8 @@ export default function HomeScreen() {
     collaborators: c.collaborators,
     collaboratorsLength: c.collaborators?.length || 0
   })));
+  
+
 
   // Get current city configuration
   const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
@@ -124,32 +126,56 @@ export default function HomeScreen() {
   }, [cityRestaurants, trendingRestaurants, newRestaurants]);
   
   // Convert plans to collections format for display
-  const planCollections: Collection[] = useMemo(() => safeCollections.map(plan => ({
-    id: plan.id,
-    name: plan.name,
-    description: plan.description || 'A collaborative dining plan',
-    cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-    created_by: plan.created_by,
-    creator_id: (plan as any).creator_id,
-    occasion: plan.occasion,
-    is_public: plan.is_public,
-    likes: plan.likes || 0,
-    equal_voting: plan.equal_voting,
-    admin_weighted: plan.admin_weighted,
-    expertise_weighted: plan.expertise_weighted,
-    minimum_participation: plan.minimum_participation,
-    voting_deadline: (plan as any).voting_deadline,
-    allow_vote_changes: plan.allow_vote_changes,
-    anonymous_voting: plan.anonymous_voting,
-    vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
-    discussion_enabled: plan.discussion_enabled,
-    auto_ranking_enabled: plan.auto_ranking_enabled,
-    consensus_threshold: plan.consensus_threshold,
-    restaurant_ids: plan.restaurant_ids || [],
-    collaborators: (plan as any).collaborators || [],
-    created_at: plan.created_at,
-    updated_at: plan.updated_at
-  })), [safeCollections]);
+  const planCollections: Collection[] = useMemo(() => {
+    console.log('[HomeScreen] planCollections mapping - input safeCollections:', safeCollections.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      memberCount: (c as any).memberCount
+    })));
+    
+    return safeCollections.map(plan => {
+      const mappedCollection = {
+        id: plan.id,
+        name: plan.name,
+        description: plan.description || 'A collaborative dining plan',
+        cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+        created_by: plan.created_by,
+        creator_id: (plan as any).creator_id,
+        occasion: plan.occasion,
+        is_public: plan.is_public,
+        likes: plan.likes || 0,
+        equal_voting: plan.equal_voting,
+        admin_weighted: plan.admin_weighted,
+        expertise_weighted: plan.expertise_weighted,
+        minimum_participation: plan.minimum_participation,
+        voting_deadline: (plan as any).voting_deadline,
+        allow_vote_changes: plan.allow_vote_changes,
+        anonymous_voting: plan.anonymous_voting,
+        vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
+        discussion_enabled: plan.discussion_enabled,
+        auto_ranking_enabled: plan.auto_ranking_enabled,
+        consensus_threshold: plan.consensus_threshold,
+        restaurant_ids: plan.restaurant_ids || [],
+        collaborators: (plan as any).collaborators || [],
+        created_at: plan.created_at,
+        updated_at: plan.updated_at,
+        // Preserve the memberCount that was calculated in the store
+        memberCount: (plan as any).memberCount
+      };
+      
+      console.log(`[HomeScreen] planCollections mapping - "${plan.name}":`, {
+        inputCollaborators: (plan as any).collaborators,
+        inputCollaboratorsLength: (plan as any).collaborators?.length || 0,
+        inputMemberCount: (plan as any).memberCount,
+        outputCollaborators: mappedCollection.collaborators,
+        outputCollaboratorsLength: mappedCollection.collaborators?.length || 0,
+        outputMemberCount: mappedCollection.memberCount
+      });
+      
+      return mappedCollection;
+    });
+  }, [safeCollections]);
   
   const displayCollections = useMemo(() => {
     // For logged out users, use city-specific mock collections
@@ -183,7 +209,28 @@ export default function HomeScreen() {
     return cityFilteredCollections;
   }, [planCollections, isAuthenticated, cityConfig.mockCollections, restaurants, currentCity]);
   
-  const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
+  const popularCollections = useMemo(() => {
+    console.log('[HomeScreen] popularCollections processing - input displayCollections:', displayCollections?.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      memberCount: (c as any).memberCount,
+      likes: c.likes
+    })));
+    
+    const sorted = (displayCollections || []).sort((a, b) => b.likes - a.likes);
+    const sliced = sorted.slice(0, 4);
+    
+    console.log('[HomeScreen] popularCollections processing - output:', sliced.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      memberCount: (c as any).memberCount,
+      likes: c.likes
+    })));
+    
+    return sliced;
+  }, [displayCollections]);
   
   // Load Mapbox restaurants for the city
   useEffect(() => {
@@ -481,20 +528,41 @@ export default function HomeScreen() {
             Collections with {getCityDisplayName(currentCity)} restaurants
           </Text>
           <View style={styles.collectionsGrid}>
-            {displayCollections.map(collection => (
-              <CollectionCard
-                key={collection.id}
-                collection={collection as Collection}
-                onPress={() => {
-                  console.log(`[HomePage] Clicking collection "${collection.name}" with ${collection.collaborators?.length || 0} collaborators`);
-                  if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
-                    router.push('/create-collection' as any);
-                  } else {
-                    router.push(`/collection/${collection.id}` as any);
-                  }
-                }}
-              />
-            ))}
+            {displayCollections.map(collection => {
+              console.log(`[HomePage] Rendering CollectionCard for "${collection.name}":`, {
+                collaborators: collection.collaborators,
+                collaboratorsLength: collection.collaborators?.length || 0,
+                memberCount: (collection as any).memberCount
+              });
+              
+              // Create a deep copy to prevent mutation issues
+              const collectionCopy = {
+                ...collection,
+                collaborators: [...(collection.collaborators || [])],
+                restaurant_ids: [...(collection.restaurant_ids || [])]
+              };
+              
+              console.log(`[HomePage] Collection copy for "${collection.name}":`, {
+                collaborators: collectionCopy.collaborators,
+                collaboratorsLength: collectionCopy.collaborators?.length || 0,
+                memberCount: (collectionCopy as any).memberCount
+              });
+              
+              return (
+                <CollectionCard
+                  key={collection.id}
+                  collection={collectionCopy as Collection}
+                  onPress={() => {
+                    console.log(`[HomePage] Clicking collection "${collection.name}" with ${collection.collaborators?.length || 0} collaborators`);
+                    if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
+                      router.push('/create-collection' as any);
+                    } else {
+                      router.push(`/collection/${collection.id}` as any);
+                    }
+                  }}
+                />
+              );
+            })}
           </View>
         </>
       ) : (

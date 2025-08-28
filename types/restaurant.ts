@@ -82,6 +82,7 @@ export interface Collection {
   created_at: string;
   updated_at: string;
   views?: number;
+  memberCount?: number; // Calculated member count (collaborators + creator)
   // Legacy fields for backward compatibility
   coverImage?: string;
   restaurants?: string[];

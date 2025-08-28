@@ -57,8 +57,8 @@ export default function ListsScreen() {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'private' | 'shared' | 'public'>('all');
 
-  // Use the same pattern as home page: Use allCollections directly and filter for user's collections
-  const collections = useMemo(() => {
+  // Combine private collections (plans) and public collections (allCollections) that the user is part of
+  const safeCollections = useMemo(() => {
     console.log('[ListsScreen] 🔄 Processing collections...');
     console.log('[ListsScreen] Input data:', {
       plansLength: plans?.length || 0,
@@ -74,24 +74,14 @@ export default function ListsScreen() {
     const privateCollections = plans || [];
     privateCollections.forEach(plan => {
       if (!addedCollectionIds.has(plan.id)) {
-        const processedPlan = {
-          ...plan,
-          memberCount: (plan as any).memberCount || getMemberCount(plan)
-        };
-        console.log(`[ListsScreen] Adding plan "${plan.name}": memberCount = ${processedPlan.memberCount}`);
-        userCollections.push(processedPlan);
+        console.log(`[ListsScreen] Adding plan "${plan.name}": memberCount = ${(plan as any).memberCount || getMemberCount(plan)}`);
+        userCollections.push(plan);
         addedCollectionIds.add(plan.id);
       }
     });
     
     // Add public collections from allCollections that the user is part of
     const publicCollections = allCollections || [];
-    console.log('[ListsScreen] Processing public collections:', publicCollections.map((c: any) => ({
-      name: c.name,
-      collaborators: c.collaborators?.length || 0,
-      memberCount: c.memberCount
-    })));
-    
     publicCollections.forEach(publicCollection => {
       // Skip if already added from plans
       if (addedCollectionIds.has(publicCollection.id)) {
@@ -107,40 +97,78 @@ export default function ListsScreen() {
           return memberId === user?.id;
         });
       
-      console.log(`[ListsScreen] Checking "${publicCollection.name}":`, {
-        isCreator,
-        isCollaborator,
-        collaborators: (publicCollection as any).collaborators?.length || 0,
-        memberCount: (publicCollection as any).memberCount
-      });
-      
       if (isCreator || isCollaborator) {
-        // Preserve the memberCount that was calculated in the store
-        const processedCollection = {
-          ...publicCollection,
-          memberCount: (publicCollection as any).memberCount || getMemberCount(publicCollection)
-        };
-        console.log(`[ListsScreen] Adding public collection "${publicCollection.name}": memberCount = ${processedCollection.memberCount}`);
-        userCollections.push(processedCollection);
+        console.log(`[ListsScreen] Adding public collection "${publicCollection.name}": memberCount = ${(publicCollection as any).memberCount || getMemberCount(publicCollection)}`);
+        userCollections.push(publicCollection);
         addedCollectionIds.add(publicCollection.id);
       }
     });
     
-    console.log('[ListsScreen] Final result:', {
-      totalCollections: userCollections.length,
-      collectionsWithMemberCount: userCollections.filter(c => (c as any).memberCount).length,
-      sampleCollections: userCollections.slice(0, 3).map(c => ({
-        name: c.name,
-        memberCount: (c as any).memberCount
-      }))
-    });
+    console.log('[ListsScreen] Combined collections data:', userCollections.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      memberCount: (c as any).memberCount || getMemberCount(c)
+    })));
     
     return userCollections;
   }, [plans, allCollections, user?.id]);
 
+  // Convert collections to proper format (same as home page)
+  const planCollections: Collection[] = useMemo(() => {
+    console.log('[ListsScreen] planCollections mapping - input safeCollections:', safeCollections.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      memberCount: (c as any).memberCount
+    })));
+    
+    return safeCollections.map((plan: any) => {
+      const mappedCollection = {
+        id: plan.id,
+        name: plan.name,
+        description: plan.description || 'A collaborative dining plan',
+        cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+        created_by: plan.created_by,
+        creator_id: (plan as any).creator_id,
+        occasion: plan.occasion,
+        is_public: plan.is_public,
+        likes: plan.likes || 0,
+        equal_voting: plan.equal_voting,
+        admin_weighted: plan.admin_weighted,
+        expertise_weighted: plan.expertise_weighted,
+        minimum_participation: plan.minimum_participation,
+        voting_deadline: (plan as any).voting_deadline,
+        allow_vote_changes: plan.allow_vote_changes,
+        anonymous_voting: plan.anonymous_voting,
+        vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
+        discussion_enabled: plan.discussion_enabled,
+        auto_ranking_enabled: plan.auto_ranking_enabled,
+        consensus_threshold: plan.consensus_threshold,
+        restaurant_ids: plan.restaurant_ids || [],
+        collaborators: (plan as any).collaborators || [],
+        created_at: plan.created_at,
+        updated_at: plan.updated_at,
+        // Preserve the memberCount that was calculated in the store
+        memberCount: (plan as any).memberCount
+      };
+      
+      console.log(`[ListsScreen] planCollections mapping - "${plan.name}":`, {
+        inputCollaborators: (plan as any).collaborators,
+        inputCollaboratorsLength: (plan as any).collaborators?.length || 0,
+        inputMemberCount: (plan as any).memberCount,
+        outputCollaborators: mappedCollection.collaborators,
+        outputCollaboratorsLength: mappedCollection.collaborators?.length || 0,
+        outputMemberCount: mappedCollection.memberCount
+      });
+      
+      return mappedCollection;
+    });
+  }, [safeCollections]);
+
   // Debug logging for collections
-  console.log('[ListsScreen] Collections count:', collections?.length || 0);
-  console.log('[ListsScreen] Collections with memberCount:', collections?.map((c: any) => ({
+  console.log('[ListsScreen] Collections count:', planCollections?.length || 0);
+  console.log('[ListsScreen] Collections with memberCount:', planCollections?.map((c: any) => ({
     name: c.name,
     memberCount: (c as any).memberCount,
     collaborators: c.collaborators?.length || 0
@@ -164,7 +192,7 @@ export default function ListsScreen() {
 
   const sortedCollections = useMemo(() => {
     // Validate collections data
-    const validCollections = (collections || []).filter((collection: any) => {
+    const validCollections = (planCollections || []).filter((collection: any) => {
       if (!collection || !collection.id || !collection.name) {
         return false;
       }
@@ -178,7 +206,7 @@ export default function ListsScreen() {
     });
     
     return sorted;
-  }, [collections]);
+  }, [planCollections]);
 
   // Filter collections by type
   const filteredCollections = useMemo(() => {
@@ -296,7 +324,7 @@ export default function ListsScreen() {
       </View>
 
       <View style={styles.tabsContainer}>
-        {renderTabButton('collections', <BookOpen size={18} color={activeTab === 'collections' ? '#FF6B6B' : '#666'} />, 'Plans', (collections || []).length)}
+        {renderTabButton('collections', <BookOpen size={18} color={activeTab === 'collections' ? '#FF6B6B' : '#666'} />, 'Plans', (planCollections || []).length)}
         {renderTabButton('favorites', <Heart size={18} color={activeTab === 'favorites' ? '#FF6B6B' : '#666'} />, 'Favorites', (favoriteRestaurants || []).length)}
       </View>
 
@@ -398,12 +426,12 @@ export default function ListsScreen() {
 
       {activeTab === 'collections' ? (
         // Enhanced loading and error states
-        collections === undefined ? (
+        planCollections === undefined ? (
           <View style={styles.loadingState}>
             <View style={styles.loadingSpinner} />
             <Text style={styles.loadingText}>Loading your collections...</Text>
           </View>
-        ) : collections === null ? (
+        ) : planCollections === null ? (
           <View style={styles.errorState}>
             <Text style={styles.errorTitle}>Failed to load collections</Text>
             <Text style={styles.errorText}>Please check your connection and try again</Text>
@@ -441,10 +469,17 @@ export default function ListsScreen() {
             </View>
             <View style={styles.collectionsGrid}>
               {filteredCollections.map((collection: any) => {
+                // Create a deep copy to prevent mutation issues (same fix as home page)
+                const collectionCopy = {
+                  ...collection,
+                  collaborators: [...(collection.collaborators || [])],
+                  restaurant_ids: [...(collection.restaurant_ids || [])]
+                };
+                
                 return (
                   <View key={collection.id} style={styles.collectionCardContainer}>
                     <CollectionCard
-                      collection={collection}
+                      collection={collectionCopy}
                       onPress={() => router.push(`/collection/${collection.id}` as any)}
                     />
                     {isCollectionOwner(collection) ? (

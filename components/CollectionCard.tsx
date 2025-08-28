@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { Users, Heart } from 'lucide-react-native';
 import { Collection } from '@/types/restaurant';
@@ -14,23 +14,50 @@ interface CollectionCardProps {
 }
 
 export function CollectionCard({ collection, onPress }: CollectionCardProps) {
+  // Debug: Log what the component receives
+  console.log(`[CollectionCard] Component received "${collection.name}":`, {
+    collaborators: collection.collaborators,
+    collaboratorsLength: collection.collaborators?.length || 0,
+    memberCount: (collection as any).memberCount,
+    id: collection.id
+  });
+  
   const restaurants = useCollectionRestaurants(collection.id);
   
   // Enhanced data validation and fallbacks
   const restaurantCount = restaurants && Array.isArray(restaurants) ? restaurants.length : 0;
   
+  // State to preserve the correct member count when it's first available
+  const [preservedMemberCount, setPreservedMemberCount] = useState<number | null>(null);
+  
   // Use memberCount from collection data if available, otherwise calculate it
-  const totalMembers = (collection as any).memberCount || getMemberCount(collection);
+  // If we have collaborators data, recalculate to ensure accuracy
+  const calculatedTotalMembers = collection.collaborators && collection.collaborators.length > 0 
+    ? getMemberCount(collection) 
+    : ((collection as any).memberCount || getMemberCount(collection));
+  
+  // Preserve the correct member count when it's first available
+  useEffect(() => {
+    if (calculatedTotalMembers > 0 && preservedMemberCount === null) {
+      setPreservedMemberCount(calculatedTotalMembers);
+      console.log(`[CollectionCard] Preserving member count for "${collection.name}": ${calculatedTotalMembers}`);
+    }
+  }, [calculatedTotalMembers, preservedMemberCount, collection.name]);
+  
+  // Use preserved count if available, otherwise use calculated
+  const totalMembers = preservedMemberCount || calculatedTotalMembers;
   const memberCountText = totalMembers.toString();
   const likeCount = collection.likes || 0;
   
-  // Debug: Log what we're calculating
-  console.log(`[CollectionCard] "${collection.name}":`, {
-    memberCount: (collection as any).memberCount,
-    calculatedTotalMembers: totalMembers,
-    memberCountText,
-    collaborators: collection.collaborators?.length || 0
-  });
+             // Debug: Log what we're calculating
+           console.log(`[CollectionCard] "${collection.name}" (${new Date().toISOString()}):`, {
+             memberCount: (collection as any).memberCount,
+             calculatedTotalMembers,
+             preservedMemberCount,
+             finalTotalMembers: totalMembers,
+             memberCountText,
+             collaborators: collection.collaborators?.length || 0
+           });
   
 
   

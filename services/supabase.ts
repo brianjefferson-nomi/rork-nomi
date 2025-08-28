@@ -582,12 +582,37 @@ export const dbHelpers = {
       throw error;
     }
     
-    console.log('[getAllCollections] Raw data from database:', data?.map(c => ({
+    console.log(`[getAllCollections] Raw data from database (${new Date().toISOString()}):`, data?.map(c => ({
       name: c.name,
       collaborators: c.collaborators,
       collaboratorsLength: c.collaborators?.length || 0,
-      created_at: c.created_at
+      created_at: c.created_at,
+      id: c.id
     })));
+    
+    // Log specific collections for debugging
+    const veniceBeach = data?.find(c => c.name === 'Venice Beach Eats');
+    const brooklynBrunch = data?.find(c => c.name === 'Brooklyn Brunch Scene');
+    
+    if (veniceBeach) {
+      console.log(`[getAllCollections] Venice Beach Eats raw data (${new Date().toISOString()}):`, {
+        id: veniceBeach.id,
+        collaborators: veniceBeach.collaborators,
+        collaboratorsLength: veniceBeach.collaborators?.length || 0,
+        collaboratorsType: typeof veniceBeach.collaborators,
+        isArray: Array.isArray(veniceBeach.collaborators)
+      });
+    }
+    
+    if (brooklynBrunch) {
+      console.log(`[getAllCollections] Brooklyn Brunch Scene raw data (${new Date().toISOString()}):`, {
+        id: brooklynBrunch.id,
+        collaborators: brooklynBrunch.collaborators,
+        collaboratorsLength: brooklynBrunch.collaborators?.length || 0,
+        collaboratorsType: typeof brooklynBrunch.collaborators,
+        isArray: Array.isArray(brooklynBrunch.collaborators)
+      });
+    }
     
     // Use the collaborators field that's already populated in the collections table
     const collectionsWithMembers = (data || []).map((collection) => {
@@ -597,7 +622,7 @@ export const dbHelpers = {
       };
     });
     
-    console.log('[getAllCollections] Processed collections:', collectionsWithMembers?.map(c => ({
+    console.log(`[getAllCollections] Processed collections (${new Date().toISOString()}):`, collectionsWithMembers?.map(c => ({
       name: c.name,
       collaborators: c.collaborators,
       collaboratorsLength: c.collaborators?.length || 0
