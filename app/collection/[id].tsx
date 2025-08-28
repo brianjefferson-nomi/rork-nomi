@@ -7,6 +7,7 @@ import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, dbHelpers } from '@/services/supabase';
+import { getMemberCount, getMemberIds, isMember, isCreator, canManageRestaurants } from '@/utils/member-helpers';
 
 function getConsensusStyle(consensus: string) {
   switch (consensus) {
@@ -70,7 +71,7 @@ function InsightsTab({
           <View style={styles.analyticCard}>
             <Text style={styles.analyticValue}>
               {(() => {
-                const totalMembers = collection.collaborators && Array.isArray(collection.collaborators) ? collection.collaborators.length : 0;
+                const totalMembers = getMemberCount(collection);
                 const participatingMembers = rankedRestaurants.reduce((total, { meta }, restaurantIndex) => {
                   // Filter votes to only include collection members
                   // Extract first 8 characters from vote user IDs to match collection member format
@@ -552,15 +553,16 @@ export default function CollectionDetailScreen() {
     getRestaurantVotingDetails,
     toggleFavorite,
     favoriteRestaurants,
-    restaurants
+    restaurants,
+    addRestaurantToStore
   } = useRestaurants();
 
 
 
 
 
-  const addDiscussion = useCallback(async (restaurantId: string, planId: string, message: string) => {
-    await originalAddDiscussion(restaurantId, planId, message);
+  const addDiscussion = useCallback(async (restaurantId: string, collectionId: string, message: string) => {
+    await originalAddDiscussion(restaurantId, collectionId, message);
     // Trigger ranking update
     setRankingUpdateTrigger(prev => prev + 1);
   }, [originalAddDiscussion]);
@@ -674,9 +676,7 @@ export default function CollectionDetailScreen() {
   const collectionRestaurants = getCollectionRestaurants(id || '');
   
   // Calculate proper member count for ranking
-  const memberCount = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
-    ? effectiveCollection.collaborators.length 
-    : (effectiveCollection?.is_public ? 1 : 1); // Default to 1 for private/public collections
+  const memberCount = getMemberCount(effectiveCollection);
   
   console.log('[CollectionDetail] Member count for ranking:', memberCount);
   
@@ -745,7 +745,7 @@ export default function CollectionDetailScreen() {
   }, [isAnimating]);
 
   // Wrapper functions that trigger ranking updates with animation
-  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', planId?: string, reason?: string) => {
+  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => {
     // Show immediate visual feedback
     setVoteFeedback({ restaurantId, vote, visible: true });
     
@@ -770,7 +770,7 @@ export default function CollectionDetailScreen() {
     const currentRankings = rankedResult?.restaurants || [];
     
     // Trigger the actual vote
-    originalVoteRestaurant(restaurantId, vote, planId, reason);
+    originalVoteRestaurant(restaurantId, vote, collectionId, reason);
     
     // Trigger ranking update with animation
     setRankingUpdateTrigger(prev => prev + 1);
@@ -1077,6 +1077,18 @@ export default function CollectionDetailScreen() {
     return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
   };
 
+  const canManageRestaurants = () => {
+    if (!user || !effectiveCollection) return false;
+    
+    // For public collections, only the creator can add/remove restaurants
+    if (effectiveCollection.is_public) {
+      return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
+    }
+    
+    // For private collections, the owner can manage restaurants
+    return isCollectionOwner();
+  };
+
   const isCollectionMember = () => {
     if (!user || !effectiveCollection) return false;
     return collectionMembers.includes(user.id);
@@ -1335,70 +1347,40 @@ export default function CollectionDetailScreen() {
           <Text style={styles.description}>{effectiveCollection?.description || ''}</Text>
           
           <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Heart size={16} color="#FF6B6B" fill="#FF6B6B" />
-              <Text style={styles.statText}>{effectiveCollection?.likes || 0} likes</Text>
+            <View style={styles.statsLeft}>
+              {/* Only show likes for non-public collections */}
+              {!effectiveCollection?.is_public && (
+                <View style={styles.stat}>
+                  <Heart size={16} color="#FF6B6B" fill="#FF6B6B" />
+                  <Text style={styles.statText}>{effectiveCollection?.likes || 0} likes</Text>
+                </View>
+              )}
+              <View style={styles.stat}>
+                <Users size={16} color="#666" />
+                <Text style={styles.statText}>
+                  {`${getMemberCount(effectiveCollection)} members`}
+                </Text>
+              </View>
             </View>
-            <View style={styles.stat}>
-              <Users size={16} color="#666" />
-              <Text style={styles.statText}>
-                {`${effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? effectiveCollection.collaborators.length : 0} members`}
-              </Text>
+            <View style={styles.collaboratorActions}>
+              <TouchableOpacity 
+                style={styles.inviteButton}
+                onPress={() => setShowInviteModal(true)}
+              >
+                <UserPlus size={14} color="#3B82F6" />
+                <Text style={styles.inviteButtonText}>Invite</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.shareButton}
+                onPress={copyInviteLink}
+              >
+                <Copy size={14} color="#6B7280" />
+                <Text style={styles.shareButtonText}>Copy Link</Text>
+              </TouchableOpacity>
             </View>
           </View>
           
-          {/* Collaborators */}
-          <View style={styles.collaboratorsSection}>
-            <View style={styles.collaboratorsHeader}>
-              <Text style={styles.collaboratorsTitle}>Group Members</Text>
-              <View style={styles.collaboratorActions}>
-                <TouchableOpacity 
-                  style={styles.inviteButton}
-                  onPress={() => setShowInviteModal(true)}
-                >
-                  <UserPlus size={14} color="#3B82F6" />
-                  <Text style={styles.inviteButtonText}>Invite</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.shareButton}
-                  onPress={copyInviteLink}
-                >
-                  <Copy size={14} color="#6B7280" />
-                  <Text style={styles.shareButtonText}>Copy Link</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collaboratorsList}>
-              {effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) ? (
-                effectiveCollection.collaborators.map((member: any, index: number) => {
-                  const memberName = typeof member === 'string' ? member : member?.name || `Member ${index + 1}`;
-                  const memberId = typeof member === 'string' ? member : member?.userId || `member-${index}`;
-                  const memberRole = typeof member === 'string' ? 'member' : member?.role || 'member';
-                  const isVerified = typeof member === 'string' ? false : member?.isVerified || false;
-                  
-                  return (
-                                          <View key={memberId} style={styles.collaboratorItem}>
-                        <View style={styles.collaboratorAvatar}>
-                          <Text style={styles.collaboratorInitial}>
-                            {memberName && typeof memberName === 'string' && memberName.length > 0 ? memberName.charAt(0).toUpperCase() : '?'}
-                          </Text>
-                          {memberRole === 'admin' && <Crown size={12} color="#FFD700" style={styles.adminBadge} />}
-                        </View>
-                        <Text style={styles.collaboratorName}>{memberName || 'Unknown Member'}</Text>
-                        {isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
-                      </View>
-                  );
-                })
-              ) : (
-                <View style={styles.collaboratorItem}>
-                  <View style={styles.collaboratorAvatar}>
-                    <Text style={styles.collaboratorInitial}>?</Text>
-                  </View>
-                  <Text style={styles.collaboratorName}>No members</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
+
         </View>
 
         {/* Tab Navigation */}
@@ -1519,7 +1501,14 @@ export default function CollectionDetailScreen() {
                      )}
 
                   {/* Restaurant Info Section */}
-                  <View style={styles.restaurantInfoSection}>
+                  <TouchableOpacity 
+                    style={styles.restaurantInfoSection}
+                    onPress={() => {
+                      addRestaurantToStore(restaurant);
+                      router.push(`/restaurant/${restaurant.id}` as any);
+                    }}
+                    activeOpacity={0.9}
+                  >
                     <View style={styles.restaurantImageContainer}>
                       <Image 
                         source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
@@ -1538,13 +1527,16 @@ export default function CollectionDetailScreen() {
                     
                     <TouchableOpacity 
                       style={styles.heartButton}
-                        onPress={() => toggleFavorite(restaurant.id)}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(restaurant.id);
+                        }}
                     >
                       <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
                         {isFavorite ? '♥' : '♡'}
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
 
                                          {/* Approval Section - Only for shared collections */}
                      {isSharedCollection && (
@@ -1617,8 +1609,8 @@ export default function CollectionDetailScreen() {
                   </View>
                      )}
 
-                                         {/* Remove Button - Only for collection owners */}
-                     {isCollectionOwner() && (
+                                         {/* Remove Button - Only for collection owners/creators */}
+                     {canManageRestaurants() && (
                     <TouchableOpacity 
                       style={styles.removeButton}
                       onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
@@ -1928,8 +1920,13 @@ const styles = StyleSheet.create({
   },
   stats: {
     flexDirection: 'row',
-    gap: 20,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  statsLeft: {
+    flexDirection: 'row',
+    gap: 20,
   },
   stat: {
     flexDirection: 'row',
@@ -1946,7 +1943,7 @@ const styles = StyleSheet.create({
   },
   collaboratorsHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: 16,
   },

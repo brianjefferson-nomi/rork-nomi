@@ -8,6 +8,7 @@ import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
 import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI, deduplicateRestaurants } from '@/services/api';
 import { dbHelpers, Database, supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/auth-store';
+import { getMemberCount, isMember, isCreator } from '@/utils/member-helpers';
 
 type Plan = Database['public']['Tables']['collections']['Row'];
 
@@ -15,6 +16,7 @@ interface RestaurantStore {
   restaurants: Restaurant[];
   plans: Plan[];
   collections: Plan[]; // Alias for plans for backward compatibility
+  allCollections: Plan[]; // All public collections for discovery
   userVotes: RestaurantVote[];
   discussions: RestaurantDiscussion[];
   favoriteRestaurants: string[];
@@ -22,6 +24,7 @@ interface RestaurantStore {
   searchHistory: string[];
   searchResults: Restaurant[];
   userLocation: { city: string; lat: number; lng: number } | null;
+  currentCity: 'nyc' | 'la';
   searchRestaurants: (query: string) => Promise<Restaurant[]>;
   addSearchQuery: (query: string) => void;
   clearSearchHistory: () => void;
@@ -66,7 +69,7 @@ interface RestaurantStore {
   refreshLocation: () => Promise<void>;
   inviteToPlan: (planId: string, email: string, message?: string) => Promise<void>;
   updatePlanSettings: (planId: string, settings: Partial<Plan>) => Promise<void>;
-  switchToCity: (city: 'New York' | 'Los Angeles') => void;
+  switchToCity: (city: 'nyc' | 'la') => void;
   shareablePlanUrl: (planId: string) => string;
   // Collection operations (aliases for backward compatibility)
   addRestaurantToCollection: (collectionId: string, restaurantId: string) => Promise<void>;
@@ -85,6 +88,10 @@ interface RestaurantStore {
   removeMemberFromCollection: (collectionId: string, userId: string) => Promise<void>;
   updateCollectionType: (collectionId: string, collectionType: 'public' | 'private' | 'shared') => Promise<any>;
   addRestaurantToStore: (restaurant: Restaurant) => void;
+  incrementCollectionViews: (collectionId: string) => Promise<void>;
+  toggleCollectionLike: (collectionId: string) => Promise<{ success: boolean; liked: boolean }>;
+  getCollectionLikeStatus: (collectionId: string) => boolean;
+  getCollectionLikeCount: (collectionId: string) => number;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -97,6 +104,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [userLocation, setUserLocation] = useState<{ city: string; lat: number; lng: number } | null>(null);
+  const [currentCity, setCurrentCity] = useState<'nyc' | 'la'>('nyc');
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
   // Remove mock data fallback - only use real data from database
@@ -123,7 +131,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     phone: dbRestaurant.phone,
     website: dbRestaurant.website,
     priceLevel: dbRestaurant.price_level,
-    userNotes: dbRestaurant.userNotes || ''
+    userNotes: dbRestaurant.userNotes || '',
+    restaurant_code: dbRestaurant.restaurant_code,
+    city: dbRestaurant.city,
+    state: dbRestaurant.state
   }), []);
 
   // Load restaurants from database
@@ -284,16 +295,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log('[RestaurantStore] useEffect - restaurantsQuery.data:', restaurantsQuery.data?.length);
     console.log('[RestaurantStore] useEffect - user ID:', user?.id);
     
-    // Prioritize restaurantsQuery.data as it's the most direct source
-    if (restaurantsQuery.data && restaurantsQuery.data.length > 0) {
-      console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
-      setRestaurants(restaurantsQuery.data);
-    } else if (dataQuery.data?.restaurants && dataQuery.data.restaurants.length > 0) {
-      console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
-      setRestaurants(dataQuery.data.restaurants);
-    } else if (restaurants.length === 0) {
-      console.log('[RestaurantStore] No restaurants available from any source');
-      setRestaurants([]);
+    // Only set restaurants from query data if we don't have any restaurants yet
+    // This prevents overwriting manually added restaurants
+    if (restaurants.length === 0) {
+      if (restaurantsQuery.data && restaurantsQuery.data.length > 0) {
+        console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
+        setRestaurants(restaurantsQuery.data);
+      } else if (dataQuery.data?.restaurants && dataQuery.data.restaurants.length > 0) {
+        console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
+        setRestaurants(dataQuery.data.restaurants);
+      } else {
+        console.log('[RestaurantStore] No restaurants available from any source');
+        setRestaurants([]);
+      }
+    } else {
+      console.log('[RestaurantStore] Preserving existing restaurants (including manually added ones)');
     }
   }, [restaurantsQuery.data, dataQuery.data, restaurants.length, user?.id]);
 
@@ -373,9 +389,9 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
             },
             // Add computed fields
             restaurantCount: Array.isArray(collection.restaurant_ids) ? collection.restaurant_ids.length : 0,
-            memberCount: Array.isArray(collection.collaborators) ? collection.collaborators.length : 0,
-            isOwner: collection.created_by === user?.id,
-            isMember: Array.isArray(collection.collaborators) && collection.collaborators.includes(user?.id)
+            memberCount: getMemberCount(collection),
+            isOwner: isCreator(collection, user?.id || ''),
+            isMember: isMember(collection, user?.id || '')
           };
         };
         
@@ -448,10 +464,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
                 autoRankingEnabled: plan.auto_ranking_enabled !== false,
                 consensusThreshold: plan.consensus_threshold ? plan.consensus_threshold / 100 : 0.7
               },
-              restaurantCount: Array.isArray(plan.restaurant_ids) ? plan.restaurant_ids.length : 0,
-              memberCount: Array.isArray(plan.collaborators) ? plan.collaborators.length : 0,
-              isOwner: plan.created_by === user?.id,
-              isMember: Array.isArray(plan.collaborators) && plan.collaborators.includes(user?.id)
+                              restaurantCount: Array.isArray(plan.restaurant_ids) ? plan.restaurant_ids.length : 0,
+                memberCount: getMemberCount(plan),
+                isOwner: isCreator(plan, user?.id || ''),
+                isMember: isMember(plan, user?.id || '')
             }))
             .filter(Boolean);
           
@@ -497,16 +513,43 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     queryFn: async () => {
       try {
         const collections = await dbHelpers.getAllCollections();
-        return collections.map((collection: any) => ({
-          ...collection,
-          collaborators: collection.collaborators || [],
-          settings: {
-            voteVisibility: collection.vote_visibility || 'public',
-            discussionEnabled: collection.discussion_enabled !== false,
-            autoRankingEnabled: collection.auto_ranking_enabled !== false,
-            consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
-          }
-        }));
+        console.log(`[RestaurantStore] Starting to process collections... (${new Date().toISOString()})`);
+        console.log('[RestaurantStore] Input collections:', collections?.map(c => ({
+          name: c.name,
+          collaborators: c.collaborators,
+          collaboratorsLength: c.collaborators?.length || 0
+        })));
+        
+        return collections.map((collection: any) => {
+          console.log(`[RestaurantStore] Processing "${collection.name}":`, {
+            inputCollaborators: collection.collaborators,
+            inputCollaboratorsLength: collection.collaborators?.length || 0
+          });
+          
+          const enhancedCollection = {
+            ...collection,
+            collaborators: collection.collaborators || [],
+            views: collection.views || 0,
+            settings: {
+              voteVisibility: collection.vote_visibility || 'public',
+              discussionEnabled: collection.discussion_enabled !== false,
+              autoRankingEnabled: collection.auto_ranking_enabled !== false,
+              consensusThreshold: collection.consensus_threshold ? collection.consensus_threshold / 100 : 0.7
+            }
+          };
+          
+          console.log(`[RestaurantStore] Enhanced "${enhancedCollection.name}":`, {
+            enhancedCollaborators: enhancedCollection.collaborators,
+            enhancedCollaboratorsLength: enhancedCollection.collaborators?.length || 0
+          });
+          
+          // Calculate member count after collaborators is properly set
+          enhancedCollection.memberCount = getMemberCount(enhancedCollection);
+          
+          console.log(`[RestaurantStore] Final "${enhancedCollection.name}": memberCount = ${enhancedCollection.memberCount}`);
+          
+          return enhancedCollection;
+        });
       } catch (error) {
         return [];
       }
@@ -514,13 +557,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: false
   });
 
   // Mutations
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
-      return await dbHelpers.createPlan(planData);
+      return await dbHelpers.createCollection(planData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
@@ -529,7 +574,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   const deletePlanMutation = useMutation({
     mutationFn: async ({ planId, userId }: { planId: string; userId: string }) => {
-      return await dbHelpers.deletePlan(planId, userId);
+      return await dbHelpers.deleteCollection(planId, userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
@@ -679,7 +724,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     console.log(`[RestaurantStore] Updated restaurant_ids:`, updatedRestaurantIds);
     
     try {
-      await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
+      await dbHelpers.updateCollection(planId, { restaurant_ids: updatedRestaurantIds });
       console.log(`[RestaurantStore] Successfully updated plan in database`);
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
       console.log(`[RestaurantStore] Invalidated userPlans query`);
@@ -694,7 +739,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     if (!plan) return;
 
     const updatedRestaurantIds = (plan.restaurant_ids || []).filter((id: string) => id !== restaurantId);
-    await dbHelpers.updatePlan(planId, { restaurant_ids: updatedRestaurantIds });
+          await dbHelpers.updateCollection(planId, { restaurant_ids: updatedRestaurantIds });
     queryClient.invalidateQueries({ queryKey: ['userPlans'] });
   }, [plansQuery.data, queryClient]);
 
@@ -1183,12 +1228,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   }, []);
 
   const updatePlanSettings = useCallback(async (planId: string, settings: Partial<Plan>) => {
-    await dbHelpers.updatePlan(planId, settings);
+    await dbHelpers.updateCollection(planId, settings);
     queryClient.invalidateQueries({ queryKey: ['userPlans'] });
   }, [queryClient]);
 
-  const switchToCity = useCallback((city: 'New York' | 'Los Angeles') => {
-    setUserLocation(prev => prev ? { ...prev, city } : { city, lat: 0, lng: 0 });
+  const switchToCity = useCallback((city: 'nyc' | 'la') => {
+    setCurrentCity(city);
+    const cityName = city === 'nyc' ? 'New York' : 'Los Angeles';
+    setUserLocation(prev => {
+      // Only update if the city is actually different to prevent infinite loops
+      if (!prev || prev.city !== cityName) {
+        return prev ? { ...prev, city: cityName } : { city: cityName, lat: 0, lng: 0 };
+      }
+      return prev;
+    });
   }, []);
 
   const shareablePlanUrl = useCallback((planId: string) => {
@@ -1310,6 +1363,103 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     });
   }, []);
 
+  // Increment collection views when clicked
+  const incrementCollectionViews = useCallback(async (collectionId: string) => {
+    try {
+      console.log('[RestaurantStore] Incrementing views for collection:', collectionId);
+      await dbHelpers.incrementCollectionViews(collectionId);
+      
+      // Invalidate collections query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    } catch (error) {
+      console.error('[RestaurantStore] Error incrementing collection views:', error);
+    }
+  }, [queryClient]);
+
+  // Collection like functionality
+  const [collectionLikes, setCollectionLikes] = useState<Record<string, boolean>>({});
+  const [collectionLikeCounts, setCollectionLikeCounts] = useState<Record<string, number>>({});
+
+  const toggleCollectionLike = useCallback(async (collectionId: string) => {
+    if (!user?.id) {
+      console.log('[RestaurantStore] User not authenticated, cannot like collection');
+      return { success: false, liked: false };
+    }
+
+    try {
+      console.log('[RestaurantStore] Toggling like for collection:', collectionId);
+      const result = await dbHelpers.toggleCollectionLike(collectionId, user.id);
+      
+      if (result.success) {
+        // Update local state
+        setCollectionLikes(prev => ({
+          ...prev,
+          [collectionId]: result.liked
+        }));
+        
+        // Update like count
+        const newCount = await dbHelpers.getCollectionLikeCount(collectionId);
+        setCollectionLikeCounts(prev => ({
+          ...prev,
+          [collectionId]: newCount
+        }));
+        
+        // Invalidate collections query to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+        queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('[RestaurantStore] Error toggling collection like:', error);
+      return { success: false, liked: false };
+    }
+  }, [user?.id, queryClient]);
+
+  const getCollectionLikeStatus = useCallback((collectionId: string) => {
+    return collectionLikes[collectionId] || false;
+  }, [collectionLikes]);
+
+  const getCollectionLikeCount = useCallback((collectionId: string) => {
+    return collectionLikeCounts[collectionId] || 0;
+  }, [collectionLikeCounts]);
+
+  // Load collection like statuses for current user
+  const collectionLikesQuery = useQuery({
+    queryKey: ['collectionLikes', user?.id || ''],
+    queryFn: async () => {
+      if (!user?.id) return {};
+      
+      try {
+        const collections = allCollectionsQuery.data || [];
+        const likeStatuses: Record<string, boolean> = {};
+        const likeCounts: Record<string, number> = {};
+        
+        for (const collection of collections) {
+          const isLiked = await dbHelpers.getCollectionLikeStatus(collection.id, user.id);
+          const likeCount = await dbHelpers.getCollectionLikeCount(collection.id);
+          
+          likeStatuses[collection.id] = isLiked;
+          likeCounts[collection.id] = likeCount;
+        }
+        
+        setCollectionLikes(likeStatuses);
+        setCollectionLikeCounts(likeCounts);
+        
+        return { likeStatuses, likeCounts };
+      } catch (error) {
+        console.error('[RestaurantStore] Error loading collection likes:', error);
+        return {};
+      }
+    },
+    enabled: !!user?.id && !!allCollectionsQuery.data,
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes
+  });
+
   // Debug logging for return values
   console.log('[RestaurantStore] Return values:');
   console.log('  - restaurants:', restaurants.length);
@@ -1342,6 +1492,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     searchHistory,
     searchResults,
     userLocation,
+    currentCity,
     searchRestaurants,
     addSearchQuery,
     clearSearchHistory,
@@ -1381,7 +1532,11 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     addMemberToCollection,
     removeMemberFromCollection,
     updateCollectionType,
-    addRestaurantToStore
+    addRestaurantToStore,
+    incrementCollectionViews,
+    toggleCollectionLike,
+    getCollectionLikeStatus,
+    getCollectionLikeCount
   };
 });
 
@@ -1431,7 +1586,7 @@ export function useRestaurantVotes(restaurantId: string | undefined, planId?: st
 }
 
 export function useCollectionRestaurants(collectionId: string | undefined) {
-  const { restaurants, plans } = useRestaurants();
+  const { restaurants, plans, allCollections } = useRestaurants();
   
   return useMemo(() => {
     if (!collectionId || collectionId === '') {
@@ -1441,26 +1596,33 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
     
     console.log(`[useCollectionRestaurants] Processing collection ${collectionId}`);
     console.log(`[useCollectionRestaurants] Available plans:`, plans.length);
+    console.log(`[useCollectionRestaurants] Available allCollections:`, allCollections.length);
     console.log(`[useCollectionRestaurants] Available restaurants:`, restaurants.length);
     
-    // Find the plan/collection
-    const plan = plans.find((p: any) => p.id === collectionId);
-    if (!plan) {
-      console.log(`[useCollectionRestaurants] No plan found for collection ${collectionId}`);
+    // Find the collection (same pattern as useCollectionById)
+    let collection = allCollections?.find((c: any) => c && c.id === collectionId);
+    
+    // If not found in allCollections, try plans (private collections)
+    if (!collection) {
+      collection = plans?.find((p: any) => p && p.id === collectionId);
+    }
+    
+    if (!collection) {
+      console.log(`[useCollectionRestaurants] No collection found for ${collectionId}`);
       return [];
     }
     
-    if (!plan.restaurant_ids) {
-      console.log(`[useCollectionRestaurants] No restaurant_ids in plan for collection ${collectionId}`);
+    if (!collection.restaurant_ids) {
+      console.log(`[useCollectionRestaurants] No restaurant_ids in collection for ${collectionId}`);
       return [];
     }
     
-    console.log(`[useCollectionRestaurants] Collection ${collectionId} has ${plan.restaurant_ids.length} restaurant IDs:`, plan.restaurant_ids);
+    console.log(`[useCollectionRestaurants] Collection ${collectionId} has ${collection.restaurant_ids.length} restaurant IDs:`, collection.restaurant_ids);
     console.log(`[useCollectionRestaurants] Available restaurant IDs:`, restaurants.map(r => r.id));
     
     // Return restaurants that are in this collection
     const collectionRestaurants = restaurants.filter((r: any) => 
-      r && r.id && plan.restaurant_ids && Array.isArray(plan.restaurant_ids) && plan.restaurant_ids.includes(r.id)
+      r && r.id && collection.restaurant_ids && Array.isArray(collection.restaurant_ids) && collection.restaurant_ids.includes(r.id)
     );
     
     console.log(`[useCollectionRestaurants] Found ${collectionRestaurants.length} restaurants for collection ${collectionId}`);
@@ -1468,12 +1630,12 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
       console.log(`[useCollectionRestaurants] Restaurant names:`, collectionRestaurants.map(r => r.name));
     }
     return collectionRestaurants;
-  }, [restaurants, plans, collectionId]);
+  }, [restaurants, plans, allCollections, collectionId]);
 }
 
 // Enhanced collection hook with member details
 export function useCollectionById(id: string | undefined) {
-  const { plans } = useRestaurants();
+  const { plans, allCollections } = useRestaurants();
   
   // Add null check for id
   if (!id || id === '') {
@@ -1481,15 +1643,21 @@ export function useCollectionById(id: string | undefined) {
     return null;
   }
   
-  // Add null check for plans
-  if (!plans || !Array.isArray(plans)) {
-    console.log('[useCollectionById] No plans available');
+  // Add null check for plans and allCollections
+  if ((!plans || !Array.isArray(plans)) && (!allCollections || !Array.isArray(allCollections))) {
+    console.log('[useCollectionById] No plans or allCollections available');
     return null;
   }
   
-  const collection = plans.find((p: any) => p && p.id === id);
+  // First try to find in allCollections (public collections)
+  let collection = allCollections?.find((c: any) => c && c.id === id);
   
-  // Fetch collection members with proper names
+  // If not found in allCollections, try plans (private collections)
+  if (!collection) {
+    collection = plans?.find((p: any) => p && p.id === id);
+  }
+  
+  // Fetch collection members with proper names (only for private collections from plans)
   const membersQuery = useQuery({
     queryKey: ['collectionMembers', id || ''],
     queryFn: async () => {
@@ -1502,7 +1670,7 @@ export function useCollectionById(id: string | undefined) {
         return [];
       }
     },
-    enabled: !!id, // Only enabled if we have an ID
+    enabled: !!id && !collection?.is_public, // Only enabled for private collections
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -1513,7 +1681,9 @@ export function useCollectionById(id: string | undefined) {
     console.log(`[useCollectionById] Processing collection for ID: ${id}`, { 
       hasCollection: !!collection, 
       collectionName: collection?.name,
-      plansCount: plans?.length 
+      isPublic: collection?.is_public,
+      plansCount: plans?.length,
+      allCollectionsCount: allCollections?.length
     });
     
     if (!collection) {
@@ -1524,12 +1694,15 @@ export function useCollectionById(id: string | undefined) {
     // Enhanced collection with proper member data
     return {
       ...collection,
-      // Use fetched members data
-      collaborators: membersQuery.data && Array.isArray(membersQuery.data) && membersQuery.data.length > 0 
-        ? membersQuery.data
-          : [],
-      // Add loading state for members
-      membersLoading: membersQuery.isLoading
+      // For public collections, use the collaborators field directly
+      // For private collections, use fetched members data
+      collaborators: collection.is_public 
+        ? ((collection as any).collaborators || [])
+        : (membersQuery.data && Array.isArray(membersQuery.data) && membersQuery.data.length > 0 
+            ? membersQuery.data
+            : []),
+      // Add loading state for members (only relevant for private collections)
+      membersLoading: collection.is_public ? false : membersQuery.isLoading
     };
   }, [collection, membersQuery.data, membersQuery.isLoading, id]);
 }

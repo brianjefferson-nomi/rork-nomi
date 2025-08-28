@@ -143,7 +143,7 @@ const CustomCalendar = ({ onDateSelect, onClose }: { onDateSelect: (date: Date) 
   );
 };
 
-export default function CreatePlanScreen() {
+export default function CreateCollectionScreen() {
   const { createPlan } = useRestaurants();
   const { isAuthenticated } = useAuth();
   const [name, setName] = useState('');

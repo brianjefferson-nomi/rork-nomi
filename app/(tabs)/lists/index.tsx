@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign, Trash2, UserMinus } from 'lucide-react-native';
@@ -7,6 +7,8 @@ import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { Collection } from '@/types/restaurant';
+import { useQueryClient } from '@tanstack/react-query';
+import { getMemberCount } from '@/utils/member-helpers';
 
 type TabType = 'collections' | 'favorites';
 type SortType = 'recent' | 'rating' | 'price' | 'distance';
@@ -14,32 +16,134 @@ type ViewType = 'grid' | 'list';
 
 export default function ListsScreen() {
   const { 
-    collections, 
+    plans, 
+    allCollections,
     restaurants, 
     favoriteRestaurants, 
     deleteCollection, 
     leaveCollection
   } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  
+  // Note: Removed forced refresh to prevent data loss during re-renders
+
+  // Debug: Log allCollections data changes
+  useEffect(() => {
+    console.log('[ListsScreen] allCollections changed:', {
+      length: allCollections?.length || 0,
+      hasMemberCount: allCollections?.some((c: any) => (c as any).memberCount) || false,
+      sampleMemberCounts: allCollections?.slice(0, 3).map((c: any) => ({
+        name: c.name,
+        memberCount: (c as any).memberCount
+      })) || []
+    });
+  }, [allCollections]);
+
+  // Debug: Log plans data changes
+  useEffect(() => {
+    console.log('[ListsScreen] plans changed:', {
+      length: plans?.length || 0,
+      hasMemberCount: plans?.some((c: any) => (c as any).memberCount) || false,
+      sampleMemberCounts: plans?.slice(0, 3).map((c: any) => ({
+        name: c.name,
+        memberCount: (c as any).memberCount
+      })) || []
+    });
+  }, [plans]);
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'private' | 'shared' | 'public'>('all');
 
-  // Enhanced debug logging for collections
-  console.log('[ListsScreen] 🚀 Component initialized');
-  console.log('[ListsScreen] 👤 User authenticated:', isAuthenticated);
-  console.log('[ListsScreen] 🆔 User ID:', user?.id);
-  console.log('[ListsScreen] 📊 Collections count:', collections?.length || 0);
-  console.log('[ListsScreen] 🔄 Collections loading state:', !collections);
-  console.log('[ListsScreen] ❌ Collections error state:', collections === null);
-  console.log('[ListsScreen] 📋 Collections data:', collections?.map(c => ({
-    id: c.id,
+  // Use the same pattern as home page: Use allCollections directly and filter for user's collections
+  const collections = useMemo(() => {
+    console.log('[ListsScreen] 🔄 Processing collections...');
+    console.log('[ListsScreen] Input data:', {
+      plansLength: plans?.length || 0,
+      allCollectionsLength: allCollections?.length || 0,
+      userId: user?.id
+    });
+    
+    // Get all collections (public and private) that the user is part of
+    const userCollections: any[] = [];
+    const addedCollectionIds = new Set<string>();
+    
+    // Add private collections (plans) - user is always part of these
+    const privateCollections = plans || [];
+    privateCollections.forEach(plan => {
+      if (!addedCollectionIds.has(plan.id)) {
+        const processedPlan = {
+          ...plan,
+          memberCount: (plan as any).memberCount || getMemberCount(plan)
+        };
+        console.log(`[ListsScreen] Adding plan "${plan.name}": memberCount = ${processedPlan.memberCount}`);
+        userCollections.push(processedPlan);
+        addedCollectionIds.add(plan.id);
+      }
+    });
+    
+    // Add public collections from allCollections that the user is part of
+    const publicCollections = allCollections || [];
+    console.log('[ListsScreen] Processing public collections:', publicCollections.map((c: any) => ({
+      name: c.name,
+      collaborators: c.collaborators?.length || 0,
+      memberCount: c.memberCount
+    })));
+    
+    publicCollections.forEach(publicCollection => {
+      // Skip if already added from plans
+      if (addedCollectionIds.has(publicCollection.id)) {
+        console.log(`[ListsScreen] Skipping "${publicCollection.name}" - already added from plans`);
+        return;
+      }
+      
+      const isCreator = publicCollection.created_by === user?.id;
+      const isCollaborator = (publicCollection as any).collaborators && 
+        Array.isArray((publicCollection as any).collaborators) &&
+        (publicCollection as any).collaborators.some((member: any) => {
+          const memberId = typeof member === 'string' ? member : member?.userId || member?.id;
+          return memberId === user?.id;
+        });
+      
+      console.log(`[ListsScreen] Checking "${publicCollection.name}":`, {
+        isCreator,
+        isCollaborator,
+        collaborators: (publicCollection as any).collaborators?.length || 0,
+        memberCount: (publicCollection as any).memberCount
+      });
+      
+      if (isCreator || isCollaborator) {
+        // Preserve the memberCount that was calculated in the store
+        const processedCollection = {
+          ...publicCollection,
+          memberCount: (publicCollection as any).memberCount || getMemberCount(publicCollection)
+        };
+        console.log(`[ListsScreen] Adding public collection "${publicCollection.name}": memberCount = ${processedCollection.memberCount}`);
+        userCollections.push(processedCollection);
+        addedCollectionIds.add(publicCollection.id);
+      }
+    });
+    
+    console.log('[ListsScreen] Final result:', {
+      totalCollections: userCollections.length,
+      collectionsWithMemberCount: userCollections.filter(c => (c as any).memberCount).length,
+      sampleCollections: userCollections.slice(0, 3).map(c => ({
+        name: c.name,
+        memberCount: (c as any).memberCount
+      }))
+    });
+    
+    return userCollections;
+  }, [plans, allCollections, user?.id]);
+
+  // Debug logging for collections
+  console.log('[ListsScreen] Collections count:', collections?.length || 0);
+  console.log('[ListsScreen] Collections with memberCount:', collections?.map((c: any) => ({
     name: c.name,
-    created_by: c.created_by,
-    is_public: c.is_public,
-    restaurant_ids: c.restaurant_ids?.length || 0
+    memberCount: (c as any).memberCount,
+    collaborators: c.collaborators?.length || 0
   })));
 
   const favoriteRestaurantsList = useMemo(() => {
@@ -59,26 +163,20 @@ export default function ListsScreen() {
   }, [restaurants, favoriteRestaurants, sortBy]);
 
   const sortedCollections = useMemo(() => {
-    console.log('[ListsScreen] Sorting collections:', collections?.length || 0);
-    
     // Validate collections data
-    const validCollections = (collections || []).filter(collection => {
+    const validCollections = (collections || []).filter((collection: any) => {
       if (!collection || !collection.id || !collection.name) {
-        console.log('[ListsScreen] Filtering out invalid collection:', collection);
         return false;
       }
       return true;
     });
     
-    console.log('[ListsScreen] Valid collections:', validCollections.length);
-    
-    const sorted = validCollections.sort((a, b) => {
+    const sorted = validCollections.sort((a: any, b: any) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       return dateB - dateA;
     });
     
-    console.log('[ListsScreen] Sorted collections:', sorted.length);
     return sorted;
   }, [collections]);
 
@@ -86,13 +184,13 @@ export default function ListsScreen() {
   const filteredCollections = useMemo(() => {
     if (selectedCollectionType === 'all') return sortedCollections;
     
-    return sortedCollections.filter(collection => {
+    return sortedCollections.filter((collection: any) => {
       // Check if user is the creator (private collections)
       const isCreator = collection.created_by === user?.id;
       
       // Check if user is a member (shared collections)
-      const isMember = (collection as any).collaborators && Array.isArray((collection as any).collaborators) && 
-        (collection as any).collaborators.some((member: any) => {
+      const isMember = collection.collaborators && Array.isArray(collection.collaborators) && 
+        collection.collaborators.some((member: any) => {
           const memberId = typeof member === 'string' ? member : member?.userId || member?.id;
           return memberId === user?.id;
         });
@@ -117,7 +215,7 @@ export default function ListsScreen() {
     >
       {icon}
       <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-        {label} ({count})
+        {`${label} (${count})`}
       </Text>
     </TouchableOpacity>
   );
@@ -203,6 +301,18 @@ export default function ListsScreen() {
       </View>
 
       {activeTab === 'collections' && (
+        <View style={styles.collectionsHeader}>
+          <TouchableOpacity
+            style={styles.allCollectionsButton}
+            onPress={() => router.push('/collections' as any)}
+          >
+            <BookOpen size={16} color="#FF6B6B" />
+            <Text style={styles.allCollectionsButtonText}>Browse All Collections</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {activeTab === 'collections' && (
         <View style={styles.collectionTypeCarousel}>
           <ScrollView 
             horizontal 
@@ -214,7 +324,7 @@ export default function ListsScreen() {
               onPress={() => setSelectedCollectionType('all')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'all' && styles.activeCollectionTypeText]}>
-                All ({sortedCollections.length})
+                {`All (${sortedCollections.length})`}
               </Text>
             </TouchableOpacity>
             
@@ -223,7 +333,7 @@ export default function ListsScreen() {
               onPress={() => setSelectedCollectionType('private')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'private' && styles.activeCollectionTypeText]}>
-                Private ({sortedCollections.filter(c => c.created_by === user?.id && !(c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+                {`Private (${sortedCollections.filter((c: any) => c.created_by === user?.id && !c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
               </Text>
             </TouchableOpacity>
             
@@ -232,7 +342,7 @@ export default function ListsScreen() {
               onPress={() => setSelectedCollectionType('shared')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'shared' && styles.activeCollectionTypeText]}>
-                Shared ({sortedCollections.filter(c => (c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+                {`Shared (${sortedCollections.filter((c: any) => c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
               </Text>
             </TouchableOpacity>
             
@@ -241,7 +351,7 @@ export default function ListsScreen() {
               onPress={() => setSelectedCollectionType('public')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'public' && styles.activeCollectionTypeText]}>
-                Public ({sortedCollections.filter(c => c.is_public && c.created_by !== user?.id && !(c as any).collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})
+                {`Public (${sortedCollections.filter((c: any) => c.is_public && c.created_by !== user?.id && !c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -330,41 +440,12 @@ export default function ListsScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.collectionsGrid}>
-              {filteredCollections.map(plan => {
-                // Convert plan to collection format for display
-                const collection: Collection = {
-                  id: plan.id,
-                  name: plan.name,
-                  description: plan.description || 'A collaborative dining plan',
-                  cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-                  created_by: plan.created_by,
-                  creator_id: (plan as any).creator_id,
-                  occasion: plan.occasion,
-                  is_public: plan.is_public,
-                  likes: plan.likes || Math.floor(Math.random() * 50) + 10,
-                  equal_voting: plan.equal_voting,
-                  admin_weighted: plan.admin_weighted,
-                  expertise_weighted: plan.expertise_weighted,
-                  minimum_participation: plan.minimum_participation,
-                  voting_deadline: (plan as any).voting_deadline,
-                  allow_vote_changes: plan.allow_vote_changes,
-                  anonymous_voting: plan.anonymous_voting,
-                  vote_visibility: (plan.vote_visibility as 'public' | 'anonymous' | 'admin_only') || 'public',
-                  discussion_enabled: plan.discussion_enabled,
-                  auto_ranking_enabled: plan.auto_ranking_enabled,
-                  consensus_threshold: plan.consensus_threshold,
-                  restaurant_ids: plan.restaurant_ids,
-                  collaborators: (plan as any).collaborators || [],
-                  unique_code: (plan as any).unique_code,
-                  planned_date: (plan as any).planned_date,
-                  created_at: plan.created_at,
-                  updated_at: plan.updated_at
-                };
+              {filteredCollections.map((collection: any) => {
                 return (
-                  <View key={plan.id} style={styles.collectionCardContainer}>
+                  <View key={collection.id} style={styles.collectionCardContainer}>
                     <CollectionCard
                       collection={collection}
-                      onPress={() => router.push(`/collection/${plan.id}` as any)}
+                      onPress={() => router.push(`/collection/${collection.id}` as any)}
                     />
                     {isCollectionOwner(collection) ? (
                       // Show delete button for owners
@@ -678,6 +759,29 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     color: '#FF6B6B',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  collectionsHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  allCollectionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    gap: 8,
+  },
+  allCollectionsButtonText: {
+    color: '#FF6B6B',
+    fontSize: 14,
     fontWeight: '600',
   },
   collectionTypeCarousel: {

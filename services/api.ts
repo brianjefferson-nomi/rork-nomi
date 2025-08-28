@@ -8,8 +8,8 @@ const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '20963faf74mshd7e2b
 const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || 'F99007CEF189438793FFD5D7B484839A';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
 // Foursquare API keys with fallback mechanism
-const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'EAAKV5FPOD1JMYUGWSULS1C05H1M4GVHPWFEPREMTT3MP5SU';
-const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || 'VUKNP0GPD5N15RZDEJVWQH0JOWKGX5GJL42NJIOSFKQERMMX';
+const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'DGV1DNHVYV2EGZY1ZRHVP4EMS2PA052UJ4IXX1WAQRKUSWTT';
+const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || 'fsq3iPnP2vBvgyThDFd5/cawBsDYxFPf37L6rOvnZjA7zvM=';
 const FOURSQUARE_FALLBACK_KEY = 'fsq3iPnP2vBvgyThDFd5/cawBsDYxFPf37L6rOvnZjA7zvM=';
 const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
 const FOURSQUARE_NEW_BASE_URL = 'https://api.foursquare.com/v2';
@@ -43,11 +43,95 @@ const WORLDWIDE_RESTAURANTS_HOST = 'worldwide-restaurants.p.rapidapi.com';
 const UBER_EATS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 
+// Development mode - disable external APIs to use local data only
+// Force development mode to true for now to ensure we use local data
+const DEV_MODE = true; // process.env.NODE_ENV === 'development' || process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+// API Rate Limiting Configuration
+const API_RATE_LIMITS = {
+  rapidapi: {
+    requestsPerMinute: 10,
+    requestsPerHour: 100,
+    requestsPerDay: 1000
+  },
+  foursquare: {
+    requestsPerMinute: 5,
+    requestsPerHour: 50,
+    requestsPerDay: 500
+  },
+  mapbox: {
+    requestsPerMinute: 10,
+    requestsPerHour: 100,
+    requestsPerDay: 1000
+  },
+  yelp: {
+    requestsPerMinute: 5,
+    requestsPerHour: 50,
+    requestsPerDay: 500
+  },
+  tripadvisor: {
+    requestsPerMinute: 5,
+    requestsPerHour: 50,
+    requestsPerDay: 500
+  }
+};
+
+// API Usage Tracking
+const apiUsageTracker = {
+  rapidapi: { minute: 0, hour: 0, day: 0, lastReset: Date.now() },
+  foursquare: { minute: 0, hour: 0, day: 0, lastReset: Date.now() },
+  mapbox: { minute: 0, hour: 0, day: 0, lastReset: Date.now() },
+  yelp: { minute: 0, hour: 0, day: 0, lastReset: Date.now() },
+  tripadvisor: { minute: 0, hour: 0, day: 0, lastReset: Date.now() }
+};
+
+// Rate limiting function
+const checkRateLimit = (apiType: keyof typeof API_RATE_LIMITS): boolean => {
+  const now = Date.now();
+  const tracker = apiUsageTracker[apiType];
+  const limits = API_RATE_LIMITS[apiType];
+  
+  // Reset counters if needed
+  if (now - tracker.lastReset > 60000) { // 1 minute
+    tracker.minute = 0;
+    tracker.lastReset = now;
+  }
+  if (now - tracker.lastReset > 3600000) { // 1 hour
+    tracker.hour = 0;
+  }
+  if (now - tracker.lastReset > 86400000) { // 1 day
+    tracker.day = 0;
+  }
+  
+  // Check limits
+  if (tracker.minute >= limits.requestsPerMinute) {
+    console.warn(`[API] Rate limit exceeded for ${apiType} (minute): ${tracker.minute}/${limits.requestsPerMinute}`);
+    return false;
+  }
+  if (tracker.hour >= limits.requestsPerHour) {
+    console.warn(`[API] Rate limit exceeded for ${apiType} (hour): ${tracker.hour}/${limits.requestsPerHour}`);
+    return false;
+  }
+  if (tracker.day >= limits.requestsPerDay) {
+    console.warn(`[API] Rate limit exceeded for ${apiType} (day): ${tracker.day}/${limits.requestsPerDay}`);
+    return false;
+  }
+  
+  // Increment counters
+  tracker.minute++;
+  tracker.hour++;
+  tracker.day++;
+  
+  return true;
+};
+
 // Log API key status for debugging
+console.log('[API] Development Mode:', DEV_MODE ? '✅ ENABLED (using local data only)' : '❌ DISABLED (using external APIs)');
 console.log('[API] RapidAPI Key loaded:', RAPIDAPI_KEY ? '✅ YES' : '❌ NO');
 console.log('[API] TripAdvisor Key loaded:', TRIPADVISOR_API_KEY ? '✅ YES' : '❌ NO');
 console.log('[API] Foursquare Client ID loaded:', FOURSQUARE_CLIENT_ID ? '✅ YES' : '❌ NO');
-console.log('[API] Note: Yelp API3 may return 403 errors if your RapidAPI subscription does not include this service');
+console.log('[API] Mapbox Key loaded:', MAPBOX_API_KEY ? '✅ YES' : '❌ NO');
+console.log('[API] Note: External APIs are disabled in development mode to preserve API limits');
 
 // Foursquare API key validation with fallback
 const validateFoursquareKey = () => {
@@ -2096,6 +2180,20 @@ export const searchFoursquareRestaurants = async (
   try {
     console.log('[Foursquare] Searching for restaurants:', query);
     
+    // In development mode, use local data only
+    if (DEV_MODE) {
+      console.log('[Foursquare] 🏠 Using local data only (development mode)');
+      return await searchLocalRestaurants(query, undefined, 20);
+    }
+    
+    // Check rate limits for Foursquare API
+    if (!checkRateLimit('foursquare')) {
+      console.log('[Foursquare] ⚠️ Rate limit exceeded, using local data');
+      return await searchLocalRestaurants(query, undefined, 20);
+    }
+    
+    console.log('[Foursquare] 🌐 Using external API (production mode)');
+    
     // Try v2 API first (more reliable)
     console.log('[Foursquare] Using v2 API as primary method');
     const v2Results = await searchFoursquareRestaurantsV2(query, lat, lng, radius);
@@ -2111,8 +2209,9 @@ export const searchFoursquareRestaurants = async (
     
   } catch (error) {
     console.error('[Foursquare] Error searching restaurants:', error);
-    // Return empty array to prevent app crashes
-    return [];
+    // Fallback to local data
+    console.log('[Foursquare] Falling back to local data');
+    return await searchLocalRestaurants(query, undefined, 20);
   }
 };
 
@@ -2979,6 +3078,88 @@ export const reverseGeocodeLocation = async (lat: number, lng: number): Promise<
   }
 };
 
+// Local restaurant search function for development mode
+const searchLocalRestaurants = async (
+  query: string, 
+  location?: string, 
+  limit: number = 20
+): Promise<any[]> => {
+  try {
+    console.log('[API] 🔍 Searching local restaurants...');
+    console.log('[API] Query:', query);
+    console.log('[API] Limit:', limit);
+    
+    // Get restaurants from database
+    const { data: restaurants, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (error) {
+      console.error('[API] Error fetching local restaurants:', error);
+      return [];
+    }
+    
+    console.log(`[API] Total restaurants in database: ${restaurants?.length || 0}`);
+    
+    if (!restaurants || restaurants.length === 0) {
+      console.log('[API] No local restaurants found in database');
+      return [];
+    }
+    
+    // Show first few restaurants for debugging
+    console.log('[API] First 3 restaurants in database:', restaurants.slice(0, 3).map(r => ({ name: r.name, cuisine: r.cuisine })));
+    
+    // Filter restaurants based on query
+    const queryLower = query.toLowerCase();
+    console.log('[API] Searching for query:', queryLower);
+    
+    const filteredRestaurants = restaurants.filter(restaurant => 
+      restaurant.name.toLowerCase().includes(queryLower) ||
+      restaurant.cuisine.toLowerCase().includes(queryLower) ||
+      restaurant.neighborhood.toLowerCase().includes(queryLower) ||
+      restaurant.address.toLowerCase().includes(queryLower)
+    );
+    
+    console.log(`[API] Filtered restaurants: ${filteredRestaurants.length}`);
+    console.log('[API] Filtered restaurant names:', filteredRestaurants.map(r => r.name));
+    
+    // Transform to match the expected format
+    const transformedRestaurants = filteredRestaurants.slice(0, limit).map(restaurant => ({
+      id: restaurant.id,
+      name: restaurant.name,
+      cuisine: restaurant.cuisine,
+      priceRange: restaurant.price_range,
+      rating: restaurant.rating,
+      location: {
+        address: restaurant.address,
+        neighborhood: restaurant.neighborhood,
+        formattedAddress: restaurant.address
+      },
+      images: restaurant.images || [],
+      description: restaurant.description,
+      hours: restaurant.hours,
+      phone: restaurant.phone,
+      website: restaurant.website,
+      vibe: restaurant.vibe || [],
+      menuHighlights: restaurant.menu_highlights || [],
+      reviews: restaurant.reviews || [],
+      aiDescription: restaurant.ai_description,
+      aiVibes: restaurant.ai_vibes || [],
+      aiTopPicks: restaurant.ai_top_picks || [],
+      source: 'local',
+      sourceId: restaurant.restaurant_code
+    }));
+    
+    console.log(`[API] Found ${transformedRestaurants.length} local restaurants matching "${query}"`);
+    console.log('[API] Returning restaurants:', transformedRestaurants.map(r => ({ name: r.name, cuisine: r.cuisine, source: r.source })));
+    return transformedRestaurants;
+  } catch (error) {
+    console.error('[API] Error in local restaurant search:', error);
+    return [];
+  }
+};
+
 // Enhanced restaurant search with Mapbox Search Box API and Geocoding API
 export const searchRestaurantsWithAPI = async (
   query: string, 
@@ -2986,9 +3167,24 @@ export const searchRestaurantsWithAPI = async (
   limit: number = 20
 ): Promise<any[]> => {
   try {
-    console.log('[API] Searching restaurants with Mapbox APIs');
+    console.log('[API] Searching restaurants...');
     console.log('[API] Query:', query);
     console.log('[API] Location:', location);
+    console.log('[API] Development Mode:', DEV_MODE ? 'ENABLED' : 'DISABLED');
+    
+    // In development mode, use local data only
+    if (DEV_MODE) {
+      console.log('[API] 🏠 Using local data only (development mode)');
+      return await searchLocalRestaurants(query, location, limit);
+    }
+    
+    // Check rate limits for external APIs
+    if (!checkRateLimit('mapbox')) {
+      console.log('[API] ⚠️ Mapbox rate limit exceeded, using local data');
+      return await searchLocalRestaurants(query, location, limit);
+    }
+    
+    console.log('[API] 🌐 Using external APIs (production mode)');
     
     // Get user location coordinates
     let lat = 40.7128; // Default to NYC
@@ -3054,16 +3250,9 @@ export const searchRestaurantsWithAPI = async (
   } catch (error) {
     console.error('[API] Error in Mapbox API search:', error);
     
-    // Fallback to Restaurants API
-    try {
-      console.log('[API] Falling back to Restaurants API');
-      const apiResults = await searchRestaurantsAPI(query, location, limit);
-      const transformedResults = apiResults.map(transformRestaurantsAPIData).filter(Boolean);
-      return transformedResults;
-    } catch (fallbackError) {
-      console.error('[API] Fallback API also failed:', fallbackError);
-      return [];
-    }
+    // Fallback to local data
+    console.log('[API] Falling back to local data');
+    return await searchLocalRestaurants(query, location, limit);
   }
 };
 
@@ -3077,6 +3266,20 @@ export const searchYelpRestaurants = async (
 ): Promise<any[]> => {
   try {
     console.log('[Yelp API] Searching restaurants in:', location);
+    
+    // In development mode, use local data only
+    if (DEV_MODE) {
+      console.log('[Yelp API] 🏠 Using local data only (development mode)');
+      return await searchLocalRestaurants('restaurant', location, limit);
+    }
+    
+    // Check rate limits for Yelp API
+    if (!checkRateLimit('yelp')) {
+      console.log('[Yelp API] ⚠️ Rate limit exceeded, using local data');
+      return await searchLocalRestaurants('restaurant', location, limit);
+    }
+    
+    console.log('[Yelp API] 🌐 Using external API (production mode)');
     
     const params = new URLSearchParams({
       location: encodeURIComponent(location),
@@ -3106,7 +3309,9 @@ export const searchYelpRestaurants = async (
     return data.businesses || [];
   } catch (error) {
     console.error('[Yelp API] Error searching restaurants:', error);
-    return [];
+    // Fallback to local data
+    console.log('[Yelp API] Falling back to local data');
+    return await searchLocalRestaurants('restaurant', location, limit);
   }
 };
 
@@ -4045,6 +4250,20 @@ export const searchTripAdvisorRestaurants = async (
   try {
     console.log('[TripAdvisor RapidAPI] Searching for:', query, 'in:', location);
     
+    // In development mode, use local data only
+    if (DEV_MODE) {
+      console.log('[TripAdvisor RapidAPI] 🏠 Using local data only (development mode)');
+      return await searchLocalRestaurants(query, location, limit);
+    }
+    
+    // Check rate limits for TripAdvisor API
+    if (!checkRateLimit('tripadvisor')) {
+      console.log('[TripAdvisor RapidAPI] ⚠️ Rate limit exceeded, using local data');
+      return await searchLocalRestaurants(query, location, limit);
+    }
+    
+    console.log('[TripAdvisor RapidAPI] 🌐 Using external API (production mode)');
+    
     const params = new URLSearchParams({
       query,
       limit: limit.toString()
@@ -4075,7 +4294,9 @@ export const searchTripAdvisorRestaurants = async (
     return restaurants;
   } catch (error) {
     console.error('[TripAdvisor RapidAPI] Error searching restaurants:', error);
-    return [];
+    // Fallback to local data
+    console.log('[TripAdvisor RapidAPI] Falling back to local data');
+    return await searchLocalRestaurants(query, location, limit);
   }
 };
 
@@ -5273,138 +5494,9 @@ export const searchMapboxRestaurants = async (
   try {
     console.log(`[Mapbox Search Box] Searching restaurants for: "${query}"`);
     
-    const sessionToken = generateSessionToken();
-    const proximity = lat && lng ? `${lng},${lat}` : undefined;
-    
-    // Build search queries to try
-    const searchQueries = [
-      query,
-      `${query} restaurant`,
-      `restaurant ${query}`
-    ];
-    
-    for (const searchQuery of searchQueries) {
-      // Use Search Box API /suggest endpoint for autocomplete search
-      const suggestParams = new URLSearchParams({
-        q: searchQuery,
-        access_token: MAPBOX_API_KEY,
-        session_token: sessionToken,
-        limit: Math.min(limit, 10).toString(), // Search Box API limit is 10
-        language: 'en'
-      });
-      
-      if (proximity) {
-        suggestParams.append('proximity', proximity);
-      }
-      
-      const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?${suggestParams.toString()}`;
-      console.log('[Mapbox Search Box] Trying suggest URL:', suggestUrl);
-      
-      try {
-        const suggestResponse = await fetch(suggestUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Rork-Nomi-App/1.0'
-          }
-        });
-        
-        if (suggestResponse.ok) {
-          const suggestData = await suggestResponse.json();
-          const suggestions = suggestData.suggestions || [];
-          
-          // Filter for restaurants and POIs
-          const restaurantSuggestions = suggestions.filter((place: any) => {
-            // Skip if no name
-            if (!place.name) return false;
-            
-            const placeName = place.name.toLowerCase();
-            const placeType = place.properties?.category?.toLowerCase() || '';
-            const poiCategory = place.properties?.poi_category?.toLowerCase() || '';
-            const poiType = place.properties?.poi_type?.toLowerCase() || '';
-            
-            // Check if it's a restaurant or food-related POI
-            const isRestaurant = 
-              placeName.includes('restaurant') || 
-              placeName.includes('cafe') || 
-              placeName.includes('bar') || 
-              placeName.includes('pizza') ||
-              placeName.includes('diner') ||
-              placeName.includes('bistro') ||
-              placeName.includes('grill') ||
-              placeName.includes('kitchen') ||
-              placeType.includes('restaurant') ||
-              placeType.includes('food') ||
-              placeType.includes('dining') ||
-              poiCategory.includes('restaurant') ||
-              poiCategory.includes('food') ||
-              poiCategory.includes('dining') ||
-              poiType.includes('restaurant') ||
-              poiType.includes('food') ||
-              poiType.includes('dining');
-              
-            return isRestaurant;
-          });
-          
-          if (restaurantSuggestions.length > 0) {
-            console.log(`[Mapbox Search Box] ✅ Found ${restaurantSuggestions.length} restaurant suggestions`);
-            
-            // Get full details for each suggestion using /retrieve endpoint
-            const detailedResults = [];
-            for (const suggestion of restaurantSuggestions.slice(0, 5)) { // Limit to 5 to avoid too many API calls
-              try {
-                const retrieveParams = new URLSearchParams({
-                  access_token: MAPBOX_API_KEY,
-                  session_token: sessionToken
-                });
-                
-                const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?${retrieveParams.toString()}`;
-                console.log('[Mapbox Search Box] Retrieving details for:', suggestion.name);
-                
-                const retrieveResponse = await fetch(retrieveUrl, {
-                  method: 'GET',
-                  headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'Rork-Nomi-App/1.0'
-                  }
-                });
-                
-                if (retrieveResponse.ok) {
-                  const retrieveData = await retrieveResponse.json();
-                  detailedResults.push(retrieveData);
-                } else {
-                  console.log(`[Mapbox Search Box] Retrieve failed for ${suggestion.name}: ${retrieveResponse.status}`);
-                }
-              } catch (error) {
-                console.log(`[Mapbox Search Box] Error retrieving details for ${suggestion.name}:`, error);
-              }
-            }
-            
-            if (detailedResults.length > 0) {
-              console.log(`[Mapbox Search Box] ✅ Success - Retrieved ${detailedResults.length} detailed restaurant results`);
-              // Extract features from each detailed result (they are FeatureCollections)
-              const allFeatures = [];
-              for (const result of detailedResults) {
-                if (result.features && Array.isArray(result.features)) {
-                  allFeatures.push(...result.features);
-                }
-              }
-              console.log(`[Mapbox Search Box] Extracted ${allFeatures.length} features from detailed results`);
-              return allFeatures;
-            }
-          }
-        } else {
-          console.log(`[Mapbox Search Box] Suggest URL failed: ${suggestResponse.status} ${suggestResponse.statusText}`);
-          const errorText = await suggestResponse.text();
-          console.log('[Mapbox Search Box] Error details:', errorText);
-        }
-      } catch (error) {
-        console.log('[Mapbox Search Box] Error with suggest URL:', error instanceof Error ? error.message : String(error));
-      }
-    }
-    
-    console.error('[Mapbox Search Box] API failed for search - no restaurants found');
-    return [];
+    // Mapbox API disabled - using local data only
+    console.log('[Mapbox Search Box] 🏠 Using local data only (Mapbox API disabled)');
+    return await searchLocalRestaurants(query, undefined, limit);
     
   } catch (error) {
     console.error('[Mapbox Search Box] Error searching restaurants:', error);
@@ -5422,136 +5514,9 @@ export const getMapboxNearbyRestaurants = async (
   try {
     console.log(`[Mapbox Search Box] Getting nearby restaurants at ${lat}, ${lng}`);
     
-    const sessionToken = generateSessionToken();
-    const proximity = `${lng},${lat}`;
-    
-    const searchQueries = [
-      'restaurant',
-      'food',
-      'dining',
-      'cafe'
-    ];
-    
-    for (const query of searchQueries) {
-      // Use Search Box API /suggest endpoint for nearby search
-      const suggestParams = new URLSearchParams({
-        q: query,
-        access_token: MAPBOX_API_KEY,
-        session_token: sessionToken,
-        limit: Math.min(limit, 10).toString(), // Search Box API limit is 10
-        language: 'en',
-        proximity: proximity
-      });
-      
-      const suggestUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?${suggestParams.toString()}`;
-      console.log('[Mapbox Search Box] Trying nearby suggest URL:', suggestUrl);
-      
-      try {
-        const suggestResponse = await fetch(suggestUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Rork-Nomi-App/1.0'
-          }
-        });
-        
-        if (suggestResponse.ok) {
-          const suggestData = await suggestResponse.json();
-          const suggestions = suggestData.suggestions || [];
-          
-          // Filter for restaurants and POIs
-          const restaurantSuggestions = suggestions.filter((place: any) => {
-            // Skip if no name
-            if (!place.name) return false;
-            
-            const placeName = place.name.toLowerCase();
-            const placeType = place.properties?.category?.toLowerCase() || '';
-            const poiCategory = place.properties?.poi_category?.toLowerCase() || '';
-            const poiType = place.properties?.poi_type?.toLowerCase() || '';
-            
-            // Check if it's a restaurant or food-related POI
-            const isRestaurant = 
-              placeName.includes('restaurant') || 
-              placeName.includes('cafe') || 
-              placeName.includes('bar') || 
-              placeName.includes('pizza') ||
-              placeName.includes('diner') ||
-              placeName.includes('bistro') ||
-              placeName.includes('grill') ||
-              placeName.includes('kitchen') ||
-              placeName.includes('food') ||
-              placeType.includes('restaurant') ||
-              placeType.includes('food') ||
-              placeType.includes('dining') ||
-              poiCategory.includes('restaurant') ||
-              poiCategory.includes('food') ||
-              poiCategory.includes('dining') ||
-              poiType.includes('restaurant') ||
-              poiType.includes('food') ||
-              poiType.includes('dining');
-              
-            return isRestaurant;
-          });
-          
-          if (restaurantSuggestions.length > 0) {
-            console.log(`[Mapbox Search Box] ✅ Found ${restaurantSuggestions.length} nearby restaurant suggestions`);
-            
-            // Get full details for each suggestion using /retrieve endpoint
-            const detailedResults = [];
-            for (const suggestion of restaurantSuggestions.slice(0, 5)) { // Limit to 5 to avoid too many API calls
-              try {
-                const retrieveParams = new URLSearchParams({
-                  access_token: MAPBOX_API_KEY,
-                  session_token: sessionToken
-                });
-                
-                const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${suggestion.mapbox_id}?${retrieveParams.toString()}`;
-                console.log('[Mapbox Search Box] Retrieving nearby details for:', suggestion.name);
-                
-                const retrieveResponse = await fetch(retrieveUrl, {
-                  method: 'GET',
-                  headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'Rork-Nomi-App/1.0'
-                  }
-                });
-                
-                if (retrieveResponse.ok) {
-                  const retrieveData = await retrieveResponse.json();
-                  detailedResults.push(retrieveData);
-                } else {
-                  console.log(`[Mapbox Search Box] Retrieve failed for ${suggestion.name}: ${retrieveResponse.status}`);
-                }
-              } catch (error) {
-                console.log(`[Mapbox Search Box] Error retrieving nearby details for ${suggestion.name}:`, error);
-              }
-            }
-            
-            if (detailedResults.length > 0) {
-              console.log(`[Mapbox Search Box] ✅ Success - Retrieved ${detailedResults.length} detailed nearby restaurant results`);
-              // Extract features from each detailed result (they are FeatureCollections)
-              const allFeatures = [];
-              for (const result of detailedResults) {
-                if (result.features && Array.isArray(result.features)) {
-                  allFeatures.push(...result.features);
-                }
-              }
-              console.log(`[Mapbox Search Box] Extracted ${allFeatures.length} features from detailed results`);
-              return allFeatures;
-            }
-          }
-        } else {
-          console.log(`[Mapbox Search Box] Nearby suggest URL failed: ${suggestResponse.status} ${suggestResponse.statusText}`);
-          const errorText = await suggestResponse.text();
-          console.log('[Mapbox Search Box] Error details:', errorText);
-        }
-      } catch (error) {
-        console.log('[Mapbox Search Box] Error with nearby suggest URL:', error instanceof Error ? error.message : String(error));
-      }
-    }
-    
-    console.error('[Mapbox Search Box] API failed for nearby search - no restaurants found');
-    return [];
+    // Mapbox API disabled - using local data only
+    console.log('[Mapbox Search Box] 🏠 Using local data only (Mapbox API disabled)');
+    return await searchLocalRestaurants('restaurant', undefined, limit);
     
   } catch (error) {
     console.error('[Mapbox Search Box] Error getting nearby restaurants:', error);
@@ -5564,41 +5529,8 @@ export const getMapboxRestaurantDetails = async (placeId: string): Promise<any> 
   try {
     console.log('[Mapbox] Getting details for restaurant:', placeId);
     
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${placeId}.json?access_token=${MAPBOX_API_KEY}`;
-    
-    console.log('[Mapbox] Using Places API for restaurant details');
-    
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Rork-Nomi-App/1.0'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const result = data.features?.[0];
-        
-        if (result) {
-          console.log('[Mapbox] ✅ Success - Retrieved restaurant details');
-          return result;
-        } else {
-          console.error('[Mapbox] No restaurant found with the provided ID');
-        }
-      } else {
-        console.error(`[Mapbox] ❌ API failed: ${response.status} ${response.statusText}`);
-        
-        if (response.status === 401) {
-          console.error('[Mapbox] Authentication failed - check API key');
-        }
-      }
-    } catch (error) {
-      console.error('[Mapbox] Error getting restaurant details:', error);
-    }
-    
-    console.error('[Mapbox] API failed for details - no restaurant details available');
+    // Mapbox API disabled - using local data only
+    console.log('[Mapbox] 🏠 Using local data only (Mapbox API disabled)');
     return null;
     
   } catch (error) {
@@ -5618,39 +5550,9 @@ export const searchMapboxRestaurantsByCuisine = async (
   try {
     console.log(`[Mapbox] Searching ${cuisine} restaurants`);
     
-    const query = `${cuisine} restaurant`;
-    const encodedQuery = encodeURIComponent(query);
-    const proximity = lat && lng ? `&proximity=${lng},${lat}` : '';
-    const limitParam = `&limit=${limit}`;
-    
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_API_KEY}&types=poi&poi_category=restaurant${proximity}${limitParam}`;
-    
-    console.log('[Mapbox] Using Places API for cuisine-specific restaurant search');
-    
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Rork-Nomi-App/1.0'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const results = data.features || [];
-        
-        console.log(`[Mapbox] ✅ Success - Found ${results.length} ${cuisine} restaurants`);
-        return results;
-      } else {
-        console.error(`[Mapbox] ❌ API failed: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('[Mapbox] Error searching restaurants by cuisine:', error);
-    }
-    
-    console.error('[Mapbox] API failed for cuisine search - no restaurants found');
-    return [];
+    // Mapbox API disabled - using local data only
+    console.log('[Mapbox] 🏠 Using local data only (Mapbox API disabled)');
+    return await searchLocalRestaurants(cuisine, undefined, limit);
     
   } catch (error) {
     console.error('[Mapbox] Error searching restaurants by cuisine:', error);

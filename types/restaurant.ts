@@ -27,6 +27,9 @@ export interface Restaurant {
   website?: string;
   priceLevel?: number;
   vibeTags?: string[];
+  restaurant_code?: string;
+  city?: string;
+  state?: string;
   // Enhanced location structure
   location?: {
     address: string;
@@ -78,6 +81,7 @@ export interface Collection {
   planned_date?: string;
   created_at: string;
   updated_at: string;
+  views?: number;
   // Legacy fields for backward compatibility
   coverImage?: string;
   restaurants?: string[];

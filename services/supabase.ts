@@ -376,7 +376,7 @@ export const dbHelpers = {
     return data;
   },
 
-  // Collection/Plan operations
+  // Plan operations (legacy - will be consolidated)
   async createPlan(planData: {
     name: string;
     description?: string;
@@ -535,7 +535,7 @@ export const dbHelpers = {
               ...collection,
               collaborators
             };
-          } catch (error) {
+    } catch (error) {
             console.error(`[getUserPlans] Error fetching members for collection ${collection.id}:`, error);
             console.error(`[getUserPlans] Error details for collection ${collection.id}:`, {
               message: error instanceof Error ? error.message : 'Unknown error',
@@ -568,6 +568,8 @@ export const dbHelpers = {
   },
 
   async getAllCollections() {
+    console.log(`[getAllCollections] Starting database query... (${new Date().toISOString()})`);
+    
     // Get all public collections for discovery
     const { data, error } = await supabase
       .from('collections')
@@ -575,30 +577,31 @@ export const dbHelpers = {
       .eq('is_public', true)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error('[getAllCollections] Database error:', error);
+      throw error;
+    }
     
-    // For each collection, get its members to populate the collaborators field
-    const collectionsWithMembers = await Promise.all(
-      (data || []).map(async (collection) => {
-        try {
-          const members = await dbHelpers.getCollectionMembers(collection.id);
-          return {
-            ...collection,
-            collaborators: members.map((member: any) => member._internalUserId || member.userId || member.id)
-          };
-        } catch (error) {
-          console.error(`[getAllCollections] Error fetching members for collection ${collection.id}:`, error);
-          console.error(`[getAllCollections] Error details for collection ${collection.id}:`, {
-            message: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined
-          });
-          return {
-            ...collection,
-            collaborators: []
-          };
-        }
-      })
-    );
+    console.log('[getAllCollections] Raw data from database:', data?.map(c => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      created_at: c.created_at
+    })));
+    
+    // Use the collaborators field that's already populated in the collections table
+    const collectionsWithMembers = (data || []).map((collection) => {
+      return {
+        ...collection,
+        collaborators: collection.collaborators || []
+      };
+    });
+    
+    console.log('[getAllCollections] Processed collections:', collectionsWithMembers?.map(c => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0
+    })));
     
     return collectionsWithMembers;
   },
@@ -618,22 +621,22 @@ export const dbHelpers = {
     // Get specific restaurants by their IDs
     if (!restaurantIds || restaurantIds.length === 0) {
       console.log('[getRestaurantsByIds] No restaurant IDs provided');
-      return [];
-    }
-    
+        return [];
+      }
+      
     console.log('[getRestaurantsByIds] Fetching restaurants with IDs:', restaurantIds);
     
     const { data, error } = await supabase
       .from('restaurants')
-      .select('*')
+        .select('*')
       .in('id', restaurantIds)
       .order('name', { ascending: true });
-    
-    if (error) {
+      
+      if (error) {
       console.error('[getRestaurantsByIds] Database error:', error);
-      throw error;
-    }
-    
+        throw error;
+      }
+      
     console.log('[getRestaurantsByIds] Found restaurants:', data?.length || 0);
     console.log('[getRestaurantsByIds] Restaurant data:', data);
     
@@ -656,7 +659,7 @@ export const dbHelpers = {
     return data || [];
   },
 
-  async updatePlan(id: string, updates: Partial<Database['public']['Tables']['collections']['Update']>) {
+  async updateCollection(id: string, updates: Partial<Database['public']['Tables']['collections']['Update']>) {
     const { data, error } = await supabase
       .from('collections')
       .update(updates)
@@ -668,10 +671,10 @@ export const dbHelpers = {
     return data;
   },
 
-  async deletePlan(id: string, userId: string) {
-    const { error } = await supabase
-      .from('collections')
-      .delete()
+  async deleteCollection(id: string, userId: string) {
+      const { error } = await supabase
+        .from('collections')
+        .delete()
       .eq('id', id)
       .eq('created_by', userId);
     
@@ -679,12 +682,12 @@ export const dbHelpers = {
   },
 
   async leaveCollection(collectionId: string, userId: string) {
-    const { error } = await supabase
-      .from('collection_members')
-      .delete()
-      .eq('collection_id', collectionId)
-      .eq('user_id', userId);
-    
+      const { error } = await supabase
+        .from('collection_members')
+        .delete()
+        .eq('collection_id', collectionId)
+        .eq('user_id', userId);
+      
     if (error) throw error;
   },
 
@@ -733,9 +736,9 @@ export const dbHelpers = {
       is_verified: false,
       expertise: []
     };
-    
-    const { data, error } = await supabase
-      .from('collection_members')
+      
+      const { data, error } = await supabase
+        .from('collection_members')
       .insert(memberData)
       .select()
       .single();
@@ -903,7 +906,7 @@ export const dbHelpers = {
   async getCollectionVotesWithUsers(collectionId: string) {
     try {
       const { data, error } = await supabase
-        .from('restaurant_votes')
+      .from('restaurant_votes')
         .select(`
           *,
           users:user_id (
@@ -948,9 +951,9 @@ export const dbHelpers = {
       let checkError = null;
       
       try {
-        const { data, error } = await supabase
+    const { data, error } = await supabase
           .from('restaurant_votes')
-          .select('*')
+      .select('*')
           .eq('restaurant_id', voteData.restaurant_id)
           .eq('user_id', voteData.user_id)
           .eq('collection_id', voteData.collection_id)
@@ -971,7 +974,7 @@ export const dbHelpers = {
           // Try a simpler query without the single() constraint
           const { data: existingVotes, error: altError } = await supabase
             .from('restaurant_votes')
-            .select('*')
+      .select('*')
             .eq('restaurant_id', voteData.restaurant_id)
             .eq('user_id', voteData.user_id)
             .eq('collection_id', voteData.collection_id);
@@ -992,7 +995,7 @@ export const dbHelpers = {
       if (existingVote) {
         // Update existing vote
         console.log('[voteRestaurant] Updating existing vote from', existingVote.vote, 'to', voteData.vote);
-        const { data, error } = await supabase
+    const { data, error } = await supabase
           .from('restaurant_votes')
           .update({
             vote: voteData.vote,
@@ -1000,9 +1003,9 @@ export const dbHelpers = {
             updated_at: new Date().toISOString()
           })
           .eq('id', existingVote.id)
-          .select()
-          .single();
-        
+      .select()
+      .single();
+    
         if (error) {
           console.error('[voteRestaurant] Error updating vote:', error);
           throw new Error(`Failed to update vote: ${error.message}`);
@@ -1012,13 +1015,13 @@ export const dbHelpers = {
       } else {
         // Insert new vote
         console.log('[voteRestaurant] Inserting new vote');
-        const { data, error } = await supabase
+    const { data, error } = await supabase
           .from('restaurant_votes')
           .insert(voteData)
-          .select()
-          .single();
-        
-        if (error) {
+      .select()
+      .single();
+    
+    if (error) {
           console.error('[voteRestaurant] Error inserting vote:', error);
           throw new Error(`Failed to insert vote: ${error.message}`);
         }
@@ -1059,8 +1062,8 @@ export const dbHelpers = {
     try {
       console.log('[getCollectionDiscussions] Starting query for collectionId:', collectionId);
       
-      let query = supabase
-        .from('restaurant_discussions')
+    let query = supabase
+      .from('restaurant_discussions')
         .select(`
           *,
           users:user_id (
@@ -1069,14 +1072,14 @@ export const dbHelpers = {
             email
           )
         `)
-        .eq('collection_id', collectionId);
-      
-      if (restaurantId) {
-        query = query.eq('restaurant_id', restaurantId);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
+      .eq('collection_id', collectionId);
+    
+    if (restaurantId) {
+      query = query.eq('restaurant_id', restaurantId);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
       console.log('[getCollectionDiscussions] Query result:', {
         dataLength: data?.length || 0,
         error: error,
@@ -1088,8 +1091,8 @@ export const dbHelpers = {
           collectionId: data[0].collection_id
         } : null
       });
-      
-      if (error) {
+    
+    if (error) {
         console.error('[getCollectionDiscussions] Error:', error);
         return [];
       }
@@ -1154,13 +1157,13 @@ export const dbHelpers = {
       .from('restaurant_discussions')
       .delete()
       .eq('id', discussionId);
-    
+
     if (error) throw error;
   },
 
   async getRestaurantComments(collectionId: string, restaurantId: string) {
     try {
-      const { data, error } = await supabase
+    const { data, error } = await supabase
         .from('restaurant_discussions')
         .select(`
           *,
@@ -1170,10 +1173,10 @@ export const dbHelpers = {
             email
           )
         `)
-        .eq('collection_id', collectionId)
+      .eq('collection_id', collectionId)
         .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false });
-      
+      .order('created_at', { ascending: false });
+    
       if (error) {
         console.error('[getRestaurantComments] Error:', error);
         return [];
@@ -1229,12 +1232,12 @@ export const dbHelpers = {
         return [];
       }
       
-      const { data, error } = await supabase
-        .from('users')
-        .select('favorite_restaurants')
-        .eq('id', userId)
-        .single();
-      
+    const { data, error } = await supabase
+      .from('users')
+      .select('favorite_restaurants')
+      .eq('id', userId)
+      .single();
+    
       if (error) {
         console.error('[getUserFavorites] Database error:', error);
         return [];
@@ -1313,13 +1316,13 @@ export const dbHelpers = {
       if (collectionType === 'private') {
         // Private collections: collections created by the user with collection_type = 'private'
         const { data, error } = await supabase
-          .from('collections')
-          .select('*')
+        .from('collections')
+        .select('*')
           .eq('created_by', userId)
           .eq('collection_type', 'private')
-          .order('created_at', { ascending: false });
-        
-        if (error) {
+        .order('created_at', { ascending: false });
+      
+      if (error) {
           console.error('[getCollectionsByType] Error fetching private collections:', error);
           return [];
         }
@@ -1330,10 +1333,10 @@ export const dbHelpers = {
       } else if (collectionType === 'shared') {
         // Shared collections: collections where user is a member and collection_type = 'shared'
         const { data: memberCollections, error: memberError } = await supabase
-          .from('collection_members')
+        .from('collection_members')
           .select('collection_id')
-          .eq('user_id', userId);
-        
+        .eq('user_id', userId);
+      
         if (memberError) {
           console.error('[getCollectionsByType] Error fetching member collections:', memberError);
           return [];
@@ -1355,7 +1358,7 @@ export const dbHelpers = {
           
           console.log('[getCollectionsByType] Found shared collections:', data?.length || 0);
           return data || [];
-        } else {
+      } else {
           console.log('[getCollectionsByType] No member collections found');
           return [];
         }
@@ -1439,7 +1442,7 @@ export const dbHelpers = {
     
     const { data, error } = await supabase
       .from('collections')
-      .update({ 
+      .update({
         collection_type: collectionType,
         is_public: isPublic // Keep for backward compatibility
       })
@@ -1563,6 +1566,120 @@ export const dbHelpers = {
       }
     } catch (error) {
       console.error('[updateCollectionTypeBasedOnContributors] Error:', error);
+    }
+  },
+
+  async incrementCollectionViews(collectionId: string) {
+    console.log('[incrementCollectionViews] Incrementing views for collection:', collectionId);
+    
+    try {
+      const { error } = await supabase
+        .from('collections')
+        .update({ 
+          views: supabase.rpc('increment_views', { collection_id: collectionId })
+        })
+        .eq('id', collectionId);
+      
+      if (error) {
+        console.error('[incrementCollectionViews] Error incrementing views:', error);
+        // Fallback: manually increment views
+        const { data: collection, error: fetchError } = await supabase
+          .from('collections')
+          .select('views')
+          .eq('id', collectionId)
+          .single();
+        
+        if (fetchError) {
+          console.error('[incrementCollectionViews] Error fetching current views:', fetchError);
+          return;
+        }
+        
+        const currentViews = collection?.views || 0;
+        const { error: updateError } = await supabase
+          .from('collections')
+          .update({ views: currentViews + 1 })
+          .eq('id', collectionId);
+        
+        if (updateError) {
+          console.error('[incrementCollectionViews] Error with fallback update:', updateError);
+        } else {
+          console.log('[incrementCollectionViews] Views incremented successfully (fallback method)');
+        }
+      } else {
+        console.log('[incrementCollectionViews] Views incremented successfully');
+      }
+    } catch (error) {
+      console.error('[incrementCollectionViews] Unexpected error:', error);
+    }
+  },
+
+  async toggleCollectionLike(collectionId: string, userId: string) {
+    console.log('[toggleCollectionLike] Toggling like for collection:', collectionId, 'user:', userId);
+    
+    try {
+      const { data, error } = await supabase.rpc('toggle_collection_like', {
+        p_collection_id: collectionId,
+        p_user_id: userId
+      });
+      
+      if (error) {
+        console.error('[toggleCollectionLike] Error toggling like:', error);
+        return { success: false, liked: false, error };
+      }
+      
+      const liked = data === true;
+      console.log('[toggleCollectionLike] Like toggled successfully. Liked:', liked);
+      return { success: true, liked, error: null };
+    } catch (error) {
+      console.error('[toggleCollectionLike] Unexpected error:', error);
+      return { success: false, liked: false, error };
+    }
+  },
+
+  async getCollectionLikeStatus(collectionId: string, userId: string) {
+    console.log('[getCollectionLikeStatus] Checking like status for collection:', collectionId, 'user:', userId);
+    
+    try {
+      const { data, error } = await supabase
+        .from('collection_likes')
+        .select('id')
+        .eq('collection_id', collectionId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('[getCollectionLikeStatus] Error checking like status:', error);
+        return false;
+      }
+      
+      const isLiked = !!data;
+      console.log('[getCollectionLikeStatus] Like status:', isLiked);
+      return isLiked;
+    } catch (error) {
+      console.error('[getCollectionLikeStatus] Unexpected error:', error);
+      return false;
+    }
+  },
+
+  async getCollectionLikeCount(collectionId: string) {
+    console.log('[getCollectionLikeCount] Getting like count for collection:', collectionId);
+    
+    try {
+      const { count, error } = await supabase
+        .from('collection_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('collection_id', collectionId);
+      
+      if (error) {
+        console.error('[getCollectionLikeCount] Error getting like count:', error);
+        return 0;
+      }
+      
+      console.log('[getCollectionLikeCount] Like count:', count);
+      return count || 0;
+    } catch (error) {
+      console.error('[getCollectionLikeCount] Unexpected error:', error);
+      return 0;
     }
   }
 };

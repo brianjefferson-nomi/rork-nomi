@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Mic, Search, ChevronDown, SlidersHorizontal, X, MapPin, Clock, TrendingUp, History } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
-import { router } from 'expo-router';
 import { getYelpAutocompleteSuggestions, getYelpPopularSearches, searchMapboxRestaurants, deduplicateRestaurants } from '@/services/api';
 
 interface SearchWizardProps {
@@ -259,22 +259,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
 
   return (
     <View style={styles.wrapper} testID={testID}>
-      <View style={styles.locationSwitcher}>
-        <MapPin size={16} color="#666" />
-        <Text style={styles.locationLabel}>Search in:</Text>
-        <TouchableOpacity 
-          style={[styles.cityButton, userLocation?.city === 'New York' && styles.cityButtonActive]}
-          onPress={() => switchToCity('New York')}
-        >
-          <Text style={[styles.cityButtonText, userLocation?.city === 'New York' && styles.cityButtonTextActive]}>NYC</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.cityButton, userLocation?.city === 'Los Angeles' && styles.cityButtonActive]}
-          onPress={() => switchToCity('Los Angeles')}
-        >
-          <Text style={[styles.cityButtonText, userLocation?.city === 'Los Angeles' && styles.cityButtonTextActive]}>LA</Text>
-        </TouchableOpacity>
-      </View>
+
       <View style={styles.searchRow}>
         <Search size={20} color="#999" />
         <TextInput
@@ -440,7 +425,6 @@ export function SearchWizard({ testID }: SearchWizardProps) {
                   cuisine: r.cuisine,
                   rating: r.rating,
                   priceRange: r.priceRange,
-                  price: r.price,
                   location: r.location,
                   neighborhood: r.neighborhood,
                   address: r.address

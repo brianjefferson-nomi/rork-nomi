@@ -55,7 +55,7 @@ export default function JoinPlanScreen() {
 
       // Add user to collaborators
       const updatedCollaborators = typedPlan.collaborators && Array.isArray(typedPlan.collaborators) ? [...typedPlan.collaborators, user!.id] : [user!.id];
-      await dbHelpers.updatePlan(typedPlan.id, {
+      await dbHelpers.updateCollection(typedPlan.id, {
         ...typedPlan,
         collaborators: updatedCollaborators,
         updated_at: new Date().toISOString()

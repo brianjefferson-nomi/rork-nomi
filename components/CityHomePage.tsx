@@ -9,12 +9,24 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
 import { searchMapboxRestaurants, getMapboxNearbyRestaurants, transformMapboxToRestaurant, searchFoursquareRestaurants, deduplicateRestaurants } from '@/services/api';
-import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
-import { filterCollectionsByCity, getCityDisplayName, getCollectionStats } from '@/utils/collection-filtering';
 
-type CityKey = 'nyc' | 'la';
+interface CityConfig {
+  name: string;
+  shortName: string;
+  coordinates: { lat: number; lng: number };
+  filterPattern: RegExp;
+  greeting: string;
+  subtitle: string;
+  neighborhoodImages: Record<string, string>;
+  mockCollections: Collection[];
+  sectionOrder: 'localFirst' | 'trendingFirst';
+}
 
-export default function HomeScreen() {
+interface CityHomePageProps {
+  cityConfig: CityConfig;
+}
+
+export default function CityHomePage({ cityConfig }: CityHomePageProps) {
   // Initialize hooks with proper error handling - MUST be at the top
   const restaurantsData = useRestaurants();
   const authData = useAuth();
@@ -25,20 +37,11 @@ export default function HomeScreen() {
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [mapboxRestaurants, setMapboxRestaurants] = useState<any[]>([]);
-  // Use shared currentCity from store
-  const { currentCity, switchToCity } = restaurantsData;
 
   // Destructure with defaults and null checks - ensure these are always defined
   const restaurants = restaurantsData?.restaurants || [];
-  const collections = restaurantsData?.allCollections || []; // Use allCollections (public only) instead of collections (user plans)
+  const collections = restaurantsData?.collections || [];
   const isLoading = restaurantsData?.isLoading || false;
-  
-  // Debug: Check what's in collections (allCollections)
-  console.log('[HomeScreen] collections (allCollections) data:', collections.map((c: any) => ({
-    name: c.name,
-    collaborators: c.collaborators,
-    collaboratorsLength: c.collaborators?.length || 0
-  })));
   const userLocation = restaurantsData?.userLocation;
   
   const user = authData?.user;
@@ -46,59 +49,15 @@ export default function HomeScreen() {
 
   // Ensure collections is always an array
   const safeCollections = Array.isArray(collections) ? collections : [];
-  
-  // Debug: Check what's in safeCollections
-  console.log('[HomeScreen] safeCollections data:', safeCollections.map((c: any) => ({
-    name: c.name,
-    collaborators: c.collaborators,
-    collaboratorsLength: c.collaborators?.length || 0
-  })));
 
-  // Get current city configuration
-  const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
-  
-  // Filter restaurants for the current city
+  // Filter restaurants for the specific city
   const cityRestaurants = useMemo(() => {
-    const filtered = (restaurants || []).filter(r => {
+    return (restaurants || []).filter(r => {
       if (!r) return false;
-      
-      // Primary filter: Use city and state for most accurate filtering
-      if (r.city && r.state) {
-        if (currentCity === 'nyc' && r.city === 'New York' && r.state === 'NY') {
-          return true;
-        }
-        if (currentCity === 'la' && r.city === 'Los Angeles' && r.state === 'CA') {
-          return true;
-        }
-      }
-      
-      // Secondary filter: Use restaurant_code for city identification
-      if (r.restaurant_code) {
-        if (currentCity === 'nyc' && r.restaurant_code.startsWith('nyc-')) {
-          return true;
-        }
-        if (currentCity === 'la' && r.restaurant_code.startsWith('la-')) {
-          return true;
-        }
-      }
-      
-      // Fallback filter: Use neighborhood and address patterns
-      const neighborhood = (r.neighborhood || '').toLowerCase();
-      const address = (r.address || '').toLowerCase();
-      return cityConfig.filterPattern.test(neighborhood) || cityConfig.filterPattern.test(address);
+      const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
+      return cityConfig.filterPattern.test(address);
     });
-    
-    console.log(`[HomeScreen] ${cityConfig.name} filtering:`, {
-      totalRestaurants: restaurants?.length || 0,
-      filteredRestaurants: filtered.length,
-      filterPattern: cityConfig.filterPattern.toString(),
-      currentCity
-    });
-    
-
-    
-    return filtered;
-  }, [restaurants, cityConfig.filterPattern, currentCity]);
+  }, [restaurants, cityConfig.filterPattern]);
 
   // Helper function to get unique restaurants for different carousels
   const getUniqueRestaurantsForCarousel = useCallback((allRestaurants: any[], startIndex: number, count: number, excludeIds: string[] = []) => {
@@ -106,23 +65,23 @@ export default function HomeScreen() {
     return filteredRestaurants.slice(startIndex, startIndex + count);
   }, []);
 
-  // City-specific restaurant sections with flexible distribution
+  // City-specific restaurant sections
   const trendingRestaurants = useMemo(() => {
-    return cityRestaurants.slice(0, Math.min(6, cityRestaurants.length));
+    return cityRestaurants.slice(0, 6);
   }, [cityRestaurants]);
   
   const newRestaurants = useMemo(() => {
-    const trendingIds = trendingRestaurants.map((r: any) => r.id);
-    const availableRestaurants = cityRestaurants.filter((r: any) => !trendingIds.includes(r.id));
-    return availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
-  }, [cityRestaurants, trendingRestaurants]);
+    const trendingIds = cityRestaurants.slice(0, 6).map((r: any) => r.id);
+    return getUniqueRestaurantsForCarousel(cityRestaurants, 6, 4, trendingIds);
+  }, [cityRestaurants, getUniqueRestaurantsForCarousel]);
   
   const localHighlights = useMemo(() => {
-    const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id)];
-    const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-    return availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
-  }, [cityRestaurants, trendingRestaurants, newRestaurants]);
-  
+    const trendingIds = cityRestaurants.slice(0, 6).map((r: any) => r.id);
+    const newIds = cityRestaurants.slice(6, 10).map((r: any) => r.id);
+    const excludeIds = [...trendingIds, ...newIds];
+    return getUniqueRestaurantsForCarousel(cityRestaurants, 10, 4, excludeIds);
+  }, [cityRestaurants, getUniqueRestaurantsForCarousel]);
+
   // Convert plans to collections format for display
   const planCollections: Collection[] = useMemo(() => safeCollections.map(plan => ({
     id: plan.id,
@@ -150,50 +109,28 @@ export default function HomeScreen() {
     created_at: plan.created_at,
     updated_at: plan.updated_at
   })), [safeCollections]);
-  
+
   const displayCollections = useMemo(() => {
     // For logged out users, use city-specific mock collections
     if (!isAuthenticated) {
       return cityConfig.mockCollections;
     }
-    
-    // Don't filter if we don't have restaurant data yet
-    if (!restaurants || restaurants.length === 0) {
-      console.log(`[HomeScreen] No restaurants loaded yet, skipping collection filtering`);
-      return [];
-    }
-    
-    // Filter collections based on the cities of restaurants inside them
-    const cityFilteredCollections = filterCollectionsByCity(planCollections, restaurants, currentCity);
-    
-    // Get collection statistics
-    const stats = getCollectionStats(planCollections, restaurants, currentCity);
-    
-    console.log(`[HomeScreen] Collection filtering for ${currentCity}:`, {
-      totalCollections: stats.totalCollections,
-      cityFilteredCollections: stats.cityFilteredCollections,
-      totalRestaurants: stats.totalRestaurants,
-      averageRestaurantsPerCollection: stats.averageRestaurantsPerCollection,
-      currentCity,
-      restaurantsLoaded: restaurants.length
-    });
-    
-
-    
-    return cityFilteredCollections;
-  }, [planCollections, isAuthenticated, cityConfig.mockCollections, restaurants, currentCity]);
+    return planCollections || [];
+  }, [planCollections, isAuthenticated, cityConfig.mockCollections]);
   
   const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
-  
+
   // Load Mapbox restaurants for the city
   useEffect(() => {
     // For logged out users, use city database restaurants
     if (!isAuthenticated) {
       setMapboxRestaurants(cityRestaurants);
       // Use unique restaurants for nearby section
-      const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id), ...localHighlights.map((r: any) => r.id)];
-      const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-      const nearbyRestaurants = availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
+      const trendingIds = cityRestaurants.slice(0, 6).map((r: any) => r.id);
+      const newIds = cityRestaurants.slice(6, 10).map((r: any) => r.id);
+      const localIds = cityRestaurants.slice(10, 14).map((r: any) => r.id);
+      const excludeIds = [...trendingIds, ...newIds, ...localIds];
+      const nearbyRestaurants = getUniqueRestaurantsForCarousel(cityRestaurants, 14, 4, excludeIds);
       setNearbyRestaurants(nearbyRestaurants);
       return;
     }
@@ -201,9 +138,11 @@ export default function HomeScreen() {
     // For web platform, use city database restaurants
     if (Platform.OS === 'web') {
       setMapboxRestaurants(cityRestaurants);
-      const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id), ...localHighlights.map((r: any) => r.id)];
-      const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-      const nearbyRestaurants = availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
+      const trendingIds = cityRestaurants.slice(0, 6).map((r: any) => r.id);
+      const newIds = cityRestaurants.slice(6, 10).map((r: any) => r.id);
+      const localIds = cityRestaurants.slice(10, 14).map((r: any) => r.id);
+      const excludeIds = [...trendingIds, ...newIds, ...localIds];
+      const nearbyRestaurants = getUniqueRestaurantsForCarousel(cityRestaurants, 14, 4, excludeIds);
       setNearbyRestaurants(nearbyRestaurants);
       return;
     }
@@ -214,7 +153,7 @@ export default function HomeScreen() {
       try {
         const { lat, lng } = cityConfig.coordinates;
         
-        console.log(`[HomeScreen] Loading ${cityConfig.name} restaurants for location:`, lat, lng);
+        console.log(`[${cityConfig.name}HomePage] Loading ${cityConfig.name} restaurants for location:`, lat, lng);
         
         // Try multiple APIs to get the best restaurant data
         const allRestaurants: any[] = [];
@@ -224,34 +163,34 @@ export default function HomeScreen() {
           const mapboxResults = await getMapboxNearbyRestaurants(lat, lng, 5000, 20);
           const transformedMapbox = mapboxResults.map(transformMapboxToRestaurant).filter(Boolean);
           allRestaurants.push(...transformedMapbox);
-          console.log(`[HomeScreen] Loaded`, transformedMapbox.length, 'Mapbox restaurants');
+          console.log(`[${cityConfig.name}HomePage] Loaded`, transformedMapbox.length, 'Mapbox restaurants');
         } catch (error) {
-          console.error(`[HomeScreen] Mapbox API error:`, error);
+          console.error(`[${cityConfig.name}HomePage] Mapbox API error:`, error);
         }
         
         // 2. Use city restaurants as fallback
         if (allRestaurants.length === 0 && cityRestaurants.length > 0) {
           allRestaurants.push(...cityRestaurants);
-          console.log(`[HomeScreen] Using ${cityConfig.name} restaurants as fallback:`, cityRestaurants.length);
+          console.log(`[${cityConfig.name}HomePage] Using ${cityConfig.name} restaurants as fallback:`, cityRestaurants.length);
         }
         
         let uniqueResults = deduplicateRestaurants(allRestaurants).slice(0, 20);
         
         if (uniqueResults.length === 0 && cityRestaurants.length > 0) {
           uniqueResults = cityRestaurants.slice(0, 20);
-          console.log(`[HomeScreen] Using ${cityConfig.name} restaurants as final fallback:`, uniqueResults.length);
+          console.log(`[${cityConfig.name}HomePage] Using ${cityConfig.name} restaurants as final fallback:`, uniqueResults.length);
         }
         
         setMapboxRestaurants(uniqueResults);
         setNearbyRestaurants(uniqueResults.slice(0, 4));
         
-        console.log(`[HomeScreen] Total loaded ${cityConfig.name} restaurants:`, uniqueResults.length);
+        console.log(`[${cityConfig.name}HomePage] Total loaded ${cityConfig.name} restaurants:`, uniqueResults.length);
       } catch (error) {
-        console.error(`[HomeScreen] Error loading ${cityConfig.name} restaurants:`, error);
+        console.error(`[${cityConfig.name}HomePage] Error loading ${cityConfig.name} restaurants:`, error);
         const localRestaurants = cityRestaurants.slice(0, 4);
         setNearbyRestaurants(localRestaurants);
         setMapboxRestaurants(cityRestaurants);
-        console.log(`[HomeScreen] Error fallback - using ${cityConfig.name} restaurants:`, cityRestaurants.length);
+        console.log(`[${cityConfig.name}HomePage] Error fallback - using ${cityConfig.name} restaurants:`, cityRestaurants.length);
       }
     };
 
@@ -263,7 +202,7 @@ export default function HomeScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.loadingText}>Initializing...</Text>
+        <Text style={styles.loadingText}>Initializing {cityConfig.name}...</Text>
       </View>
     );
   }
@@ -272,14 +211,10 @@ export default function HomeScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading {cityConfig.name}...</Text>
       </View>
     );
   }
-  
-  const handleCityToggle = () => {
-            switchToCity(currentCity === 'nyc' ? 'la' : 'nyc');
-  };
 
   // Render sections based on city configuration
   const renderLocalSection = () => (
@@ -388,8 +323,10 @@ export default function HomeScreen() {
           </View>
         ) : cityRestaurants.length > 0 ? (
           (() => {
-            // Use only cityRestaurants for neighborhood counting
-            const neighborhoodCounts = cityRestaurants.reduce((acc, restaurant) => {
+            const allRestaurants = [...cityRestaurants, ...mapboxRestaurants];
+            const uniqueRestaurants = deduplicateRestaurants(allRestaurants);
+            
+            const neighborhoodCounts = uniqueRestaurants.reduce((acc, restaurant) => {
               const neighborhood = restaurant.neighborhood;
               if (neighborhood) {
                 acc[neighborhood] = (acc[neighborhood] || 0) + 1;
@@ -397,28 +334,13 @@ export default function HomeScreen() {
               return acc;
             }, {} as Record<string, number>);
             
-            // Get top 4 neighborhoods, but if we don't have 4 with multiple restaurants, 
-            // include neighborhoods with at least 1 restaurant
-            let topNeighborhoods = Object.entries(neighborhoodCounts)
+            const topNeighborhoods = Object.entries(neighborhoodCounts)
               .filter(([, count]) => (count as number) >= 2)
               .sort(([,a], [,b]) => (b as number) - (a as number))
-              .slice(0, 4);
-            
-            // If we don't have 4 neighborhoods with 2+ restaurants, add neighborhoods with 1 restaurant
-            if (topNeighborhoods.length < 4) {
-              const singleRestaurantNeighborhoods = Object.entries(neighborhoodCounts)
-                .filter(([, count]) => (count as number) === 1)
-                .sort(([,a], [,b]) => (b as number) - (a as number))
-                .slice(0, 4 - topNeighborhoods.length);
-              
-              topNeighborhoods = [...topNeighborhoods, ...singleRestaurantNeighborhoods];
-            }
-            
-            const finalNeighborhoods = topNeighborhoods
               .slice(0, 4)
               .map(([neighborhood, count]) => ({ neighborhood, count }));
             
-            return finalNeighborhoods.map(({ neighborhood, count }) => {
+            return topNeighborhoods.map(({ neighborhood, count }) => {
               const imageUrl = cityConfig.neighborhoodImages[neighborhood] || cityConfig.neighborhoodImages['default'] || 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400';
               
               return (
@@ -456,52 +378,28 @@ export default function HomeScreen() {
 
   const renderCollectionsSection = () => (
     <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-          <BookOpen size={20} color="#FF6B6B" />
-          <TouchableOpacity 
-            style={styles.sectionTitleContainer}
-            onLongPress={() => router.push('/collections' as any)}
-            onPress={() => router.push('/collections' as any)}
-          >
-            <Text style={styles.sectionTitle}>{cityConfig.name} Collections</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/collections' as any)}>
-            <Text style={styles.seeAll}>See all</Text>
-          </TouchableOpacity>
-        </View>
-      
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#FF6B6B" />
-          <Text style={styles.loadingText}>Loading collections...</Text>
-        </View>
-      ) : displayCollections.length > 0 ? (
-        <>
-          <Text style={styles.sectionSubtitle}>
-            Collections with {getCityDisplayName(currentCity)} restaurants
-          </Text>
-          <View style={styles.collectionsGrid}>
-            {displayCollections.map(collection => (
-              <CollectionCard
-                key={collection.id}
-                collection={collection as Collection}
-                onPress={() => {
-                  console.log(`[HomePage] Clicking collection "${collection.name}" with ${collection.collaborators?.length || 0} collaborators`);
-                  if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
-                    router.push('/create-collection' as any);
-                  } else {
-                    router.push(`/collection/${collection.id}` as any);
-                  }
-                }}
-              />
-            ))}
-          </View>
-        </>
-      ) : (
-        <Text style={styles.emptyText}>
-          No collections found for {getCityDisplayName(currentCity)}
-        </Text>
-      )}
+      <View style={styles.sectionHeader}>
+        <BookOpen size={20} color="#FF6B6B" />
+        <Text style={styles.sectionTitle}>{cityConfig.name} Popular Plans</Text>
+        <TouchableOpacity onPress={() => router.push('/lists' as any)}>
+          <Text style={styles.seeAll}>See all</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.collectionsGrid}>
+        {popularCollections.map(collection => (
+          <CollectionCard
+            key={collection.id}
+            collection={collection}
+            onPress={() => {
+              if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
+                router.push('/create-collection' as any);
+              } else {
+                router.push(`/collection/${collection.id}` as any);
+              }
+            }}
+          />
+        ))}
+      </View>
     </View>
   );
 
@@ -509,7 +407,7 @@ export default function HomeScreen() {
     <>
       <Stack.Screen 
         options={{
-          title: 'Home',
+          title: cityConfig.name,
         }} 
       />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -544,23 +442,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.subtitle}>{cityConfig.subtitle}</Text>
-          
-          {/* City Toggle */}
-          <View style={styles.cityToggleContainer}>
-            <TouchableOpacity 
-              style={[styles.cityToggleButton, currentCity === 'nyc' && styles.cityToggleButtonActive]}
-              onPress={() => switchToCity('nyc')}
-            >
-              <Text style={[styles.cityToggleText, currentCity === 'nyc' && styles.cityToggleTextActive]}>NYC</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.cityToggleButton, currentCity === 'la' && styles.cityToggleButtonActive]}
-              onPress={() => switchToCity('la')}
-            >
-              <Text style={[styles.cityToggleText, currentCity === 'la' && styles.cityToggleTextActive]}>LA</Text>
-            </TouchableOpacity>
-        </View>
-
           <SearchWizard testID="search-wizard" />
         </View>
 
@@ -629,31 +510,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  cityToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F0F0F0',
-    borderRadius: 8,
-    padding: 4,
-    gap: 4,
-  },
-  cityToggleButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  cityToggleButtonActive: {
-    backgroundColor: '#FF6B6B',
-  },
-  cityToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  cityToggleTextActive: {
-    color: '#FFF',
-  },
   section: {
     marginTop: 16,
   },
@@ -669,23 +525,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
     flex: 1,
-  },
-  sectionTitleContainer: {
-    flex: 1,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
   },
   seeAll: {
     fontSize: 14,

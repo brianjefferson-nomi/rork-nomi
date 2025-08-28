@@ -3,9 +3,16 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "bunx rork start -p meqwxgi04e28qktwb7llm --tunnel",
-    "start-web": "bunx rork start -p meqwxgi04e28qktwb7llm --web --tunnel",
-    "start-web-dev": "DEBUG=expo* bunx rork start -p meqwxgi04e28qktwb7llm --web --tunnel",
+    "start": "npx rork start -p meqwxgi04e28qktwb7llm --tunnel",
+    "start-web": "npx rork start -p meqwxgi04e28qktwb7llm --web --tunnel",
+    "start-web-dev": "DEBUG=expo* npx rork start -p meqwxgi04e28qktwb7llm --web --tunnel",
+    "build": "npx expo build",
+    "build:web": "npx expo build --platform web",
+    "build:ios": "npx expo build --platform ios",
+    "build:android": "npx expo build --platform android",
+    "export": "npx expo export",
+    "export:web": "npx expo export --platform web",
+    "prebuild": "npx expo prebuild",
     "lint": "expo lint"
   },
   "dependencies": {
@@ -31,7 +38,7 @@
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.11",
     "expo-web-browser": "~14.2.0",
-    "lucide-react-native": "^0.475.0",
+    "lucide-react-native": "^0.542.0",
     "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-dom": "19.0.0",

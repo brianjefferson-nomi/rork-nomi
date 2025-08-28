@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput,
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Utensils } from 'lucide-react-native';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
 
 const { width } = Dimensions.get('window');
@@ -32,6 +33,7 @@ export default function RestaurantDetailScreen() {
   const restaurant = useRestaurantById(id || '');
   console.log('[RestaurantDetail] Found restaurant:', restaurant?.name || 'NOT FOUND');
   const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection } = useRestaurants();
+  const { user } = useAuth();
   const votes = useRestaurantVotes(id || '');
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(restaurant?.userNotes || null);
@@ -44,15 +46,27 @@ export default function RestaurantDetailScreen() {
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
 
-  // Get available collections (collections where restaurant is not already added)
+  // Get available collections (collections where restaurant is not already added and user has permission to add)
   const availableCollections = useMemo(() => {
-    if (!restaurant || !collections) return [];
+    if (!restaurant || !collections || !user) return [];
     
     return collections.filter(c => {
       const restaurantIds = c.restaurant_ids || [];
-      return !restaurantIds.includes(restaurant.id);
+      const isRestaurantAlreadyAdded = restaurantIds.includes(restaurant.id);
+      
+      // For public collections, only the creator can add restaurants
+      if (c.is_public) {
+        const isCreator = c.created_by === user.id || (c as any).creator_id === user.id;
+        return !isRestaurantAlreadyAdded && isCreator;
+      }
+      
+      // For private collections, check if user is owner or member
+      const isOwner = c.created_by === user.id || (c as any).creator_id === user.id;
+      const isMember = (c as any).collaborators && Array.isArray((c as any).collaborators) && (c as any).collaborators.includes(user.id);
+      
+      return !isRestaurantAlreadyAdded && (isOwner || isMember);
     });
-  }, [restaurant, collections]);
+  }, [restaurant, collections, user]);
 
   // Enhanced restaurant data loading with proper image assignment and caching
   useEffect(() => {

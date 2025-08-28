@@ -298,21 +298,7 @@ export default function AIScreen() {
 
         {messages.length === 1 && (
           <View style={styles.quickPromptsContainer}>
-            <View style={styles.locationSwitcher}>
-              <Text style={styles.locationSwitcherTitle}>Current location:</Text>
-              <TouchableOpacity 
-                style={[styles.cityButton, userLocation?.city === 'New York' && styles.cityButtonActive]}
-                onPress={() => switchToCity('New York')}
-              >
-                <Text style={[styles.cityButtonText, userLocation?.city === 'New York' && styles.cityButtonTextActive]}>NYC</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.cityButton, userLocation?.city === 'Los Angeles' && styles.cityButtonActive]}
-                onPress={() => switchToCity('Los Angeles')}
-              >
-                <Text style={[styles.cityButtonText, userLocation?.city === 'Los Angeles' && styles.cityButtonTextActive]}>LA</Text>
-              </TouchableOpacity>
-            </View>
+
             <Text style={styles.quickPromptsTitle}>Try asking:</Text>
             {quickPrompts.map((prompt, index) => (
               <TouchableOpacity

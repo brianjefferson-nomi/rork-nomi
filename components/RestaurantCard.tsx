@@ -197,11 +197,10 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
             {renderStarRating(restaurant.rating || 0)}
           </View>
-        </View>
-        
-        {/* Vibe tags */}
-        {(() => {
-          const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
+          
+                    {/* Vibe tags - moved closer to restaurant name */}
+          {(() => {
+            const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
           console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
           
           // Generate more specific vibe tags based on restaurant characteristics
@@ -330,6 +329,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             </View>
           );
         })()}
+        </View>
         
         {/* Price and cuisine */}
         <Text style={styles.cuisine}>{formatPriceRange(restaurant.priceRange)} · {restaurant.cuisine}</Text>

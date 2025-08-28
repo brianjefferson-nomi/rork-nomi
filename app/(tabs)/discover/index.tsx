@@ -1,30 +1,57 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
+import { Search, Filter, X, MapPin } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 
 const cuisineTypes = ['All', 'Italian', 'French', 'Chinese', 'American', 'Deli', 'Bakery', 'Gastropub'];
 const priceRanges = ['All', '$', '$$', '$$$', '$$$$'];
 
 export default function DiscoverScreen() {
-  const { restaurants, userLocation } = useRestaurants();
+  const { restaurants, userLocation, addRestaurantToStore } = useRestaurants();
   const params = useLocalSearchParams();
+  const pathname = usePathname();
   
+  // Use shared currentCity from store
+  const { currentCity, switchToCity } = useRestaurants();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState(params.neighborhood as string || 'All');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('All');
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Get unique neighborhoods from restaurants
+  // No need to auto-detect city here - just use the current city from the store
+
+  // Handle URL parameters for neighborhood filtering (only if explicitly provided)
+  useEffect(() => {
+    if (params.neighborhood) {
+      setSelectedNeighborhood(params.neighborhood as string);
+    }
+  }, [params.neighborhood]);
+
+  // Get city configuration
+  const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
+
+  // Filter restaurants for current city
+  const cityRestaurants = useMemo(() => {
+    return restaurants.filter(r => {
+      if (!r) return false;
+      const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
+      return cityConfig.filterPattern.test(address);
+    });
+  }, [restaurants, cityConfig]);
+
+  // Get unique neighborhoods from city restaurants
   const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = [...new Set(restaurants.map(r => r.neighborhood).filter(Boolean))];
+    const neighborhoods = [...new Set(cityRestaurants.map(r => r.neighborhood).filter(Boolean))];
     return ['All', ...neighborhoods.sort()];
-  }, [restaurants]);
+  }, [cityRestaurants]);
 
+  // Filter restaurants based on all criteria
   const filteredRestaurants = useMemo(() => {
-    return restaurants.filter(restaurant => {
+    return cityRestaurants.filter(restaurant => {
       const matchesSearch = restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            restaurant.cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            restaurant.neighborhood.toLowerCase().includes(searchQuery.toLowerCase());
@@ -40,103 +67,68 @@ export default function DiscoverScreen() {
       
       return matchesSearch && matchesCuisine && matchesPrice && matchesNeighborhood;
     });
-  }, [restaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhood]);
+  }, [cityRestaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhood]);
+
+  const handleCityToggle = () => {
+    const newCity = currentCity === 'nyc' ? 'la' : 'nyc';
+    switchToCity(newCity);
+    // Reset filters when switching cities
+    setSelectedCuisine('All');
+    setSelectedPrice('All');
+    setSelectedNeighborhood('All');
+  };
+
+  const resetFilters = () => {
+    setSelectedCuisine('All');
+    setSelectedPrice('All');
+    setSelectedNeighborhood('All');
+  };
+
+  const hasActiveFilters = selectedCuisine !== 'All' || selectedPrice !== 'All' || selectedNeighborhood !== 'All';
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Search size={20} color="#999" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Search restaurants in ${userLocation?.city || 'NYC'}...`}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
-          />
+      {/* Header with search and city toggle */}
+      <View style={styles.header}>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Search size={20} color="#999" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={`Search restaurants in ${cityConfig.name}...`}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor="#999"
+            />
+          </View>
+        </View>
+
+        {/* City toggle and filters button */}
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.cityToggle}
+            onPress={handleCityToggle}
+          >
+            <MapPin size={16} color="#FF6B6B" />
+            <Text style={styles.cityToggleText}>{cityConfig.name}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.filtersButton, hasActiveFilters && styles.filtersButtonActive]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Filter size={20} color={hasActiveFilters ? "#FFF" : "#666"} />
+            <Text style={[styles.filtersButtonText, hasActiveFilters && styles.filtersButtonTextActive]}>
+              Filters
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.filtersContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Cuisine</Text>
-            <View style={styles.filterOptions}>
-              {cuisineTypes.map(cuisine => (
-                <TouchableOpacity
-                  key={cuisine}
-                  style={[
-                    styles.filterChip,
-                    selectedCuisine === cuisine && styles.filterChipActive
-                  ]}
-                  onPress={() => setSelectedCuisine(cuisine)}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    selectedCuisine === cuisine && styles.filterChipTextActive
-                  ]}>
-                    {cuisine}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Price</Text>
-            <View style={styles.filterOptions}>
-              {priceRanges.map(price => (
-                <TouchableOpacity
-                  key={price}
-                  style={[
-                    styles.filterChip,
-                    selectedPrice === price && styles.filterChipActive
-                  ]}
-                  onPress={() => setSelectedPrice(price)}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    selectedPrice === price && styles.filterChipTextActive
-                  ]}>
-                    {price}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Neighborhood</Text>
-            <View style={styles.filterOptions}>
-              {availableNeighborhoods.map(neighborhood => (
-                <TouchableOpacity
-                  key={neighborhood}
-                  style={[
-                    styles.filterChip,
-                    selectedNeighborhood === neighborhood && styles.filterChipActive
-                  ]}
-                  onPress={() => setSelectedNeighborhood(neighborhood)}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    selectedNeighborhood === neighborhood && styles.filterChipTextActive
-                  ]}>
-                    {neighborhood}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-
+      {/* Results */}
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
         <Text style={styles.resultsCount}>
-          {filteredRestaurants.length} restaurants found
+          {filteredRestaurants.length} restaurants found in {cityConfig.name}
         </Text>
         
         <View style={styles.restaurantsList}>
@@ -144,7 +136,10 @@ export default function DiscoverScreen() {
             <RestaurantCard
               key={restaurant.id}
               restaurant={restaurant}
-              onPress={() => router.push({ pathname: '/restaurant/[id]', params: { id: restaurant.id } })}
+              onPress={() => {
+                addRestaurantToStore(restaurant);
+                router.push(`/restaurant/${restaurant.id}` as any);
+              }}
               compact
             />
           ))}
@@ -152,6 +147,114 @@ export default function DiscoverScreen() {
         
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Filters Modal */}
+      <Modal
+        visible={showFilters}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFilters(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filters</Text>
+            <TouchableOpacity onPress={() => setShowFilters(false)}>
+              <X size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Cuisine Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Cuisine</Text>
+              <View style={styles.filterChips}>
+                {cuisineTypes.map(cuisine => (
+                  <TouchableOpacity
+                    key={cuisine}
+                    style={[
+                      styles.filterChip,
+                      selectedCuisine === cuisine && styles.filterChipActive
+                    ]}
+                    onPress={() => setSelectedCuisine(cuisine)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedCuisine === cuisine && styles.filterChipTextActive
+                    ]}>
+                      {cuisine}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Price Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Price Range</Text>
+              <View style={styles.filterChips}>
+                {priceRanges.map(price => (
+                  <TouchableOpacity
+                    key={price}
+                    style={[
+                      styles.filterChip,
+                      selectedPrice === price && styles.filterChipActive
+                    ]}
+                    onPress={() => setSelectedPrice(price)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedPrice === price && styles.filterChipTextActive
+                    ]}>
+                      {price}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Neighborhood Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Neighborhood</Text>
+              <View style={styles.filterChips}>
+                {availableNeighborhoods.map(neighborhood => (
+                  <TouchableOpacity
+                    key={neighborhood}
+                    style={[
+                      styles.filterChip,
+                      selectedNeighborhood === neighborhood && styles.filterChipActive
+                    ]}
+                    onPress={() => setSelectedNeighborhood(neighborhood)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedNeighborhood === neighborhood && styles.filterChipTextActive
+                    ]}>
+                      {neighborhood}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Modal Footer */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity 
+              style={styles.resetButton}
+              onPress={resetFilters}
+            >
+              <Text style={styles.resetButtonText}>Reset All</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.applyButton}
+              onPress={() => setShowFilters(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -161,11 +264,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-  searchContainer: {
-    padding: 16,
+  header: {
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+  },
+  searchContainer: {
+    padding: 16,
+    paddingBottom: 8,
   },
   searchBar: {
     flexDirection: 'row',
@@ -181,46 +287,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A1A1A',
   },
-  filtersContainer: {
-    backgroundColor: '#FFF',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  filterScroll: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  filterGroup: {
-    marginRight: 16,
-  },
-  filterLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  filterOptions: {
+  headerActions: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 12,
   },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+  cityToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  cityToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6B6B',
+  },
+  filtersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F0F0F0',
-    marginRight: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
-  filterChipActive: {
+  filtersButtonActive: {
     backgroundColor: '#FF6B6B',
   },
-  filterChipText: {
+  filtersButtonText: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#666',
   },
-  filterChipTextActive: {
+  filtersButtonTextActive: {
     color: '#FFF',
-    fontWeight: '500',
   },
   results: {
     flex: 1,
@@ -233,5 +340,88 @@ const styles = StyleSheet.create({
   },
   restaurantsList: {
     gap: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  filterChipActive: {
+    backgroundColor: '#FF6B6B',
+  },
+  filterChipText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  filterChipTextActive: {
+    color: '#FFF',
+    fontWeight: '500',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: 12,
+  },
+  resetButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FF6B6B',
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
   },
 });

@@ -99,6 +99,9 @@ export function CollectionSelectorModal({
                     <Text style={styles.savedCount}>
                       {getSavedCount(collection)} saved
                     </Text>
+                    {collection.is_public && (
+                      <Text style={styles.publicBadge}>Public</Text>
+                    )}
                   </LinearGradient>
                   <View style={styles.cardShadow} />
                 </TouchableOpacity>
@@ -219,6 +222,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#E0E0E0',
     fontWeight: '500',
+  },
+  publicBadge: {
+    fontSize: 11,
+    color: '#FFD700',
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   cardShadow: {
     position: 'absolute',
