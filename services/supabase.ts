@@ -1669,15 +1669,14 @@ export const dbHelpers = {
         .from('collection_likes')
         .select('id')
         .eq('collection_id', collectionId)
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', userId);
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      if (error) {
         console.error('[getCollectionLikeStatus] Error checking like status:', error);
         return false;
       }
       
-      const isLiked = !!data;
+      const isLiked = data && data.length > 0;
       console.log('[getCollectionLikeStatus] Like status:', isLiked);
       return isLiked;
     } catch (error) {

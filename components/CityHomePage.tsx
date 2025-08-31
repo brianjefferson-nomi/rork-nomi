@@ -300,7 +300,7 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
                 router.push(`/restaurant/${restaurant.id}` as any);
               }}
             />
-          </View>
+            </View>
         ))}
       </ScrollView>
     </View>

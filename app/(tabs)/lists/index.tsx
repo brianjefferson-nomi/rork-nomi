@@ -1,13 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Heart, BookOpen, Filter, Grid, List, Clock, Star, DollarSign, Trash2, UserMinus } from 'lucide-react-native';
 import { CollectionCard } from '@/components/CollectionCard';
-import { RestaurantCard } from '@/components/RestaurantCard';
+import { SimpleRestaurantCard } from '@/components/restaurant-cards';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { Collection } from '@/types/restaurant';
-import { useQueryClient } from '@tanstack/react-query';
 import { getMemberCount } from '@/utils/member-helpers';
 
 type TabType = 'collections' | 'favorites';
@@ -24,33 +23,7 @@ export default function ListsScreen() {
     leaveCollection
   } = useRestaurants();
   const { user, isAuthenticated } = useAuth();
-  const queryClient = useQueryClient();
   
-  // Note: Removed forced refresh to prevent data loss during re-renders
-
-  // Debug: Log allCollections data changes
-  useEffect(() => {
-    console.log('[ListsScreen] allCollections changed:', {
-      length: allCollections?.length || 0,
-      hasMemberCount: allCollections?.some((c: any) => (c as any).memberCount) || false,
-      sampleMemberCounts: allCollections?.slice(0, 3).map((c: any) => ({
-        name: c.name,
-        memberCount: (c as any).memberCount
-      })) || []
-    });
-  }, [allCollections]);
-
-  // Debug: Log plans data changes
-  useEffect(() => {
-    console.log('[ListsScreen] plans changed:', {
-      length: plans?.length || 0,
-      hasMemberCount: plans?.some((c: any) => (c as any).memberCount) || false,
-      sampleMemberCounts: plans?.slice(0, 3).map((c: any) => ({
-        name: c.name,
-        memberCount: (c as any).memberCount
-      })) || []
-    });
-  }, [plans]);
   const [activeTab, setActiveTab] = useState<TabType>('collections');
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
@@ -59,14 +32,6 @@ export default function ListsScreen() {
 
   // Combine private collections (plans) and public collections (allCollections) that the user is part of
   const safeCollections = useMemo(() => {
-    console.log('[ListsScreen] 🔄 Processing collections...');
-    console.log('[ListsScreen] Input data:', {
-      plansLength: plans?.length || 0,
-      allCollectionsLength: allCollections?.length || 0,
-      userId: user?.id
-    });
-    
-    // Get all collections (public and private) that the user is part of
     const userCollections: any[] = [];
     const addedCollectionIds = new Set<string>();
     
@@ -74,8 +39,12 @@ export default function ListsScreen() {
     const privateCollections = plans || [];
     privateCollections.forEach(plan => {
       if (!addedCollectionIds.has(plan.id)) {
-        console.log(`[ListsScreen] Adding plan "${plan.name}": memberCount = ${(plan as any).memberCount || getMemberCount(plan)}`);
-        userCollections.push(plan);
+        // Ensure memberCount is calculated for private collections
+        const processedPlan = {
+          ...plan,
+          memberCount: (plan as any).memberCount || getMemberCount(plan)
+        };
+        userCollections.push(processedPlan);
         addedCollectionIds.add(plan.id);
       }
     });
@@ -85,7 +54,6 @@ export default function ListsScreen() {
     publicCollections.forEach(publicCollection => {
       // Skip if already added from plans
       if (addedCollectionIds.has(publicCollection.id)) {
-        console.log(`[ListsScreen] Skipping "${publicCollection.name}" - already added from plans`);
         return;
       }
       
@@ -98,81 +66,49 @@ export default function ListsScreen() {
         });
       
       if (isCreator || isCollaborator) {
-        console.log(`[ListsScreen] Adding public collection "${publicCollection.name}": memberCount = ${(publicCollection as any).memberCount || getMemberCount(publicCollection)}`);
-        userCollections.push(publicCollection);
+        // Ensure memberCount is calculated for public collections
+        const processedCollection = {
+          ...publicCollection,
+          memberCount: (publicCollection as any).memberCount || getMemberCount(publicCollection)
+        };
+        userCollections.push(processedCollection);
         addedCollectionIds.add(publicCollection.id);
       }
     });
     
-    console.log('[ListsScreen] Combined collections data:', userCollections.map((c: any) => ({
-      name: c.name,
-      collaborators: c.collaborators,
-      collaboratorsLength: c.collaborators?.length || 0,
-      memberCount: (c as any).memberCount || getMemberCount(c)
-    })));
-    
     return userCollections;
   }, [plans, allCollections, user?.id]);
 
-  // Convert collections to proper format (same as home page)
+  // Convert collections to proper format
   const planCollections: Collection[] = useMemo(() => {
-    console.log('[ListsScreen] planCollections mapping - input safeCollections:', safeCollections.map((c: any) => ({
-      name: c.name,
-      collaborators: c.collaborators,
-      collaboratorsLength: c.collaborators?.length || 0,
-      memberCount: (c as any).memberCount
-    })));
-    
-    return safeCollections.map((plan: any) => {
-      const mappedCollection = {
-        id: plan.id,
-        name: plan.name,
-        description: plan.description || 'A collaborative dining plan',
-        cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
-        created_by: plan.created_by,
-        creator_id: (plan as any).creator_id,
-        occasion: plan.occasion,
-        is_public: plan.is_public,
-        likes: plan.likes || 0,
-        equal_voting: plan.equal_voting,
-        admin_weighted: plan.admin_weighted,
-        expertise_weighted: plan.expertise_weighted,
-        minimum_participation: plan.minimum_participation,
-        voting_deadline: (plan as any).voting_deadline,
-        allow_vote_changes: plan.allow_vote_changes,
-        anonymous_voting: plan.anonymous_voting,
-        vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
-        discussion_enabled: plan.discussion_enabled,
-        auto_ranking_enabled: plan.auto_ranking_enabled,
-        consensus_threshold: plan.consensus_threshold,
-        restaurant_ids: plan.restaurant_ids || [],
-        collaborators: (plan as any).collaborators || [],
-        created_at: plan.created_at,
-        updated_at: plan.updated_at,
-        // Preserve the memberCount that was calculated in the store
-        memberCount: (plan as any).memberCount
-      };
-      
-      console.log(`[ListsScreen] planCollections mapping - "${plan.name}":`, {
-        inputCollaborators: (plan as any).collaborators,
-        inputCollaboratorsLength: (plan as any).collaborators?.length || 0,
-        inputMemberCount: (plan as any).memberCount,
-        outputCollaborators: mappedCollection.collaborators,
-        outputCollaboratorsLength: mappedCollection.collaborators?.length || 0,
-        outputMemberCount: mappedCollection.memberCount
-      });
-      
-      return mappedCollection;
-    });
+    return safeCollections.map(plan => ({
+      id: plan.id,
+      name: plan.name,
+      description: plan.description || 'A collaborative dining plan',
+      cover_image: (plan as any).cover_image || 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+      created_by: plan.created_by,
+      creator_id: (plan as any).creator_id,
+      occasion: plan.occasion,
+      is_public: plan.is_public,
+      likes: plan.likes || 0,
+      equal_voting: plan.equal_voting,
+      admin_weighted: plan.admin_weighted,
+      expertise_weighted: plan.expertise_weighted,
+      minimum_participation: plan.minimum_participation,
+      voting_deadline: (plan as any).voting_deadline,
+      allow_vote_changes: plan.allow_vote_changes,
+      anonymous_voting: plan.anonymous_voting,
+      vote_visibility: plan.vote_visibility as 'public' | 'anonymous' | 'admin_only',
+      discussion_enabled: plan.discussion_enabled,
+      auto_ranking_enabled: plan.auto_ranking_enabled,
+      consensus_threshold: plan.consensus_threshold,
+      restaurant_ids: plan.restaurant_ids || [],
+      collaborators: (plan as any).collaborators || [],
+      created_at: plan.created_at,
+      updated_at: plan.updated_at,
+      memberCount: (plan as any).memberCount
+    }));
   }, [safeCollections]);
-
-  // Debug logging for collections
-  console.log('[ListsScreen] Collections count:', planCollections?.length || 0);
-  console.log('[ListsScreen] Collections with memberCount:', planCollections?.map((c: any) => ({
-    name: c.name,
-    memberCount: (c as any).memberCount,
-    collaborators: c.collaborators?.length || 0
-  })));
 
   const favoriteRestaurantsList = useMemo(() => {
     const favs = restaurants.filter(r => favoriteRestaurants.includes(r.id));
@@ -191,7 +127,6 @@ export default function ListsScreen() {
   }, [restaurants, favoriteRestaurants, sortBy]);
 
   const sortedCollections = useMemo(() => {
-    // Validate collections data
     const validCollections = (planCollections || []).filter((collection: any) => {
       if (!collection || !collection.id || !collection.name) {
         return false;
@@ -287,7 +222,7 @@ export default function ListsScreen() {
   const handleLeaveCollection = (collection: Collection) => {
     Alert.alert(
       'Leave Collection',
-      `Are you sure you want to leave "${collection.name}"? You can rejoin later if invited.`,
+      `Are you sure you want to leave "${collection.name}"? You won't be able to access it anymore.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -308,18 +243,44 @@ export default function ListsScreen() {
     );
   };
 
-  // Check if user is the owner of a collection
   const isCollectionOwner = (collection: Collection) => {
-    if (!user) return false;
-    const isOwner = collection.created_by === user.id || collection.creator_id === user.id;
-    console.log(`[ListsScreen] Collection ${collection.name} - User ${user.id} is owner: ${isOwner}`);
-    return isOwner;
+    return collection.created_by === user?.id;
   };
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>My Lists</Text>
+          <Text style={styles.subtitle}>Organize and manage your favorites</Text>
+        </View>
+        <View style={styles.authPrompt}>
+          <BookOpen size={48} color="#CCC" />
+          <Text style={styles.authTitle}>Sign in to access your lists</Text>
+          <Text style={styles.authText}>Create and manage your restaurant collections</Text>
+          <TouchableOpacity 
+            style={styles.authButton}
+            onPress={() => router.push('/auth' as any)}
+          >
+            <Text style={styles.authButtonText}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Lists</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>My Lists</Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => router.push('/create-collection' as any)}
+          >
+            <Plus size={24} color="#FF6B6B" />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subtitle}>Organize and manage your favorites</Text>
       </View>
 
@@ -469,7 +430,7 @@ export default function ListsScreen() {
             </View>
             <View style={styles.collectionsGrid}>
               {filteredCollections.map((collection: any) => {
-                // Create a deep copy to prevent mutation issues (same fix as home page)
+                // Create a deep copy to prevent mutation issues
                 const collectionCopy = {
                   ...collection,
                   collaborators: [...(collection.collaborators || [])],
@@ -533,7 +494,7 @@ export default function ListsScreen() {
               <View style={styles.favoritesGrid}>
                 {favoriteRestaurantsList.map(restaurant => (
                   <View key={restaurant.id} style={styles.favoriteCardWrapper}>
-                    <RestaurantCard
+                    <SimpleRestaurantCard
                       restaurant={restaurant}
                       onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
                       compact={false}
@@ -544,7 +505,7 @@ export default function ListsScreen() {
             ) : (
               <View style={styles.favoritesList}>
                 {favoriteRestaurantsList.map(restaurant => (
-                  <RestaurantCard
+                  <SimpleRestaurantCard
                     key={restaurant.id}
                     restaurant={restaurant}
                     onPress={() => router.push(`/restaurant/${restaurant.id}` as any)}
@@ -571,15 +532,52 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 24,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+  },
+
+  authPrompt: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  authTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  authText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  authButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  authButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -609,6 +607,59 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#FF6B6B',
+    fontWeight: '600',
+  },
+  collectionsHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  allCollectionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    gap: 8,
+  },
+  allCollectionsButtonText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  collectionTypeCarousel: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  carouselContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  collectionTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  activeCollectionTypeButton: {
+    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
+  },
+  collectionTypeText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  activeCollectionTypeText: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   controlsContainer: {
@@ -794,57 +845,6 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     color: '#FF6B6B',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  collectionsHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  allCollectionsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    gap: 8,
-  },
-  allCollectionsButtonText: {
-    color: '#FF6B6B',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  collectionTypeCarousel: {
-    marginBottom: 16,
-  },
-  carouselContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  collectionTypeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  activeCollectionTypeButton: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
-  },
-  collectionTypeText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  activeCollectionTypeText: {
-    color: '#FFFFFF',
     fontWeight: '600',
   },
   // Enhanced loading and error states

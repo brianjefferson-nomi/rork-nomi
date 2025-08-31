@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform, Animated } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User, Navigation } from 'lucide-react-native';
 import { RestaurantCard } from '@/components/RestaurantCard';
@@ -19,6 +19,9 @@ export default function HomeScreen() {
   const restaurantsData = useRestaurants();
   const authData = useAuth();
   
+  // Animated value for city toggle sliding
+  const slideAnim = useMemo(() => new Animated.Value(0), []);
+  
   // Destructure addRestaurantToStore from the store
   const { addRestaurantToStore } = restaurantsData;
   
@@ -27,6 +30,16 @@ export default function HomeScreen() {
   const [mapboxRestaurants, setMapboxRestaurants] = useState<any[]>([]);
   // Use shared currentCity from store
   const { currentCity, switchToCity } = restaurantsData;
+  
+  // Update animation when city changes
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: currentCity === 'nyc' ? 0 : 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8
+    }).start();
+  }, [currentCity, slideAnim]);
 
   // Destructure with defaults and null checks - ensure these are always defined
   const restaurants = restaurantsData?.restaurants || [];
@@ -58,6 +71,14 @@ export default function HomeScreen() {
 
   // Get current city configuration
   const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
+  
+  // Debug: Log current city state
+  console.log('[HomePage] Current city state:', {
+    currentCity,
+    cityConfigName: cityConfig.name,
+    totalRestaurants: restaurants?.length || 0,
+    restaurantsLoaded: !!restaurants
+  });
   
   // Filter restaurants for the current city
   const cityRestaurants = useMemo(() => {
@@ -98,6 +119,19 @@ export default function HomeScreen() {
     });
     
 
+    
+    console.log(`[HomePage] City filtering - ${currentCity}:`, {
+      totalRestaurants: restaurants?.length || 0,
+      filteredRestaurants: filtered.length,
+      sampleRestaurants: filtered.slice(0, 3).map(r => ({
+        name: r.name,
+        city: r.city,
+        state: r.state,
+        restaurant_code: r.restaurant_code,
+        neighborhood: r.neighborhood,
+        address: r.address
+      }))
+    });
     
     return filtered;
   }, [restaurants, cityConfig.filterPattern, currentCity]);
@@ -444,6 +478,35 @@ export default function HomeScreen() {
               return acc;
             }, {} as Record<string, number>);
             
+            // Debug: Log neighborhood counts
+            console.log('[HomePage] Neighborhood counts:', neighborhoodCounts);
+            
+            // Debug: Show all Brooklyn restaurants
+            const brooklynRestaurants = cityRestaurants.filter(r => r.neighborhood === 'Brooklyn');
+            console.log('[HomePage] Brooklyn restaurants:', brooklynRestaurants.map(r => ({
+              name: r.name,
+              neighborhood: r.neighborhood,
+              city: r.city,
+              state: r.state,
+              restaurant_code: r.restaurant_code
+            })));
+            
+            // Debug: Check for NYC restaurants in all data
+            const allNYCRestaurants = restaurants?.filter(r => 
+              r.city === 'New York' || 
+              r.state === 'NY' || 
+              r.restaurant_code?.startsWith('nyc-') ||
+              r.neighborhood === 'Brooklyn' ||
+              r.neighborhood === 'Manhattan'
+            ) || [];
+            console.log('[HomePage] All NYC restaurants found:', allNYCRestaurants.length, allNYCRestaurants.map(r => ({
+              name: r.name,
+              neighborhood: r.neighborhood,
+              city: r.city,
+              state: r.state,
+              restaurant_code: r.restaurant_code
+            })));
+            
             // Get top 4 neighborhoods, but if we don't have 4 with multiple restaurants, 
             // include neighborhoods with at least 1 restaurant
             let topNeighborhoods = Object.entries(neighborhoodCounts)
@@ -613,21 +676,52 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.subtitle}>{cityConfig.subtitle}</Text>
           
-          {/* City Toggle */}
+          {/* Enhanced City Toggle */}
           <View style={styles.cityToggleContainer}>
+            <Animated.View 
+              style={[
+                styles.cityToggleSlider,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 200] // Match the slider width
+                    })
+                  }]
+                }
+              ]}
+            />
             <TouchableOpacity 
-              style={[styles.cityToggleButton, currentCity === 'nyc' && styles.cityToggleButtonActive]}
-              onPress={() => switchToCity('nyc')}
+              style={[styles.cityToggleButton]}
+              onPress={() => {
+                Animated.spring(slideAnim, {
+                  toValue: 0,
+                  useNativeDriver: true,
+                  tension: 100,
+                  friction: 8
+                }).start();
+                switchToCity('nyc');
+              }}
+              activeOpacity={0.8}
             >
               <Text style={[styles.cityToggleText, currentCity === 'nyc' && styles.cityToggleTextActive]}>NYC</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.cityToggleButton, currentCity === 'la' && styles.cityToggleButtonActive]}
-              onPress={() => switchToCity('la')}
+              style={[styles.cityToggleButton]}
+              onPress={() => {
+                Animated.spring(slideAnim, {
+                  toValue: 1,
+                  useNativeDriver: true,
+                  tension: 100,
+                  friction: 8
+                }).start();
+                switchToCity('la');
+              }}
+              activeOpacity={0.8}
             >
               <Text style={[styles.cityToggleText, currentCity === 'la' && styles.cityToggleTextActive]}>LA</Text>
             </TouchableOpacity>
-        </View>
+          </View>
 
           <SearchWizard testID="search-wizard" />
         </View>
@@ -703,6 +797,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 4,
     gap: 4,
+    position: 'relative',
+  },
+  cityToggleSlider: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    width: 190,
+    height: 32,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 6,
+    zIndex: 1,
   },
   cityToggleButton: {
     flex: 1,
@@ -710,9 +815,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 6,
     alignItems: 'center',
-  },
-  cityToggleButtonActive: {
-    backgroundColor: '#FF6B6B',
+    zIndex: 2,
   },
   cityToggleText: {
     fontSize: 14,

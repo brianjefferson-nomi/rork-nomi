@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image, Animated, KeyboardAvoidingView } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus } from 'lucide-react-native';
-import { RestaurantCard } from '@/components/RestaurantCard';
+import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus, X } from 'lucide-react-native';
+import { SimpleCollectionRestaurantCard } from '@/components/restaurant-cards';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { useQuery } from '@tanstack/react-query';
@@ -1525,17 +1525,41 @@ export default function CollectionDetailScreen() {
                       </Text>
                     </View>
                     
-                    <TouchableOpacity 
-                      style={styles.heartButton}
+                    <View style={styles.buttonContainer}>
+                      <TouchableOpacity 
+                        style={styles.heartButton}
                         onPress={(e) => {
                           e.stopPropagation();
                           toggleFavorite(restaurant.id);
                         }}
-                    >
-                      <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
-                        {isFavorite ? '♥' : '♡'}
-                      </Text>
-                    </TouchableOpacity>
+                      >
+                        <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
+                          {isFavorite ? '♥' : '♡'}
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      {/* Remove Button - Only for collection owners/creators */}
+                      {(() => {
+                        const canManage = canManageRestaurants();
+                        console.log('[CollectionDetail] Can manage restaurants:', canManage, {
+                          user: user?.id,
+                          createdBy: effectiveCollection?.created_by,
+                          creatorId: effectiveCollection?.creator_id,
+                          isPublic: effectiveCollection?.is_public
+                        });
+                        return canManage;
+                      })() && (
+                        <TouchableOpacity 
+                          style={styles.heartButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleRemoveRestaurant(restaurant.id, restaurant.name);
+                          }}
+                        >
+                          <X size={20} color="#999" strokeWidth={2} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </TouchableOpacity>
 
                                          {/* Approval Section - Only for shared collections */}
@@ -1609,15 +1633,7 @@ export default function CollectionDetailScreen() {
                   </View>
                      )}
 
-                                         {/* Remove Button - Only for collection owners/creators */}
-                     {canManageRestaurants() && (
-                    <TouchableOpacity 
-                      style={styles.removeButton}
-                      onPress={() => handleRemoveRestaurant(restaurant.id, restaurant.name)}
-                    >
-                      <Text style={styles.removeButtonText}>Remove</Text>
-                    </TouchableOpacity>
-                  )}
+
                   </Animated.View>
               );
             })
@@ -2719,5 +2735,10 @@ const styles = StyleSheet.create({
   },
   commentPostTextDisabled: {
     color: '#9CA3AF',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
 import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import { Search, Filter, X, MapPin } from 'lucide-react-native';
-import { RestaurantCard } from '@/components/RestaurantCard';
+import { SimpleRestaurantCard } from '@/components/restaurant-cards';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 
@@ -19,7 +19,7 @@ export default function DiscoverScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('All');
   const [selectedPrice, setSelectedPrice] = useState('All');
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState('All');
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<Set<string>>(new Set(['All']));
   const [showFilters, setShowFilters] = useState(false);
 
   // No need to auto-detect city here - just use the current city from the store
@@ -27,7 +27,7 @@ export default function DiscoverScreen() {
   // Handle URL parameters for neighborhood filtering (only if explicitly provided)
   useEffect(() => {
     if (params.neighborhood) {
-      setSelectedNeighborhood(params.neighborhood as string);
+      setSelectedNeighborhoods(new Set([params.neighborhood as string]));
     }
   }, [params.neighborhood]);
 
@@ -43,7 +43,28 @@ export default function DiscoverScreen() {
     });
   }, [restaurants, cityConfig]);
 
-  // Get unique neighborhoods from city restaurants
+  // Get ALL restaurants (not just current city) for neighborhood filtering
+  const allRestaurants = useMemo(() => {
+    return restaurants.filter(r => r && r.neighborhood);
+  }, [restaurants]);
+
+  // Get restaurants from current city (for when "All" neighborhoods is selected)
+  const currentCityRestaurants = useMemo(() => {
+    return restaurants.filter(r => {
+      if (!r) return false;
+      // Check if restaurant belongs to current city by checking city/state fields
+      const restaurantCity = r.city?.toLowerCase();
+      const restaurantState = r.state?.toLowerCase();
+      const currentCityName = cityConfig.name.toLowerCase();
+      
+      // Match by city name or state
+      return restaurantCity === currentCityName || 
+             (currentCity === 'nyc' && restaurantState === 'ny') ||
+             (currentCity === 'la' && restaurantState === 'ca');
+    });
+  }, [restaurants, cityConfig, currentCity]);
+
+  // Get unique neighborhoods from current city restaurants only
   const availableNeighborhoods = useMemo(() => {
     const neighborhoods = [...new Set(cityRestaurants.map(r => r.neighborhood).filter(Boolean))];
     return ['All', ...neighborhoods.sort()];
@@ -51,7 +72,10 @@ export default function DiscoverScreen() {
 
   // Filter restaurants based on all criteria
   const filteredRestaurants = useMemo(() => {
-    return cityRestaurants.filter(restaurant => {
+    // Use current city restaurants when "All" is selected, otherwise use all restaurants for neighborhood filtering
+    const baseRestaurants = !selectedNeighborhoods.has('All') ? allRestaurants : currentCityRestaurants;
+    
+    return baseRestaurants.filter(restaurant => {
       const matchesSearch = restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            restaurant.cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            restaurant.neighborhood.toLowerCase().includes(searchQuery.toLowerCase());
@@ -62,12 +86,15 @@ export default function DiscoverScreen() {
       const matchesPrice = selectedPrice === 'All' || 
                           restaurant.priceRange === selectedPrice;
       
-      const matchesNeighborhood = selectedNeighborhood === 'All' || 
-                                 restaurant.neighborhood === selectedNeighborhood;
+      // Fixed: Case-insensitive neighborhood matching for multiple neighborhoods
+      const matchesNeighborhood = selectedNeighborhoods.has('All') || 
+                                 Array.from(selectedNeighborhoods).filter(n => n !== 'All').some(n => 
+                                   restaurant.neighborhood?.toLowerCase() === n?.toLowerCase()
+                                 );
       
       return matchesSearch && matchesCuisine && matchesPrice && matchesNeighborhood;
     });
-  }, [cityRestaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhood]);
+  }, [currentCityRestaurants, allRestaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhoods]);
 
   const handleCityToggle = () => {
     const newCity = currentCity === 'nyc' ? 'la' : 'nyc';
@@ -75,16 +102,16 @@ export default function DiscoverScreen() {
     // Reset filters when switching cities
     setSelectedCuisine('All');
     setSelectedPrice('All');
-    setSelectedNeighborhood('All');
+    setSelectedNeighborhoods(new Set(['All']));
   };
 
   const resetFilters = () => {
     setSelectedCuisine('All');
     setSelectedPrice('All');
-    setSelectedNeighborhood('All');
+    setSelectedNeighborhoods(new Set(['All']));
   };
 
-  const hasActiveFilters = selectedCuisine !== 'All' || selectedPrice !== 'All' || selectedNeighborhood !== 'All';
+  const hasActiveFilters = selectedCuisine !== 'All' || selectedPrice !== 'All' || !selectedNeighborhoods.has('All');
 
   return (
     <View style={styles.container}>
@@ -129,11 +156,13 @@ export default function DiscoverScreen() {
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
         <Text style={styles.resultsCount}>
           {filteredRestaurants.length} restaurants found in {cityConfig.name}
+          {!selectedNeighborhoods.has('All') && selectedNeighborhoods.size > 0 && 
+            ` • ${Array.from(selectedNeighborhoods).filter(n => n !== 'All').join(', ')}`}
         </Text>
         
         <View style={styles.restaurantsList}>
           {filteredRestaurants.map(restaurant => (
-            <RestaurantCard
+            <SimpleRestaurantCard
               key={restaurant.id}
               restaurant={restaurant}
               onPress={() => {
@@ -221,13 +250,36 @@ export default function DiscoverScreen() {
                     key={neighborhood}
                     style={[
                       styles.filterChip,
-                      selectedNeighborhood === neighborhood && styles.filterChipActive
+                      selectedNeighborhoods.has(neighborhood) && styles.filterChipActive
                     ]}
-                    onPress={() => setSelectedNeighborhood(neighborhood)}
+                    onPress={() => {
+                      setSelectedNeighborhoods(prev => {
+                        const newSet = new Set(prev);
+                        if (neighborhood === 'All') {
+                          // If "All" is clicked, clear all other selections and select only "All"
+                          return new Set(['All']);
+                        } else {
+                          // If a specific neighborhood is clicked
+                          if (newSet.has(neighborhood)) {
+                            // Remove the neighborhood
+                            newSet.delete(neighborhood);
+                            // If no neighborhoods left, add "All"
+                            if (newSet.size === 0) {
+                              newSet.add('All');
+                            }
+                          } else {
+                            // Add the neighborhood and remove "All" if it exists
+                            newSet.delete('All');
+                            newSet.add(neighborhood);
+                          }
+                          return newSet;
+                        }
+                      });
+                    }}
                   >
                     <Text style={[
                       styles.filterChipText,
-                      selectedNeighborhood === neighborhood && styles.filterChipTextActive
+                      selectedNeighborhoods.has(neighborhood) && styles.filterChipTextActive
                     ]}>
                       {neighborhood}
                     </Text>

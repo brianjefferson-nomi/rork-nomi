@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Heart, BookOpen, Users, Star, Camera, MessageSquare, MapPin, Settings, Edit3, LogOut } from 'lucide-react-native';
-import { RestaurantCard } from '@/components/RestaurantCard';
+
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { supabase } from '@/services/supabase';
 

@@ -34,8 +34,15 @@ export function filterCollectionsByCity(
 ): CollectionWithRestaurants[] {
   const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
   
+  console.log(`[filterCollectionsByCity] Starting filtering for ${currentCity}:`, {
+    totalCollections: collections.length,
+    totalRestaurants: restaurants.length,
+    cityConfig: cityConfig.name
+  });
+  
   return collections.filter(collection => {
     if (!collection.restaurant_ids || collection.restaurant_ids.length === 0) {
+      console.log(`[filterCollectionsByCity] Skipping "${collection.name}" - no restaurant_ids`);
       return false; // Skip collections with no restaurants
     }
     
@@ -45,40 +52,87 @@ export function filterCollectionsByCity(
     );
     
     if (collectionRestaurants.length === 0) {
+      console.log(`[filterCollectionsByCity] Skipping "${collection.name}" - no restaurants found in database`);
       return false; // Skip if no restaurants found
     }
     
-    // Check if any restaurant in the collection matches the current city
-    const hasCityRestaurants = collectionRestaurants.some(restaurant => {
-      if (!restaurant) return false;
+    console.log(`[filterCollectionsByCity] Checking "${collection.name}":`, {
+      restaurant_ids_count: collection.restaurant_ids.length,
+      found_restaurants: collectionRestaurants.length,
+      restaurants_sample: collectionRestaurants.slice(0, 3).map(r => ({
+        name: r.name,
+        city: r.city,
+        state: r.state,
+        restaurant_code: r.restaurant_code,
+        neighborhood: r.neighborhood
+      }))
+    });
+    
+    // Count restaurants by city
+    let cityRestaurantCount = 0;
+    let otherCityRestaurantCount = 0;
+    
+    collectionRestaurants.forEach(restaurant => {
+      if (!restaurant) return;
+      
+      let isCurrentCity = false;
       
       // Primary filter: Use city and state for most accurate filtering
       if (restaurant.city && restaurant.state) {
         if (currentCity === 'nyc' && restaurant.city === 'New York' && restaurant.state === 'NY') {
-          return true;
+          isCurrentCity = true;
         }
         if (currentCity === 'la' && restaurant.city === 'Los Angeles' && restaurant.state === 'CA') {
-          return true;
+          isCurrentCity = true;
         }
       }
       
       // Secondary filter: Use restaurant_code for city identification
-      if (restaurant.restaurant_code) {
+      if (!isCurrentCity && restaurant.restaurant_code) {
         if (currentCity === 'nyc' && restaurant.restaurant_code.startsWith('nyc-')) {
-          return true;
+          isCurrentCity = true;
         }
         if (currentCity === 'la' && restaurant.restaurant_code.startsWith('la-')) {
-          return true;
+          isCurrentCity = true;
         }
       }
       
       // Fallback filter: Use neighborhood and address patterns
-      const neighborhood = (restaurant.neighborhood || '').toLowerCase();
-      const address = (restaurant.address || '').toLowerCase();
-      return cityConfig.filterPattern.test(neighborhood) || cityConfig.filterPattern.test(address);
+      if (!isCurrentCity) {
+        const neighborhood = (restaurant.neighborhood || '').toLowerCase();
+        const address = (restaurant.address || '').toLowerCase();
+        isCurrentCity = cityConfig.filterPattern.test(neighborhood) || cityConfig.filterPattern.test(address);
+      }
+      
+      if (isCurrentCity) {
+        cityRestaurantCount++;
+        console.log(`[filterCollectionsByCity] "${collection.name}" - ${currentCity} match: ${restaurant.name}`);
+      } else {
+        otherCityRestaurantCount++;
+        console.log(`[filterCollectionsByCity] "${collection.name}" - other city: ${restaurant.name} (${restaurant.city}, ${restaurant.state})`);
+      }
     });
     
-    return hasCityRestaurants;
+    // Only include collections where the majority of restaurants are from the current city
+    const totalRestaurants = cityRestaurantCount + otherCityRestaurantCount;
+    const majorityThreshold = Math.ceil(totalRestaurants * 0.6); // 60% threshold
+    const hasMajority = cityRestaurantCount >= majorityThreshold;
+    
+    console.log(`[filterCollectionsByCity] "${collection.name}" city breakdown:`, {
+      currentCity: cityRestaurantCount,
+      otherCity: otherCityRestaurantCount,
+      total: totalRestaurants,
+      majorityThreshold,
+      hasMajority
+    });
+    
+    if (hasMajority) {
+      console.log(`[filterCollectionsByCity] ✅ Including "${collection.name}" - majority ${currentCity} restaurants (${cityRestaurantCount}/${totalRestaurants})`);
+    } else {
+      console.log(`[filterCollectionsByCity] ❌ Excluding "${collection.name}" - not majority ${currentCity} restaurants (${cityRestaurantCount}/${totalRestaurants})`);
+    }
+    
+    return hasMajority;
   });
 }
 

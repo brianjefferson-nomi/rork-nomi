@@ -571,6 +571,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
     }
   });
 
@@ -580,6 +581,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
     }
   });
 
@@ -728,8 +730,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     try {
       await dbHelpers.updateCollection(planId, { restaurant_ids: updatedRestaurantIds });
       console.log(`[RestaurantStore] Successfully updated plan in database`);
+      
+      // Invalidate all relevant queries for immediate UI updates
       queryClient.invalidateQueries({ queryKey: ['userPlans'] });
-      console.log(`[RestaurantStore] Invalidated userPlans query`);
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+      queryClient.invalidateQueries({ queryKey: ['collectionRestaurants', planId] });
+      
+      console.log(`[RestaurantStore] Invalidated queries for immediate update`);
     } catch (error) {
       console.error(`[RestaurantStore] Error updating plan:`, error);
       throw error;
@@ -741,8 +748,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     if (!plan) return;
 
     const updatedRestaurantIds = (plan.restaurant_ids || []).filter((id: string) => id !== restaurantId);
-          await dbHelpers.updateCollection(planId, { restaurant_ids: updatedRestaurantIds });
-    queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    
+    try {
+      await dbHelpers.updateCollection(planId, { restaurant_ids: updatedRestaurantIds });
+      
+      // Invalidate all relevant queries for immediate UI updates
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+      queryClient.invalidateQueries({ queryKey: ['collectionRestaurants', planId] });
+      
+      console.log(`[RestaurantStore] Removed restaurant and invalidated queries for immediate update`);
+    } catch (error) {
+      console.error(`[RestaurantStore] Error removing restaurant from plan:`, error);
+      throw error;
+    }
   }, [plansQuery.data, queryClient]);
 
   const createPlan = useCallback(async (planData: any) => {
@@ -1232,6 +1251,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const updatePlanSettings = useCallback(async (planId: string, settings: Partial<Plan>) => {
     await dbHelpers.updateCollection(planId, settings);
     queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    queryClient.invalidateQueries({ queryKey: ['allCollections'] });
   }, [queryClient]);
 
   const switchToCity = useCallback((city: 'nyc' | 'la') => {
@@ -1258,6 +1278,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     if (!user?.id) return;
     await dbHelpers.leaveCollection(collectionId, user.id);
     queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+    queryClient.invalidateQueries({ queryKey: ['allCollections'] });
   }, [user?.id, queryClient]);
 
   const isCollectionOwner = useCallback(async (collectionId: string) => {
@@ -1323,27 +1344,38 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   const addMemberToCollection = useCallback(async (collectionId: string, userId: string, role?: 'member' | 'admin') => {
     try {
-      return await dbHelpers.addMemberToCollection(collectionId, userId, role);
+      const result = await dbHelpers.addMemberToCollection(collectionId, userId, role);
+      // Invalidate queries to ensure UI updates immediately
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+      return result;
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [queryClient]);
 
   const removeMemberFromCollection = useCallback(async (collectionId: string, userId: string) => {
     try {
       await dbHelpers.removeMemberFromCollection(collectionId, userId);
+      // Invalidate queries to ensure UI updates immediately
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [queryClient]);
 
   const updateCollectionType = useCallback(async (collectionId: string, collectionType: 'public' | 'private' | 'shared') => {
     try {
-      return await dbHelpers.updateCollectionType(collectionId, collectionType);
+      const result = await dbHelpers.updateCollectionType(collectionId, collectionType);
+      // Invalidate queries to ensure UI updates immediately
+      queryClient.invalidateQueries({ queryKey: ['userPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['allCollections'] });
+      return result;
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [queryClient]);
 
   // Add restaurant to store when selected from search results
   const addRestaurantToStore = useCallback((restaurant: Restaurant) => {

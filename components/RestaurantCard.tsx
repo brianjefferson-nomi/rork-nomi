@@ -8,9 +8,11 @@ interface RestaurantCardProps {
   restaurant: Restaurant;
   onPress: () => void;
   compact?: boolean;
+  showRemoveButton?: boolean;
+  onRemove?: () => void;
 }
 
-export function RestaurantCard({ restaurant, onPress, compact = false }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, onPress, compact = false, showRemoveButton = false, onRemove }: RestaurantCardProps) {
   const { favoriteRestaurants, toggleFavorite } = useRestaurants();
   const isFavorite = favoriteRestaurants.includes(restaurant.id);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -21,6 +23,8 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
     e.stopPropagation();
     toggleFavorite(restaurant.id);
   };
+
+
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -127,11 +131,12 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             <Text style={styles.compactNeighborhood}>{restaurant.neighborhood}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleFavoritePress} style={styles.compactFavorite}>
+        <TouchableOpacity onPress={handleFavoritePress} style={styles.compactFavorite} activeOpacity={0.7}>
           <Heart 
             size={20} 
-            color={isFavorite ? '#FF6B6B' : '#999'} 
+            color={isFavorite ? '#FF6B6B' : '#666'} 
             fill={isFavorite ? '#FF6B6B' : 'transparent'}
+            strokeWidth={2}
           />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -180,12 +185,12 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
           </>
         )}
         
-        <TouchableOpacity onPress={handleFavoritePress} style={styles.favoriteButton}>
+        <TouchableOpacity onPress={handleFavoritePress} style={styles.favoriteButton} activeOpacity={0.7}>
           <Heart 
             size={24} 
-            color={isFavorite ? '#FF6B6B' : '#FFF'} 
+            color={isFavorite ? '#FF6B6B' : '#FFFFFF'} 
             fill={isFavorite ? '#FF6B6B' : 'transparent'}
-            strokeWidth={2}
+            strokeWidth={2.5}
           />
         </TouchableOpacity>
       </View>
@@ -198,137 +203,137 @@ export function RestaurantCard({ restaurant, onPress, compact = false }: Restaur
             {renderStarRating(restaurant.rating || 0)}
           </View>
           
-                    {/* Vibe tags - moved closer to restaurant name */}
+          {/* Vibe tags - moved closer to restaurant name */}
           {(() => {
             const vibeTags = restaurant.aiVibes || restaurant.vibe || [];
-          console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
-          
-          // Generate more specific vibe tags based on restaurant characteristics
-          const generateSpecificTags = () => {
-            const description = (restaurant.aiDescription || restaurant.description || '').toLowerCase();
-            const cuisine = restaurant.cuisine.toLowerCase();
-            const priceRange = restaurant.priceRange;
-            const name = restaurant.name.toLowerCase();
+            console.log(`[RestaurantCard] Vibe tags for ${restaurant.name}:`, vibeTags);
             
-            const specificTags = [];
+            // Generate more specific vibe tags based on restaurant characteristics
+            const generateSpecificTags = () => {
+              const description = (restaurant.aiDescription || restaurant.description || '').toLowerCase();
+              const cuisine = restaurant.cuisine.toLowerCase();
+              const priceRange = restaurant.priceRange;
+              const name = restaurant.name.toLowerCase();
+              
+              const specificTags = [];
+              
+              // Price-based tags
+              if (priceRange === '$$$$') {
+                specificTags.push('Luxury', 'Fine Dining');
+              } else if (priceRange === '$$$') {
+                specificTags.push('Upscale', 'Sophisticated');
+              } else if (priceRange === '$$') {
+                specificTags.push('Casual', 'Comfortable');
+              } else {
+                specificTags.push('Affordable', 'Quick Bite');
+              }
+              
+              // Cuisine-based tags
+              if (cuisine.includes('italian')) {
+                specificTags.push('Authentic', 'Traditional');
+              } else if (cuisine.includes('japanese') || cuisine.includes('sushi')) {
+                specificTags.push('Fresh', 'Artisanal');
+              } else if (cuisine.includes('mexican')) {
+                specificTags.push('Spicy', 'Vibrant');
+              } else if (cuisine.includes('french')) {
+                specificTags.push('Elegant', 'Refined');
+              } else if (cuisine.includes('american')) {
+                specificTags.push('Classic', 'Comfort');
+              } else if (cuisine.includes('thai')) {
+                specificTags.push('Aromatic', 'Bold');
+              } else if (cuisine.includes('indian')) {
+                specificTags.push('Spiced', 'Rich');
+              }
+              
+              // Description-based tags
+              if (description.includes('romantic') || description.includes('intimate')) {
+                specificTags.push('Romantic');
+              }
+              if (description.includes('cozy') || description.includes('warm')) {
+                specificTags.push('Cozy');
+              }
+              if (description.includes('trendy') || description.includes('modern')) {
+                specificTags.push('Trendy');
+              }
+              if (description.includes('rustic') || description.includes('farm')) {
+                specificTags.push('Rustic');
+              }
+              if (description.includes('elegant') || description.includes('sophisticated')) {
+                specificTags.push('Elegant');
+              }
+              if (description.includes('bustling') || description.includes('energetic')) {
+                specificTags.push('Bustling');
+              }
+              if (description.includes('quiet') || description.includes('serene')) {
+                specificTags.push('Serene');
+              }
+              if (description.includes('authentic') || description.includes('traditional')) {
+                specificTags.push('Authentic');
+              }
+              if (description.includes('innovative') || description.includes('creative')) {
+                specificTags.push('Innovative');
+              }
+              if (description.includes('family') || description.includes('friendly')) {
+                specificTags.push('Family-friendly');
+              }
+              if (description.includes('date') || description.includes('romantic')) {
+                specificTags.push('Date Night');
+              }
+              if (description.includes('business') || description.includes('professional')) {
+                specificTags.push('Business');
+              }
+              if (description.includes('outdoor') || description.includes('patio')) {
+                specificTags.push('Outdoor');
+              }
+              if (description.includes('rooftop') || description.includes('view')) {
+                specificTags.push('Rooftop');
+              }
+              if (description.includes('historic') || description.includes('landmark')) {
+                specificTags.push('Historic');
+              }
+              if (description.includes('local') || description.includes('neighborhood')) {
+                specificTags.push('Local');
+              }
+              if (description.includes('organic') || description.includes('farm-to-table')) {
+                specificTags.push('Farm-to-table');
+              }
+              if (description.includes('vegan') || description.includes('vegetarian')) {
+                specificTags.push('Plant-based');
+              }
+              
+              // Remove duplicates and limit to 4 tags
+              const uniqueTags = [...new Set(specificTags)];
+              return uniqueTags.slice(0, 4);
+            };
             
-            // Price-based tags
-            if (priceRange === '$$$$') {
-              specificTags.push('Luxury', 'Fine Dining');
-            } else if (priceRange === '$$$') {
-              specificTags.push('Upscale', 'Sophisticated');
-            } else if (priceRange === '$$') {
-              specificTags.push('Casual', 'Comfortable');
-            } else {
-              specificTags.push('Affordable', 'Quick Bite');
-            }
+            // Use specific tags if available, otherwise fallback to default
+            const displayTags = vibeTags.length > 0 ? vibeTags : generateSpecificTags();
             
-            // Cuisine-based tags
-            if (cuisine.includes('italian')) {
-              specificTags.push('Authentic', 'Traditional');
-            } else if (cuisine.includes('japanese') || cuisine.includes('sushi')) {
-              specificTags.push('Fresh', 'Artisanal');
-            } else if (cuisine.includes('mexican')) {
-              specificTags.push('Spicy', 'Vibrant');
-            } else if (cuisine.includes('french')) {
-              specificTags.push('Elegant', 'Refined');
-            } else if (cuisine.includes('american')) {
-              specificTags.push('Classic', 'Comfort');
-            } else if (cuisine.includes('thai')) {
-              specificTags.push('Aromatic', 'Bold');
-            } else if (cuisine.includes('indian')) {
-              specificTags.push('Spiced', 'Rich');
-            }
-            
-            // Description-based tags
-            if (description.includes('romantic') || description.includes('intimate')) {
-              specificTags.push('Romantic');
-            }
-            if (description.includes('cozy') || description.includes('warm')) {
-              specificTags.push('Cozy');
-            }
-            if (description.includes('trendy') || description.includes('modern')) {
-              specificTags.push('Trendy');
-            }
-            if (description.includes('rustic') || description.includes('farm')) {
-              specificTags.push('Rustic');
-            }
-            if (description.includes('elegant') || description.includes('sophisticated')) {
-              specificTags.push('Elegant');
-            }
-            if (description.includes('bustling') || description.includes('energetic')) {
-              specificTags.push('Bustling');
-            }
-            if (description.includes('quiet') || description.includes('serene')) {
-              specificTags.push('Serene');
-            }
-            if (description.includes('authentic') || description.includes('traditional')) {
-              specificTags.push('Authentic');
-            }
-            if (description.includes('innovative') || description.includes('creative')) {
-              specificTags.push('Innovative');
-            }
-            if (description.includes('family') || description.includes('friendly')) {
-              specificTags.push('Family-friendly');
-            }
-            if (description.includes('date') || description.includes('romantic')) {
-              specificTags.push('Date Night');
-            }
-            if (description.includes('business') || description.includes('professional')) {
-              specificTags.push('Business');
-            }
-            if (description.includes('outdoor') || description.includes('patio')) {
-              specificTags.push('Outdoor');
-            }
-            if (description.includes('rooftop') || description.includes('view')) {
-              specificTags.push('Rooftop');
-            }
-            if (description.includes('historic') || description.includes('landmark')) {
-              specificTags.push('Historic');
-            }
-            if (description.includes('local') || description.includes('neighborhood')) {
-              specificTags.push('Local');
-            }
-            if (description.includes('organic') || description.includes('farm-to-table')) {
-              specificTags.push('Farm-to-table');
-            }
-            if (description.includes('vegan') || description.includes('vegetarian')) {
-              specificTags.push('Plant-based');
-            }
-            
-            // Remove duplicates and limit to 4 tags
-            const uniqueTags = [...new Set(specificTags)];
-            return uniqueTags.slice(0, 4);
-          };
-          
-          // Use specific tags if available, otherwise fallback to default
-          const displayTags = vibeTags.length > 0 ? vibeTags : generateSpecificTags();
-          
-          return (
-            <View style={styles.vibeContainer}>
-              {(() => {
-                const validTags = displayTags.slice(0, 4)
-                  .filter(v => v && typeof v === 'string' && v.trim().length > 0)
-                  .map(v => {
-                    const firstWord = v.split(' ')[0];
-                    if (!firstWord || firstWord.length === 0) return null;
-                    const firstChar = firstWord.charAt(0);
-                    const restOfWord = firstWord.slice(1);
-                    const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
-                    if (!cleanTag || cleanTag.length === 0) return null;
-                    return cleanTag;
-                  })
-                  .filter(Boolean);
-                
-                return validTags.map((cleanTag, i) => (
-                  <View key={i} style={styles.vibeTag}>
-                    <Text style={styles.vibeText}>{cleanTag}</Text>
-                  </View>
-                ));
-              })()}
-            </View>
-          );
-        })()}
+            return (
+              <View style={styles.vibeContainer}>
+                {(() => {
+                  const validTags = displayTags.slice(0, 4)
+                    .filter(v => v && typeof v === 'string' && v.trim().length > 0)
+                    .map(v => {
+                      const firstWord = v.split(' ')[0];
+                      if (!firstWord || firstWord.length === 0) return null;
+                      const firstChar = firstWord.charAt(0);
+                      const restOfWord = firstWord.slice(1);
+                      const cleanTag = (firstChar ? firstChar.toUpperCase() : '') + (restOfWord ? restOfWord.toLowerCase() : '');
+                      if (!cleanTag || cleanTag.length === 0) return null;
+                      return cleanTag;
+                    })
+                    .filter(Boolean);
+                  
+                  return validTags.map((cleanTag, i) => (
+                    <View key={i} style={styles.vibeTag}>
+                      <Text style={styles.vibeText}>{cleanTag}</Text>
+                    </View>
+                  ));
+                })()}
+              </View>
+            );
+          })()}
         </View>
         
         {/* Price and cuisine */}
@@ -430,11 +435,11 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 140,
+    height: 180,
   },
   image: {
     width: '100%',
-    height: 140,
+    height: 180,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -448,10 +453,10 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   prevButton: {
-    left: 12,
+    left: 16,
   },
   nextButton: {
-    right: 12,
+    right: 16,
   },
   imageIndicators: {
     position: 'absolute',
@@ -474,12 +479,17 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 20,
     padding: 8,
     zIndex: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   content: {
     padding: 12,
