@@ -44,14 +44,21 @@ export class PexelsImageStorageService {
       });
 
       // Check if image already exists
-      const { data: existingImage } = await supabase
+      const { data: existingImage, error: checkError } = await supabase
         .from('pexels_images')
         .select('*')
         .eq('pexels_id', pexelsImage.id)
         .eq('image_type', imageType)
         .single();
 
-      if (existingImage) {
+      // If table doesn't exist, log warning and return null
+      if (checkError?.code === 'PGRST205') {
+        console.warn('[PexelsImageStorage] Table pexels_images does not exist. Skipping database storage.');
+        console.warn('[PexelsImageStorage] Run the migration: database/migrations/create_pexels_images_table.sql');
+        return null;
+      }
+
+      if (existingImage && !checkError) {
         console.log(`[PexelsImageStorage] Image already exists, updating context`);
         
         // Update existing image with new context
@@ -151,6 +158,11 @@ export class PexelsImageStorageService {
         .single();
 
       if (error) {
+        // If table doesn't exist, log warning and return null
+        if (error.code === 'PGRST205') {
+          console.warn('[PexelsImageStorage] Table pexels_images does not exist. Cannot retrieve saved images.');
+          return null;
+        }
         console.error('[PexelsImageStorage] Error getting saved image:', error);
         return null;
       }
