@@ -3,19 +3,20 @@ import { supabase } from './supabase';
 
 // Use environment variables for API keys (more secure)
 const AI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const AI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || 'sk-proj-your-api-key-here';
-const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '20963faf74mshd7e2b2b5c31072dp144d88jsnedee80161863';
-const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || 'F99007CEF189438793FFD5D7B484839A';
+const AI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
+const RAPIDAPI_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY || '';
+const TRIPADVISOR_API_KEY = process.env.EXPO_PUBLIC_TRIPADVISOR_API_KEY || '';
 const TA_CONTENT_BASE = 'https://api.content.tripadvisor.com/api/v1';
+
 // Foursquare API keys with fallback mechanism
-const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || 'DGV1DNHVYV2EGZY1ZRHVP4EMS2PA052UJ4IXX1WAQRKUSWTT';
-const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || 'fsq3iPnP2vBvgyThDFd5/cawBsDYxFPf37L6rOvnZjA7zvM=';
-const FOURSQUARE_FALLBACK_KEY = 'fsq3iPnP2vBvgyThDFd5/cawBsDYxFPf37L6rOvnZjA7zvM=';
+const FOURSQUARE_CLIENT_ID = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_ID || '';
+const FOURSQUARE_CLIENT_SECRET = process.env.EXPO_PUBLIC_FOURSQUARE_CLIENT_SECRET || '';
+const FOURSQUARE_PLACES_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_PLACES_API_KEY || '';
 const FOURSQUARE_BASE_URL = 'https://api.foursquare.com/v3';
 const FOURSQUARE_NEW_BASE_URL = 'https://api.foursquare.com/v2';
-const FOURSQUARE_PLACES_API_KEY = process.env.EXPO_PUBLIC_FOURSQUARE_PLACES_API_KEY || FOURSQUARE_FALLBACK_KEY;
 const FOURSQUARE_PLACES_BASE_URL = 'https://places-api.foursquare.com';
-const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_API_KEY || 'sk.eyJ1Ijoibm9taS1icmlhbiIsImEiOiJjbWV0aW5hcTEwZnM2Mmlwb2cweGxkc3pwIn0.-I4ZJXTfYnJwr8bOvt9JhQ';
+
+const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_API_KEY || '';
 const STOCK_PHOTOS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const STOCK_PHOTOS_HOST = 'stock-photos-and-videos.p.rapidapi.com';
 const RESTAURANTS_API_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
@@ -44,8 +45,8 @@ const UBER_EATS_KEY = RAPIDAPI_KEY; // Use same RapidAPI key
 const UBER_EATS_HOST = 'uber-eats-scraper-api.p.rapidapi.com';
 
 // Development mode - disable external APIs to use local data only
-// Force development mode to true for now to ensure we use local data
-const DEV_MODE = true; // process.env.NODE_ENV === 'development' || process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+// Set to false to enable external APIs for testing
+const DEV_MODE = false; // process.env.NODE_ENV === 'development' || process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
 // API Rate Limiting Configuration
 const API_RATE_LIMITS = {
@@ -148,8 +149,8 @@ const getFoursquareApiKey = () => {
   if (FOURSQUARE_CLIENT_ID && FOURSQUARE_CLIENT_ID !== 'DGV1DNHVYV2EGZY1ZRHVP4EMS2PA052UJ4IXX1WAQRKUSWTT') {
     return FOURSQUARE_CLIENT_ID;
   }
-  // Use fallback key
-  return FOURSQUARE_FALLBACK_KEY;
+  // No fallback key available
+  return '';
 };
 
 // Function to build Foursquare v2 API URL with authentication

@@ -32,6 +32,12 @@ interface InsightsTabProps {
   handleDeleteDiscussion: (discussionId: string) => Promise<void>;
   setEditDiscussionMessage: (message: string) => void;
   setShowEditDiscussionModal: (modal: { discussionId: string; currentMessage: string } | null) => void;
+  participationData?: {
+    totalMembers: number;
+    totalVotes: number;
+    participationRate: number;
+    has75PercentParticipation: boolean;
+  };
 }
 
 function InsightsTab({ 
@@ -45,7 +51,8 @@ function InsightsTab({
   handleEditDiscussion,
   handleDeleteDiscussion,
   setEditDiscussionMessage,
-  setShowEditDiscussionModal
+  setShowEditDiscussionModal,
+  participationData
 }: InsightsTabProps) {
   console.log('[InsightsTab] Component received props:', {
     collectionId: collection?.id,
@@ -233,10 +240,17 @@ function InsightsTab({
                 </View>
                 <View style={styles.restaurantTitleContainer}>
                   <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
-                  <Text style={styles.restaurantSubtitle}>{`Ranked #${index + 1} • ${restaurant.cuisine || 'Restaurant'}`}</Text>
+                  <Text style={styles.restaurantSubtitle}>
+                    {participationData?.has75PercentParticipation ? 
+                      `Ranked #${index + 1} • ${restaurant.cuisine || 'Restaurant'}` :
+                      `${restaurant.cuisine || 'Restaurant'} • ${participationData?.participationRate || 0}% participation`
+                    }
+                  </Text>
                 </View>
                 <View style={styles.restaurantRank}>
-                  <Text style={styles.rankText}>#{index + 1}</Text>
+                  {participationData?.has75PercentParticipation ? (
+                    <Text style={styles.rankText}>#{index + 1}</Text>
+                  ) : null}
                 </View>
               </View>
               

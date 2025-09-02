@@ -6,6 +6,7 @@ import { SimpleRestaurantCard } from '@/components/restaurant-cards';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 
+
 const cuisineTypes = ['All', 'Italian', 'French', 'Chinese', 'American', 'Deli', 'Bakery', 'Gastropub'];
 const priceRanges = ['All', '$', '$$', '$$$', '$$$$'];
 
@@ -64,11 +65,24 @@ export default function DiscoverScreen() {
     });
   }, [restaurants, cityConfig, currentCity]);
 
-  // Get unique neighborhoods from current city restaurants only
+  // Get unique neighborhoods from NYC Open Data for NYC, fallback to local data for LA
   const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = [...new Set(cityRestaurants.map(r => r.neighborhood).filter(Boolean))];
-    return ['All', ...neighborhoods.sort()];
-  }, [cityRestaurants]);
+    if (currentCity === 'nyc') {
+      // For NYC, we'll use a predefined list of popular neighborhoods
+      // In a real implementation, you'd fetch this from NYC Open Data
+      const nycNeighborhoods = [
+        'All', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
+        'Upper East Side', 'Upper West Side', 'Midtown', 'Downtown',
+        'Chelsea', 'Greenwich Village', 'East Village', 'SoHo', 'TriBeCa',
+        'Harlem', 'Williamsburg', 'Bushwick', 'Astoria', 'Long Island City'
+      ];
+      return nycNeighborhoods;
+    } else {
+      // For LA, use local data
+      const neighborhoods = [...new Set(cityRestaurants.map(r => r.neighborhood).filter(Boolean))];
+      return ['All', ...neighborhoods.sort()];
+    }
+  }, [cityRestaurants, currentCity]);
 
   // Filter restaurants based on all criteria
   const filteredRestaurants = useMemo(() => {

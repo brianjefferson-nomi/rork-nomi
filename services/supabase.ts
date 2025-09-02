@@ -89,6 +89,12 @@ export interface Database {
           phone?: string;
           website?: string;
           price_level?: number;
+          // TripAdvisor fields
+          tripadvisor_location_id?: string;
+          tripadvisor_rating?: number;
+          tripadvisor_review_count?: number;
+          tripadvisor_photos?: string[];
+          tripadvisor_last_updated?: string;
           created_at: string;
           updated_at: string;
         };
@@ -114,6 +120,12 @@ export interface Database {
           phone?: string;
           website?: string;
           price_level?: number;
+          // TripAdvisor fields
+          tripadvisor_location_id?: string;
+          tripadvisor_rating?: number;
+          tripadvisor_review_count?: number;
+          tripadvisor_photos?: string[];
+          tripadvisor_last_updated?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -139,6 +151,12 @@ export interface Database {
           phone?: string;
           website?: string;
           price_level?: number;
+          // TripAdvisor fields
+          tripadvisor_location_id?: string;
+          tripadvisor_rating?: number;
+          tripadvisor_review_count?: number;
+          tripadvisor_photos?: string[];
+          tripadvisor_last_updated?: string;
           updated_at?: string;
         };
       };
@@ -485,25 +503,10 @@ export const dbHelpers = {
         }
       }
       
-      // Get all public collections for discovery
-      const { data: publicCollections, error: publicError } = await supabase
-        .from('collections')
-        .select('*')
-        .eq('is_public', true);
-      
-      if (publicError) {
-        console.error('[getUserPlans] Error fetching public collections:', publicError);
-        // Don't throw error, continue with other queries
-        console.log('[getUserPlans] Continuing with other queries despite public collections error');
-      }
-      
-      console.log('[getUserPlans] Public collections found:', publicCollections?.length || 0);
-      
-      // Combine all collections
+      // Combine collections (only user-created and user-member collections)
       const allCollections = [
         ...(createdCollections || []), 
-        ...memberCollectionData, 
-        ...(publicCollections || [])
+        ...memberCollectionData
       ];
       
       // Deduplicate collections
@@ -512,7 +515,7 @@ export const dbHelpers = {
       );
       
       console.log(`[getUserPlans] Found ${uniqueCollections.length} total collections for user ${userId}`);
-      console.log(`[getUserPlans] Created: ${createdCollections?.length || 0}, Members: ${memberCollectionData.length}, Public: ${publicCollections?.length || 0}`);
+      console.log(`[getUserPlans] Created: ${createdCollections?.length || 0}, Members: ${memberCollectionData.length}`);
       
       // For each collection, get its members to populate the collaborators field
       console.log('[getUserPlans] Processing collections with members...');
@@ -567,15 +570,60 @@ export const dbHelpers = {
     }
   },
 
-  async getAllCollections() {
-    console.log(`[getAllCollections] Starting database query... (${new Date().toISOString()})`);
+  async getUserCollections(userId: string) {
+    console.log(`[getUserCollections] Starting database query for user: ${userId}... (${new Date().toISOString()})`);
     
-    // Get all public collections for discovery
-    const { data, error } = await supabase
+    // Get all collections where the user is involved (created or is a collaborator)
+    const query = supabase
+      .from('collections')
+      .select('*')
+      .or(`created_by.eq.${userId},collaborators.cs.{${userId}}`)
+      .order('created_at', { ascending: false });
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('[getUserCollections] Database error:', error);
+      throw error;
+    }
+    
+    console.log(`[getUserCollections] Raw data from database (${new Date().toISOString()}):`, data?.map(c => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0,
+      created_at: c.created_at,
+      id: c.id,
+      is_public: c.is_public
+    })));
+    
+    // Use the collaborators field that's already populated in the collections table
+    const collectionsWithMembers = (data || []).map((collection) => {
+      return {
+        ...collection,
+        collaborators: collection.collaborators || []
+      };
+    });
+    
+    console.log(`[getUserCollections] Processed collections (${new Date().toISOString()}):`, collectionsWithMembers?.map(c => ({
+      name: c.name,
+      collaborators: c.collaborators,
+      collaboratorsLength: c.collaborators?.length || 0
+    })));
+    
+    return collectionsWithMembers;
+  },
+
+  async getAllCollections(userId?: string) {
+    console.log(`[getAllCollections] Starting database query for public collections... (${new Date().toISOString()})`);
+    
+    // Get all public collections regardless of user involvement
+    const query = supabase
       .from('collections')
       .select('*')
       .eq('is_public', true)
       .order('created_at', { ascending: false });
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('[getAllCollections] Database error:', error);
@@ -587,7 +635,8 @@ export const dbHelpers = {
       collaborators: c.collaborators,
       collaboratorsLength: c.collaborators?.length || 0,
       created_at: c.created_at,
-      id: c.id
+      id: c.id,
+      is_public: c.is_public
     })));
     
     // Log specific collections for debugging
@@ -1704,6 +1753,106 @@ export const dbHelpers = {
     } catch (error) {
       console.error('[getCollectionLikeCount] Unexpected error:', error);
       return 0;
+    }
+  },
+
+  // TripAdvisor integration functions
+  async enhanceRestaurantWithTripAdvisor(restaurantId: string, tripAdvisorLocationId: string) {
+    console.log('[enhanceRestaurantWithTripAdvisor] Enhancing restaurant:', restaurantId, 'with TripAdvisor ID:', tripAdvisorLocationId);
+    
+    try {
+      // Import TripAdvisor service dynamically to avoid circular dependencies
+      const { tripAdvisorService } = await import('./tripadvisor');
+      
+      // Get comprehensive TripAdvisor data
+      const tripAdvisorData = await tripAdvisorService.getLocationData(tripAdvisorLocationId, false);
+      
+      if (!tripAdvisorData.details) {
+        console.log('[enhanceRestaurantWithTripAdvisor] No TripAdvisor details found for location:', tripAdvisorLocationId);
+        return false;
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        tripadvisor_location_id: tripAdvisorLocationId,
+        tripadvisor_rating: tripAdvisorData.details.rating,
+        tripadvisor_review_count: tripAdvisorData.details.num_reviews,
+        tripadvisor_last_updated: new Date().toISOString()
+      };
+
+      // Add photos if available
+      if (tripAdvisorData.photos && tripAdvisorData.photos.length > 0) {
+        const photoUrls = tripAdvisorData.photos.slice(0, 5).map(photo => 
+          photo.sizes.large?.url || photo.sizes.medium?.url || photo.sizes.small?.url
+        ).filter(Boolean);
+        
+        if (photoUrls.length > 0) {
+          updateData.tripadvisor_photos = photoUrls;
+        }
+      }
+
+      // Update restaurant with TripAdvisor data
+      const { error } = await supabase
+        .from('restaurants')
+        .update(updateData)
+        .eq('id', restaurantId);
+
+      if (error) {
+        console.error('[enhanceRestaurantWithTripAdvisor] Error updating restaurant:', error);
+        return false;
+      }
+
+      console.log('[enhanceRestaurantWithTripAdvisor] Successfully enhanced restaurant with TripAdvisor data');
+      return true;
+    } catch (error) {
+      console.error('[enhanceRestaurantWithTripAdvisor] Unexpected error:', error);
+      return false;
+    }
+  },
+
+  async getRestaurantsWithTripAdvisorData() {
+    console.log('[getRestaurantsWithTripAdvisorData] Getting restaurants with TripAdvisor data');
+    
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .not('tripadvisor_location_id', 'is', null);
+
+      if (error) {
+        console.error('[getRestaurantsWithTripAdvisorData] Error fetching restaurants:', error);
+        return [];
+      }
+
+      console.log('[getRestaurantsWithTripAdvisorData] Found', data?.length || 0, 'restaurants with TripAdvisor data');
+      return data || [];
+    } catch (error) {
+      console.error('[getRestaurantsWithTripAdvisorData] Unexpected error:', error);
+      return [];
+    }
+  },
+
+  async updateTripAdvisorDataForRestaurant(restaurantId: string) {
+    console.log('[updateTripAdvisorDataForRestaurant] Updating TripAdvisor data for restaurant:', restaurantId);
+    
+    try {
+      // Get restaurant to find TripAdvisor location ID
+      const { data: restaurant, error: fetchError } = await supabase
+        .from('restaurants')
+        .select('tripadvisor_location_id')
+        .eq('id', restaurantId)
+        .single();
+
+      if (fetchError || !restaurant?.tripadvisor_location_id) {
+        console.log('[updateTripAdvisorDataForRestaurant] No TripAdvisor location ID found for restaurant:', restaurantId);
+        return false;
+      }
+
+      // Enhance with fresh TripAdvisor data
+      return await this.enhanceRestaurantWithTripAdvisor(restaurantId, restaurant.tripadvisor_location_id);
+    } catch (error) {
+      console.error('[updateTripAdvisorDataForRestaurant] Unexpected error:', error);
+      return false;
     }
   }
 };

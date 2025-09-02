@@ -5,6 +5,7 @@ import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
+import { formatAddressForDisplay } from '@/utils/address-formatting';
 
 const { width } = Dimensions.get('window');
 
@@ -325,8 +326,7 @@ export default function RestaurantDetailScreen() {
               <MapPin size={18} color="#666" />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Location</Text>
-                <Text style={styles.infoText}>{restaurant.address || 'Address not available'}</Text>
-                {restaurant.neighborhood && <Text style={styles.infoSubtext}>{restaurant.neighborhood}</Text>}
+                <Text style={styles.infoText}>{formatAddressForDisplay(restaurant.address || '', restaurant.neighborhood, restaurant.city)}</Text>
               </View>
             </View>
             <View style={styles.infoItem}>

@@ -45,12 +45,32 @@ export interface Restaurant {
     longitude: number;
   };
   // Location-based fields
-  distance?: string;
+  latitude?: number;
+  longitude?: number;
+  distance?: number | string;
   proximity?: 'Very Close' | 'Nearby' | 'Close' | 'Within Range';
   isFavorite?: boolean;
   // Source information
   source?: string;
   sourceId?: string;
+  // Google Places integration fields
+  googlePlaceId?: string;
+  googleRating?: number;
+  googlePhotos?: string;
+  // Google Places editorial content
+  editorialSummary?: string;
+  // TripAdvisor integration fields
+  tripadvisor_location_id?: string;
+  tripadvisor_rating?: number;
+  tripadvisor_review_count?: number;
+  tripadvisor_photos?: string[];
+  tripadvisor_last_updated?: string;
+  // Engagement tracking fields
+  views?: number;
+  favorites?: number; // Changed from favorited to match your database
+  saves_collection?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Collection {
@@ -83,6 +103,9 @@ export interface Collection {
   updated_at: string;
   views?: number;
   memberCount?: number; // Calculated member count (collaborators + creator)
+  // Follow/unfollow functionality for public collections
+  followerCount?: number;
+  isFollowing?: boolean;
   // Legacy fields for backward compatibility
   coverImage?: string;
   restaurants?: string[];

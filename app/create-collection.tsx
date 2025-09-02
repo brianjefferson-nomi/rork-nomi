@@ -180,7 +180,7 @@ export default function CreateCollectionScreen() {
         name: name.trim(),
         description: description.trim() || undefined,
         plannedDate: selectedDate?.toISOString() || plannedDate.trim() || undefined,
-        isPublic: collectionType === 'public',
+        is_public: collectionType === 'public',
         collection_type: collectionType,
         occasion: selectedOccasion || undefined
       });

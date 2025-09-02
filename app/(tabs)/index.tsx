@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform, Animated } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { TrendingUp, Users, MapPin, Sparkles, Clock, BookOpen, User, Navigation } from 'lucide-react-native';
@@ -8,11 +8,54 @@ import { Collection } from '@/types/restaurant';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
+import NearbyRestaurants from '@/components/NearbyRestaurants';
+import { 
+  TrendingRestaurantsComponent, 
+  NewAndNotableComponent 
+} from '@/components/HomePageRestaurantComponents';
 import { searchMapboxRestaurants, getMapboxNearbyRestaurants, transformMapboxToRestaurant, searchFoursquareRestaurants, deduplicateRestaurants } from '@/services/api';
 import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 import { filterCollectionsByCity, getCityDisplayName, getCollectionStats } from '@/utils/collection-filtering';
+import { usePexelsImage } from '@/hooks/use-pexels-images';
+import { PexelsImageComponent } from '@/components/PexelsImage';
+import { isMember } from '@/utils/member-helpers';
 
 type CityKey = 'nyc' | 'la';
+
+// Neighborhood card component with Pexels images
+function NeighborhoodCard({ neighborhood, count, cityName, onPress }: {
+  neighborhood: string;
+  count: number;
+  cityName: string;
+  onPress: () => void;
+}) {
+  const { image: pexelsImage, isLoading: imageLoading, error: imageError } = usePexelsImage(
+    neighborhood,
+    'neighborhood',
+    { city: cityName }
+  );
+
+  return (
+    <TouchableOpacity style={styles.localCard} onPress={onPress}>
+      <PexelsImageComponent
+        image={pexelsImage}
+        isLoading={imageLoading}
+        error={imageError}
+        style={styles.localImage}
+        fallbackSource={{ 
+          uri: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400' 
+        }}
+        showLoadingIndicator={false}
+      />
+      <View style={styles.localOverlay}>
+        <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
+        <Text style={styles.localNeighborhood}>
+          {count} restaurant{count !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function HomeScreen() {
   // Initialize hooks with proper error handling - MUST be at the top
@@ -28,6 +71,7 @@ export default function HomeScreen() {
   const [nearbyRestaurants, setNearbyRestaurants] = useState<any[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [mapboxRestaurants, setMapboxRestaurants] = useState<any[]>([]);
+  
   // Use shared currentCity from store
   const { currentCity, switchToCity } = restaurantsData;
   
@@ -39,12 +83,15 @@ export default function HomeScreen() {
       tension: 100,
       friction: 8
     }).start();
+    
+    // Reset used restaurants when city changes to prevent duplicates
   }, [currentCity, slideAnim]);
 
   // Destructure with defaults and null checks - ensure these are always defined
   const restaurants = restaurantsData?.restaurants || [];
   const collections = restaurantsData?.allCollections || []; // Use allCollections (public only) instead of collections (user plans)
   const isLoading = restaurantsData?.isLoading || false;
+  const { followCollection, unfollowCollection } = restaurantsData;
   
   // Debug: Check what's in collections (allCollections)
   console.log('[HomeScreen] collections (allCollections) data:', collections.map((c: any) => ({
@@ -59,6 +106,12 @@ export default function HomeScreen() {
 
   // Ensure collections is always an array
   const safeCollections = Array.isArray(collections) ? collections : [];
+  
+  // Function to get restaurants for a specific section with offset
+  const getRestaurantsForSection = useCallback((restaurants: any[], sectionIndex: number, maxPerSection: number = 8) => {
+    const startIndex = sectionIndex * maxPerSection;
+    return restaurants.slice(startIndex, startIndex + maxPerSection);
+  }, []);
   
   // Debug: Check what's in safeCollections
   console.log('[HomeScreen] safeCollections data:', safeCollections.map((c: any) => ({
@@ -87,7 +140,7 @@ export default function HomeScreen() {
       
       // Primary filter: Use city and state for most accurate filtering
       if (r.city && r.state) {
-        if (currentCity === 'nyc' && r.city === 'New York' && r.state === 'NY') {
+        if (currentCity === 'nyc' && r.state === 'NY') {
           return true;
         }
         if (currentCity === 'la' && r.city === 'Los Angeles' && r.state === 'CA') {
@@ -142,22 +195,19 @@ export default function HomeScreen() {
     return filteredRestaurants.slice(startIndex, startIndex + count);
   }, []);
 
-  // City-specific restaurant sections with flexible distribution
-  const trendingRestaurants = useMemo(() => {
-    return cityRestaurants.slice(0, Math.min(6, cityRestaurants.length));
-  }, [cityRestaurants]);
-  
-  const newRestaurants = useMemo(() => {
-    const trendingIds = trendingRestaurants.map((r: any) => r.id);
-    const availableRestaurants = cityRestaurants.filter((r: any) => !trendingIds.includes(r.id));
-    return availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
-  }, [cityRestaurants, trendingRestaurants]);
-  
-  const localHighlights = useMemo(() => {
-    const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id)];
-    const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-    return availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
-  }, [cityRestaurants, trendingRestaurants, newRestaurants]);
+  // Restaurant press handler with engagement tracking
+  const handleRestaurantPress = async (restaurant: any) => {
+    try {
+      // Add to store and navigate
+      addRestaurantToStore(restaurant);
+      router.push(`/restaurant/${restaurant.id}` as any);
+    } catch (error) {
+      console.error('Error navigating to restaurant:', error);
+      // Still navigate even if there's an error
+      addRestaurantToStore(restaurant);
+      router.push(`/restaurant/${restaurant.id}` as any);
+    }
+  };
   
   // Convert plans to collections format for display
   const planCollections: Collection[] = useMemo(() => {
@@ -272,9 +322,7 @@ export default function HomeScreen() {
     if (!isAuthenticated) {
       setMapboxRestaurants(cityRestaurants);
       // Use unique restaurants for nearby section
-      const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id), ...localHighlights.map((r: any) => r.id)];
-      const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-      const nearbyRestaurants = availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
+      const nearbyRestaurants = cityRestaurants.slice(0, Math.min(4, cityRestaurants.length));
       setNearbyRestaurants(nearbyRestaurants);
       return;
     }
@@ -282,9 +330,7 @@ export default function HomeScreen() {
     // For web platform, use city database restaurants
     if (Platform.OS === 'web') {
       setMapboxRestaurants(cityRestaurants);
-      const usedIds = [...trendingRestaurants.map((r: any) => r.id), ...newRestaurants.map((r: any) => r.id), ...localHighlights.map((r: any) => r.id)];
-      const availableRestaurants = cityRestaurants.filter((r: any) => !usedIds.includes(r.id));
-      const nearbyRestaurants = availableRestaurants.slice(0, Math.min(4, availableRestaurants.length));
+      const nearbyRestaurants = cityRestaurants.slice(0, Math.min(4, cityRestaurants.length));
       setNearbyRestaurants(nearbyRestaurants);
       return;
     }
@@ -363,94 +409,7 @@ export default function HomeScreen() {
   };
 
   // Render sections based on city configuration
-  const renderLocalSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Navigation size={20} color="#FF6B6B" />
-        <Text style={styles.sectionTitle}>Local {cityConfig.name} Restaurants</Text>
-        <TouchableOpacity onPress={() => router.push('/discover' as any)}>
-          <Text style={styles.seeAll}>See all</Text>
-        </TouchableOpacity>
-      </View>
-      {nearbyLoading ? (
-        <View style={styles.nearbyLoadingContainer}>
-          <ActivityIndicator size="small" color="#FF6B6B" />
-          <Text style={styles.nearbyLoadingText}>
-            Loading {cityConfig.name} restaurants...
-          </Text>
-        </View>
-      ) : nearbyRestaurants.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-          {nearbyRestaurants.map(restaurant => (
-            <View key={restaurant.id} style={styles.cardWrapper}>
-              <RestaurantCard
-                restaurant={restaurant}
-                onPress={() => {
-                  addRestaurantToStore(restaurant);
-                  router.push(`/restaurant/${restaurant.id}` as any);
-                }}
-              />
-            </View>
-          ))}
-        </ScrollView>
-      ) : (
-        <View style={styles.nearbyEmptyContainer}>
-          <Text style={styles.nearbyEmptyText}>No {cityConfig.name} restaurants found</Text>
-          <Text style={styles.nearbyEmptySubtext}>Try refreshing the app</Text>
-        </View>
-      )}
-    </View>
-  );
 
-  const renderTrendingSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <TrendingUp size={20} color="#FF6B6B" />
-        <Text style={styles.sectionTitle}>Trending in {cityConfig.name}</Text>
-        <TouchableOpacity onPress={() => router.push('/discover' as any)}>
-          <Text style={styles.seeAll}>See all</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-        {trendingRestaurants.map(restaurant => (
-          <View key={restaurant.id} style={styles.cardWrapper}>
-            <RestaurantCard
-              restaurant={restaurant}
-              onPress={() => {
-                addRestaurantToStore(restaurant);
-                router.push(`/restaurant/${restaurant.id}` as any);
-              }}
-            />
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-
-  const renderNewSection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Sparkles size={20} color="#FF6B6B" />
-        <Text style={styles.sectionTitle}>New & Notable in {cityConfig.name}</Text>
-        <TouchableOpacity onPress={() => router.push('/discover' as any)}>
-          <Text style={styles.seeAll}>See all</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-        {newRestaurants.map(restaurant => (
-          <View key={restaurant.id} style={styles.cardWrapper}>
-            <RestaurantCard
-              restaurant={restaurant}
-              onPress={() => {
-                addRestaurantToStore(restaurant);
-                router.push(`/restaurant/${restaurant.id}` as any);
-              }}
-            />
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
 
   const renderNeighborhoodSection = () => (
     <View style={styles.section}>
@@ -528,31 +487,17 @@ export default function HomeScreen() {
               .slice(0, 4)
               .map(([neighborhood, count]) => ({ neighborhood, count }));
             
-            return finalNeighborhoods.map(({ neighborhood, count }) => {
-              const imageUrl = cityConfig.neighborhoodImages[neighborhood] || cityConfig.neighborhoodImages['default'] || 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400';
-              
-              return (
-                <TouchableOpacity 
-                  key={neighborhood} 
-                  style={styles.localCard}
-                  onPress={() => {
-                    router.push(`/discover?neighborhood=${encodeURIComponent(neighborhood)}` as any);
-                  }}
-                >
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.localImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.localOverlay}>
-                    <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
-                    <Text style={styles.localNeighborhood}>
-                      {count as number} restaurant{(count as number) !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            });
+            return finalNeighborhoods.map(({ neighborhood, count }) => (
+              <NeighborhoodCard
+                key={neighborhood}
+                neighborhood={neighborhood}
+                count={count as number}
+                cityName={cityConfig.name}
+                onPress={() => {
+                  router.push(`/discover?neighborhood=${encodeURIComponent(neighborhood)}` as any);
+                }}
+              />
+            ));
           })()
         ) : (
           <View style={styles.nearbyEmptyContainer}>
@@ -585,13 +530,13 @@ export default function HomeScreen() {
           <ActivityIndicator size="small" color="#FF6B6B" />
           <Text style={styles.loadingText}>Loading collections...</Text>
         </View>
-      ) : displayCollections.length > 0 ? (
+      ) : popularCollections.length > 0 ? (
         <>
           <Text style={styles.sectionSubtitle}>
-            Collections with {getCityDisplayName(currentCity)} restaurants
+            Top collections with {getCityDisplayName(currentCity)} restaurants
           </Text>
           <View style={styles.collectionsGrid}>
-            {displayCollections.map(collection => {
+            {popularCollections.map(collection => {
               console.log(`[HomePage] Rendering CollectionCard for "${collection.name}":`, {
                 collaborators: collection.collaborators,
                 collaboratorsLength: collection.collaborators?.length || 0,
@@ -615,6 +560,19 @@ export default function HomeScreen() {
                 <CollectionCard
                   key={collection.id}
                   collection={collectionCopy as Collection}
+                  showFollowButton={true}
+                  isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+                  onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
+                    try {
+                      if (isFollowing) {
+                        await unfollowCollection(collectionId);
+                      } else {
+                        await followCollection(collectionId);
+                      }
+                    } catch (error) {
+                      console.error('[HomePage] Error toggling collection follow:', error);
+                    }
+                  }}
                   onPress={() => {
                     console.log(`[HomePage] Clicking collection "${collection.name}" with ${collection.collaborators?.length || 0} collaborators`);
                     if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
@@ -630,7 +588,7 @@ export default function HomeScreen() {
         </>
       ) : (
         <Text style={styles.emptyText}>
-          No collections found for {getCityDisplayName(currentCity)}
+          No top collections found for {getCityDisplayName(currentCity)}
         </Text>
       )}
     </View>
@@ -726,22 +684,29 @@ export default function HomeScreen() {
           <SearchWizard testID="search-wizard" />
         </View>
 
-        {/* Render sections based on city configuration */}
-        {cityConfig.sectionOrder === 'localFirst' ? (
-          <>
-            {renderLocalSection()}
-            {renderTrendingSection()}
-            {renderNewSection()}
-            {renderNeighborhoodSection()}
-          </>
-        ) : (
-          <>
-            {renderTrendingSection()}
-            {renderNewSection()}
-            {renderNeighborhoodSection()}
-            {renderLocalSection()}
-          </>
-        )}
+        {/* Nearby Restaurants based on user location */}
+        <NearbyRestaurants 
+          restaurants={restaurants}
+          radius={5}
+          maxResults={8}
+          showDistance={true}
+          showWhenEmpty={true}
+        />
+
+        {/* New Engagement-Based Restaurant Components */}
+        <TrendingRestaurantsComponent
+          userLocation={userLocation}
+          currentCity={currentCity}
+          onRestaurantPress={handleRestaurantPress}
+        />
+        
+        <NewAndNotableComponent
+          userLocation={userLocation}
+          currentCity={currentCity}
+          onRestaurantPress={handleRestaurantPress}
+        />
+
+        {renderNeighborhoodSection()}
 
         {renderCollectionsSection()}
 

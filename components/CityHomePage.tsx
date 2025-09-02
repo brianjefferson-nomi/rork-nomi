@@ -9,6 +9,9 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { SearchWizard } from '@/components/SearchWizard';
 import { searchMapboxRestaurants, getMapboxNearbyRestaurants, transformMapboxToRestaurant, searchFoursquareRestaurants, deduplicateRestaurants } from '@/services/api';
+import { usePexelsImage } from '@/hooks/use-pexels-images';
+import { PexelsImageComponent } from '@/components/PexelsImage';
+import { isMember } from '@/utils/member-helpers';
 
 interface CityConfig {
   name: string;
@@ -24,6 +27,41 @@ interface CityConfig {
 
 interface CityHomePageProps {
   cityConfig: CityConfig;
+}
+
+// Neighborhood card component with Pexels images
+function NeighborhoodCard({ neighborhood, count, cityName, onPress }: {
+  neighborhood: string;
+  count: number;
+  cityName: string;
+  onPress: () => void;
+}) {
+  const { image: pexelsImage, isLoading: imageLoading, error: imageError } = usePexelsImage(
+    neighborhood,
+    'neighborhood',
+    { city: cityName }
+  );
+
+  return (
+    <TouchableOpacity style={styles.localCard} onPress={onPress}>
+      <PexelsImageComponent
+        image={pexelsImage}
+        isLoading={imageLoading}
+        error={imageError}
+        style={styles.localImage}
+        fallbackSource={{ 
+          uri: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400' 
+        }}
+        showLoadingIndicator={false}
+      />
+      <View style={styles.localOverlay}>
+        <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
+        <Text style={styles.localNeighborhood}>
+          {count} restaurant{count !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export default function CityHomePage({ cityConfig }: CityHomePageProps) {
@@ -43,6 +81,7 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
   const collections = restaurantsData?.collections || [];
   const isLoading = restaurantsData?.isLoading || false;
   const userLocation = restaurantsData?.userLocation;
+  const { followCollection, unfollowCollection } = restaurantsData;
   
   const user = authData?.user;
   const isAuthenticated = authData?.isAuthenticated || false;
@@ -340,31 +379,17 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
               .slice(0, 4)
               .map(([neighborhood, count]) => ({ neighborhood, count }));
             
-            return topNeighborhoods.map(({ neighborhood, count }) => {
-              const imageUrl = cityConfig.neighborhoodImages[neighborhood] || cityConfig.neighborhoodImages['default'] || 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400';
-              
-              return (
-                <TouchableOpacity 
-                  key={neighborhood} 
-                  style={styles.localCard}
-                  onPress={() => {
-                    router.push(`/discover?neighborhood=${encodeURIComponent(neighborhood)}` as any);
-                  }}
-                >
-                  <Image
-                    source={{ uri: imageUrl }}
-                    style={styles.localImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.localOverlay}>
-                    <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
-                    <Text style={styles.localNeighborhood}>
-                      {count as number} restaurant{(count as number) !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            });
+            return topNeighborhoods.map(({ neighborhood, count }) => (
+              <NeighborhoodCard
+                key={neighborhood}
+                neighborhood={neighborhood}
+                count={count as number}
+                cityName={cityConfig.name}
+                onPress={() => {
+                  router.push(`/discover?neighborhood=${encodeURIComponent(neighborhood)}` as any);
+                }}
+              />
+            ));
           })()
         ) : (
           <View style={styles.nearbyEmptyContainer}>
@@ -390,6 +415,19 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
           <CollectionCard
             key={collection.id}
             collection={collection}
+            showFollowButton={true}
+            isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+            onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
+              try {
+                if (isFollowing) {
+                  await unfollowCollection(collectionId);
+                } else {
+                  await followCollection(collectionId);
+              }
+            } catch (error) {
+              console.error('[CityHomePage] Error toggling collection follow:', error);
+            }
+          }}
             onPress={() => {
               if (collection.id.startsWith(`${cityConfig.shortName.toLowerCase()}-mock-`)) {
                 router.push('/create-collection' as any);

@@ -3,17 +3,19 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert 
 import { Stack, useRouter } from 'expo-router';
 import { Search, Filter, MapPin, Users, Eye, EyeOff, BookOpen } from 'lucide-react-native';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useAuth } from '@/hooks/auth-store';
 import { CollectionCard } from '@/components/CollectionCard';
 import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 import { filterCollectionsByCity, getCityDisplayName } from '@/utils/collection-filtering';
 import { Collection } from '@/types/restaurant';
-import { getMemberCount } from '@/utils/member-helpers';
+import { getMemberCount, isMember } from '@/utils/member-helpers';
 
 type FilterType = 'all' | 'nyc' | 'la';
 
 export default function CollectionsPage() {
   const router = useRouter();
-  const { allCollections, collections, restaurants, currentCity } = useRestaurants();
+  const { allCollections, collections, restaurants, currentCity, followCollection, unfollowCollection } = useRestaurants();
+  const { user } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
@@ -34,8 +36,8 @@ export default function CollectionsPage() {
     
     // Sort by member count (most to least)
     const sortedCollections = enhancedCollections.sort((a, b) => {
-      const aMembers = getMemberCount(a);
-      const bMembers = getMemberCount(b);
+      const aMembers = getMemberCount(a.collaborators || []);
+      const bMembers = getMemberCount(b.collaborators || []);
       return bMembers - aMembers; // Descending order (most to least)
     });
     
@@ -87,8 +89,8 @@ export default function CollectionsPage() {
   const getFilterCount = (filter: FilterType) => {
     switch (filter) {
       case 'all': return allCollectionsCombined.length;
-      case 'nyc': return filterCollectionsByCity(allCollectionsCombined, restaurants, 'nyc').length;
-      case 'la': return filterCollectionsByCity(allCollectionsCombined, restaurants, 'la').length;
+      case 'nyc': return (filterCollectionsByCity(allCollectionsCombined, restaurants, 'nyc') as any[]).length;
+      case 'la': return (filterCollectionsByCity(allCollectionsCombined, restaurants, 'la') as any[]).length;
       default: return allCollectionsCombined.length;
     }
   };
@@ -175,6 +177,19 @@ export default function CollectionsPage() {
                   >
                     <CollectionCard
                       collection={collection as Collection}
+                      showFollowButton={true}
+                      isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+                      onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
+                        try {
+                          if (isFollowing) {
+                            await unfollowCollection(collectionId);
+                          } else {
+                            await followCollection(collectionId);
+                          }
+                        } catch (error) {
+                          console.error('[CollectionsPage] Error toggling collection follow:', error);
+                        }
+                      }}
                       onPress={() => {
                         console.log(`[CollectionsPage] Clicking collection "${collection.name}" with ${collection.collaborators?.length || 0} collaborators`);
                         router.push(`/collection/${collection.id}` as any);

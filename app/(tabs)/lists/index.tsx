@@ -17,6 +17,7 @@ export default function ListsScreen() {
   const { 
     plans, 
     allCollections,
+    userCollections,
     restaurants, 
     favoriteRestaurants, 
     deleteCollection, 
@@ -28,56 +29,47 @@ export default function ListsScreen() {
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [viewType, setViewType] = useState<ViewType>('grid');
   const [showFilters, setShowFilters] = useState<boolean>(false);
-  const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'private' | 'shared' | 'public'>('all');
+  const [selectedCollectionType, setSelectedCollectionType] = useState<'all' | 'shared' | 'public' | 'private'>('all');
 
-  // Combine private collections (plans) and public collections (allCollections) that the user is part of
+  // Combine private plans and user-involved collections
   const safeCollections = useMemo(() => {
-    const userCollections: any[] = [];
+    const combinedCollections: any[] = [];
     const addedCollectionIds = new Set<string>();
     
     // Add private collections (plans) - user is always part of these
     const privateCollections = plans || [];
     privateCollections.forEach(plan => {
       if (!addedCollectionIds.has(plan.id)) {
-        // Ensure memberCount is calculated for private collections
         const processedPlan = {
           ...plan,
-          memberCount: (plan as any).memberCount || getMemberCount(plan)
+          memberCount: (plan as any).memberCount || getMemberCount((plan as any).collaborators || [])
         };
-        userCollections.push(processedPlan);
+        combinedCollections.push(processedPlan);
         addedCollectionIds.add(plan.id);
       }
     });
     
-    // Add public collections from allCollections that the user is part of
-    const publicCollections = allCollections || [];
-    publicCollections.forEach(publicCollection => {
-      // Skip if already added from plans
-      if (addedCollectionIds.has(publicCollection.id)) {
-        return;
-      }
-      
-      const isCreator = publicCollection.created_by === user?.id;
-      const isCollaborator = (publicCollection as any).collaborators && 
-        Array.isArray((publicCollection as any).collaborators) &&
-        (publicCollection as any).collaborators.some((member: any) => {
-          const memberId = typeof member === 'string' ? member : member?.userId || member?.id;
-          return memberId === user?.id;
-        });
-      
-      if (isCreator || isCollaborator) {
-        // Ensure memberCount is calculated for public collections
+    // Add userCollections (shared and private collections user is involved in)
+    const userInvolvedCollections = userCollections || [];
+    userInvolvedCollections.forEach(sharedCollection => {
+      if (!addedCollectionIds.has(sharedCollection.id)) {
         const processedCollection = {
-          ...publicCollection,
-          memberCount: (publicCollection as any).memberCount || getMemberCount(publicCollection)
+          ...sharedCollection,
+          memberCount: (sharedCollection as any).memberCount || getMemberCount((sharedCollection as any).collaborators || [])
         };
-        userCollections.push(processedCollection);
-        addedCollectionIds.add(publicCollection.id);
+        combinedCollections.push(processedCollection);
+        addedCollectionIds.add(sharedCollection.id);
       }
     });
     
-    return userCollections;
-  }, [plans, allCollections, user?.id]);
+    // Debug logging
+    console.log(`[ListsScreen] safeCollections: ${combinedCollections.length} collections`);
+    console.log(`[ListsScreen] userCollections total: ${userCollections?.length || 0}`);
+    console.log(`[ListsScreen] privateCollections: ${privateCollections.length}`);
+    console.log(`[ListsScreen] user ID: ${user?.id}`);
+    
+    return combinedCollections;
+  }, [plans, userCollections, user?.id]);
 
   // Convert collections to proper format
   const planCollections: Collection[] = useMemo(() => {
@@ -143,32 +135,37 @@ export default function ListsScreen() {
     return sorted;
   }, [planCollections]);
 
-  // Filter collections by type
+  // Filter collections by type (sortedCollections already contains only user-involved collections)
   const filteredCollections = useMemo(() => {
     if (selectedCollectionType === 'all') return sortedCollections;
     
-    return sortedCollections.filter((collection: any) => {
-      // Check if user is the creator (private collections)
+    const filtered = sortedCollections.filter((collection: any) => {
       const isCreator = collection.created_by === user?.id;
-      
-      // Check if user is a member (shared collections)
-      const isMember = collection.collaborators && Array.isArray(collection.collaborators) && 
-        collection.collaborators.some((member: any) => {
-          const memberId = typeof member === 'string' ? member : member?.userId || member?.id;
-          return memberId === user?.id;
-        });
+      const isCollaborator = collection.collaborators && 
+        Array.isArray(collection.collaborators) &&
+        user?.id &&
+        collection.collaborators.includes(user.id);
       
       switch (selectedCollectionType) {
-        case 'private':
-          return isCreator && !isMember; // Creator only, not shared
         case 'shared':
-          return isMember; // User is a member but not creator
+          // Shared collections are those where user is a collaborator but NOT the creator
+          return isCollaborator && !isCreator;
         case 'public':
-          return collection.is_public && !isCreator && !isMember; // Public collections user doesn't own or belong to
+          // Public collections are those the user created that are public
+          return isCreator && collection.is_public === true;
+        case 'private':
+          // Private collections are those the user created that are NOT public
+          return isCreator && collection.is_public === false;
         default:
-          return true;
+          return true; // Show all collections
       }
     });
+    
+    // Debug logging
+    console.log(`[ListsScreen] filteredCollections: ${filtered.length} collections for type: ${selectedCollectionType}`);
+    console.log(`[ListsScreen] sortedCollections total: ${sortedCollections.length}`);
+    
+    return filtered;
   }, [sortedCollections, selectedCollectionType, user?.id]);
 
   const renderTabButton = (tab: TabType, icon: React.ReactNode, label: string, count: number) => (
@@ -317,21 +314,18 @@ export default function ListsScreen() {
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={[styles.collectionTypeButton, selectedCollectionType === 'private' && styles.activeCollectionTypeButton]}
-              onPress={() => setSelectedCollectionType('private')}
-            >
-              <Text style={[styles.collectionTypeText, selectedCollectionType === 'private' && styles.activeCollectionTypeText]}>
-                {`Private (${sortedCollections.filter((c: any) => c.created_by === user?.id && !c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
-              </Text>
-            </TouchableOpacity>
+
             
             <TouchableOpacity
               style={[styles.collectionTypeButton, selectedCollectionType === 'shared' && styles.activeCollectionTypeButton]}
               onPress={() => setSelectedCollectionType('shared')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'shared' && styles.activeCollectionTypeText]}>
-                {`Shared (${sortedCollections.filter((c: any) => c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
+                {`Shared (${sortedCollections.filter((c: any) => {
+                  const isCreator = c.created_by === user?.id;
+                  const isCollaborator = c.collaborators && Array.isArray(c.collaborators) && user?.id && c.collaborators.includes(user.id);
+                  return isCollaborator && !isCreator;
+                }).length})`}
               </Text>
             </TouchableOpacity>
             
@@ -340,7 +334,22 @@ export default function ListsScreen() {
               onPress={() => setSelectedCollectionType('public')}
             >
               <Text style={[styles.collectionTypeText, selectedCollectionType === 'public' && styles.activeCollectionTypeText]}>
-                {`Public (${sortedCollections.filter((c: any) => c.is_public && c.created_by !== user?.id && !c.collaborators?.some((m: any) => (typeof m === 'string' ? m : m?.userId || m?.id) === user?.id)).length})`}
+                {`Public (${sortedCollections.filter((c: any) => {
+                  const isCreator = c.created_by === user?.id;
+                  return isCreator && c.is_public === true;
+                }).length})`}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.collectionTypeButton, selectedCollectionType === 'private' && styles.activeCollectionTypeButton]}
+              onPress={() => setSelectedCollectionType('private')}
+            >
+              <Text style={[styles.collectionTypeText, selectedCollectionType === 'private' && styles.activeCollectionTypeText]}>
+                {`Private (${sortedCollections.filter((c: any) => {
+                  const isCreator = c.created_by === user?.id;
+                  return isCreator && c.is_public === false;
+                }).length})`}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -406,20 +415,30 @@ export default function ListsScreen() {
         ) : (filteredCollections || []).length === 0 ? (
           <View style={styles.emptyState}>
             <BookOpen size={48} color="#CCC" />
-            <Text style={styles.emptyTitle}>No plans yet</Text>
-            <Text style={styles.emptyText}>Create your first plan to start organizing restaurants for group dining experiences</Text>
+            <Text style={styles.emptyTitle}>No collections found</Text>
+            <Text style={styles.emptyText}>
+              {selectedCollectionType === 'shared' ? 'You are not part of any shared collections' :
+               selectedCollectionType === 'public' ? 'You have not created any public collections' :
+               selectedCollectionType === 'private' ? 'You have not created any private collections' :
+               'You are not part of any collections yet'}
+            </Text>
             <TouchableOpacity 
               style={styles.createButton} 
               onPress={() => router.push('/create-collection' as any)}
             >
               <Plus size={20} color="#FFF" />
-              <Text style={styles.createButtonText}>Create Plan</Text>
+              <Text style={styles.createButtonText}>Create Collection</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.content}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Plans</Text>
+                          <Text style={styles.sectionTitle}>
+              {selectedCollectionType === 'shared' ? 'Shared Collections' :
+               selectedCollectionType === 'public' ? 'Public Collections' :
+               selectedCollectionType === 'private' ? 'Private Collections' :
+               'Your Collections'}
+              </Text>
               <TouchableOpacity 
                 style={styles.addButton}
                 onPress={() => router.push('/create-collection' as any)}

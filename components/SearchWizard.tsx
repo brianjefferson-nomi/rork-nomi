@@ -6,6 +6,8 @@ import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
 import { getYelpAutocompleteSuggestions, getYelpPopularSearches, searchMapboxRestaurants, deduplicateRestaurants } from '@/services/api';
 
+import { capitalizeRestaurantName, formatNeighborhoodName } from '@/utils/text-formatting';
+
 interface SearchWizardProps {
   testID?: string;
 }
@@ -31,17 +33,16 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const [isLoadingYelpSuggestions, setIsLoadingYelpSuggestions] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Load Mapbox popular searches on component mount
+  // Load popular searches on component mount
   useEffect(() => {
-    const loadMapboxPopularSearches = async () => {
+    const loadPopularSearches = async () => {
       try {
-        // For popular searches, always use user location for relevance
+        console.log('[SearchWizard] Loading popular searches');
+        
+        // Use Mapbox for popular restaurant searches
         const lat = userLocation?.lat || 40.7128;
         const lng = userLocation?.lng || -74.0060;
         
-        console.log('[SearchWizard] Loading popular searches with user location:', lat, lng);
-        
-        // Search for popular cuisines
         const popularQueries = ['pizza', 'sushi', 'italian', 'chinese', 'mexican', 'burger'];
         const allResults: string[] = [];
         
@@ -57,16 +58,16 @@ export function SearchWizard({ testID }: SearchWizardProps) {
         
         setYelpPopularSearches(allResults.slice(0, 6));
       } catch (error) {
-        console.error('[SearchWizard] Error loading Mapbox popular searches:', error);
+        console.error('[SearchWizard] Error loading popular searches:', error);
       }
     };
     
-    loadMapboxPopularSearches();
+    loadPopularSearches();
   }, [userLocation]);
 
-  // Get Mapbox autocomplete suggestions when query changes
+  // Get autocomplete suggestions when query changes
   useEffect(() => {
-    const getMapboxSuggestions = async () => {
+    const getSuggestions = async () => {
       if (query.length < 2) {
         setYelpSuggestions([]);
         return;
@@ -74,31 +75,16 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       
       setIsLoadingYelpSuggestions(true);
       try {
-        // Check if query is a neighborhood search (contains neighborhood keywords)
-        const neighborhoodKeywords = ['soho', 'tribeca', 'chelsea', 'west village', 'east village', 'upper east side', 'upper west side', 'midtown', 'downtown', 'brooklyn', 'queens', 'bronx', 'manhattan', 'hollywood', 'beverly hills', 'santa monica', 'venice', 'downtown la', 'koreatown', 'silver lake'];
-        const isNeighborhoodSearch = neighborhoodKeywords.some(keyword => 
-          query.toLowerCase().includes(keyword.toLowerCase())
-        );
+        console.log('[SearchWizard] Getting suggestions for:', query);
         
-        let lat, lng;
-        
-        if (isNeighborhoodSearch) {
-          // For neighborhood searches, ignore user location and use city center
-          console.log('[SearchWizard] Neighborhood search detected, using city center');
-          lat = 40.7128; // NYC center
-          lng = -74.0060;
-        } else {
-          // For generic searches, use user location
-          console.log('[SearchWizard] Generic search detected, using user location');
-          lat = userLocation?.lat || 40.7128;
-          lng = userLocation?.lng || -74.0060;
-        }
-        
+        // Use Mapbox for restaurant search suggestions
+        const lat = userLocation?.lat || 40.7128;
+        const lng = userLocation?.lng || -74.0060;
         const results = await searchMapboxRestaurants(query, lat, lng, 5000, 5);
         const suggestions = results.map((restaurant: any) => restaurant.name).filter(Boolean);
         setYelpSuggestions(suggestions);
       } catch (error) {
-        console.error('[SearchWizard] Error getting Mapbox suggestions:', error);
+        console.error('[SearchWizard] Error getting suggestions:', error);
         setYelpSuggestions([]);
       } finally {
         setIsLoadingYelpSuggestions(false);
@@ -106,7 +92,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
     };
 
     // Debounce the API call
-    const timeoutId = setTimeout(getMapboxSuggestions, 300);
+            const timeoutId = setTimeout(getSuggestions, 300);
     return () => clearTimeout(timeoutId);
   }, [query, userLocation]);
 

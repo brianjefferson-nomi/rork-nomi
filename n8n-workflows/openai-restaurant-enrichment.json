@@ -1,0 +1,304 @@
+{
+  "name": "OpenAI Restaurant Enrichment - Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "day",
+              "value": 7
+            },
+            {
+              "field": "hour",
+              "value": 2
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Weekly Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": "public",
+        "table": "restaurants",
+        "columns": "id,name,cuisine,rating,price_range,address,neighborhood,latitude,longitude,city,state,description,vibe,menu_highlights,images",
+        "where": "description IS NULL OR description = '' OR vibe IS NULL OR array_length(vibe, 1) = 0",
+        "limit": 20
+      },
+      "id": "get-restaurants-from-db",
+      "name": "Get Restaurants from DB",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const restaurants = $input.first().json; if (!restaurants || !Array.isArray(restaurants) || restaurants.length === 0) { return []; } const validRestaurants = restaurants.filter(restaurant => { return restaurant && restaurant.name && restaurant.name.trim() !== \"\" && restaurant.id; }); return validRestaurants;"
+      },
+      "id": "validate-restaurants",
+      "name": "Validate Restaurants",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4o-mini"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\":\"system\",\"content\":\"Generate a compelling restaurant description based on the provided data. Follow these rules:\\n\\n- Length: 50-200 characters\\n- Include: cuisine type, atmosphere, and what makes it special\\n- Avoid: generic words like 'amazing', 'incredible', 'perfect'\\n- Be specific and authentic\\n- If existing description exists, enhance it rather than replace it\"},{\"role\":\"user\",\"content\":\"Restaurant: {{ $json.name }}\\nCuisine: {{ $json.cuisine }}\\nRating: {{ $json.rating || 'No rating' }}\\nNeighborhood: {{ $json.neighborhood || 'Unknown' }}\\nPrice Range: {{ $json.price_range || 'Unknown' }}\\nExisting Description: {{ $json.description || 'None' }}\"}]"
+            },
+            {
+              "name": "max_tokens",
+              "value": "150"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            }
+          ]
+        }
+      },
+      "id": "openai-description",
+      "name": "OpenAI Description",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4o-mini"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\":\"system\",\"content\":\"Generate 3-5 unique vibe tags for this restaurant. Return only the tags separated by commas.\\n\\nUse these tags if available: Popular, Local, Casual, Authentic, Cozy, Trendy, Upscale, Family-Friendly, Romantic, Business-Friendly\\n\\nAvoid: generic, boring, basic\\n\\nBe specific to the restaurant type and neighborhood\"},{\"role\":\"user\",\"content\":\"Restaurant: {{ $json.name }}\\nCuisine: {{ $json.cuisine }}\\nRating: {{ $json.rating || 'No rating' }}\\nNeighborhood: {{ $json.neighborhood || 'Unknown' }}\\nPrice Range: {{ $json.price_range || 'Unknown' }}\"}]"
+            },
+            {
+              "name": "max_tokens",
+              "value": "100"
+            },
+            {
+              "name": "temperature",
+              "value": "0.8"
+            }
+          ]
+        }
+      },
+      "id": "generate-ai-vibes",
+      "name": "Generate AI Vibes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ENRICHMENT: Combine AI-generated content with existing restaurant data\n// Get the existing restaurant data from database\nconst existingRestaurant = $input.first().json;\n\n// Get AI-generated content from OpenAI\nconst aiDescription = $input.all()[1]?.json?.choices?.[0]?.message?.content || '';\nconst aiVibes = $input.all()[2]?.json?.choices?.[0]?.message?.content || '';\n\nconsole.log('=== ENRICHMENT PROCESS ===');\nconsole.log('Existing restaurant from DB:', existingRestaurant);\nconsole.log('AI Description:', aiDescription);\nconsole.log('AI Vibes:', aiVibes);\n\n// ENRICHMENT LOGIC: Preserve existing data, enhance with AI\nconst enrichedData = {\n  // PRESERVE existing data from database\n  id: existingRestaurant.id,\n  name: existingRestaurant.name,\n  address: existingRestaurant.address,\n  neighborhood: existingRestaurant.neighborhood,\n  cuisine: existingRestaurant.cuisine,\n  price_range: existingRestaurant.price_range,\n  rating: existingRestaurant.rating || 4.0,\n  latitude: existingRestaurant.latitude,\n  longitude: existingRestaurant.longitude,\n  city: existingRestaurant.city,\n  state: existingRestaurant.state,\n  \n  // ENRICH description: Use AI-generated if available, fallback to existing\n  description: enrichDescription(existingRestaurant.description || '', aiDescription, existingRestaurant),\n  \n  // ENRICH vibe: Use AI-generated vibes + existing vibes\n  vibe: enrichVibes(existingRestaurant.vibe || [], aiVibes, existingRestaurant),\n  \n  // ENRICH menu highlights: Keep existing\n  menu_highlights: existingRestaurant.menu_highlights || [],\n  \n  // ENRICH images: Keep existing\n  images: existingRestaurant.images || [],\n  \n  last_enhanced: new Date().toISOString()\n};\n\nconsole.log('=== ENRICHMENT RESULTS ===');\nconsole.log('Final enriched data:', enrichedData);\nconsole.log('Final rating:', enrichedData.rating);\nconsole.log('Images count:', enrichedData.images.length);\nconsole.log('Vibes count:', enrichedData.vibe.length);\nconsole.log('Menu highlights count:', enrichedData.menu_highlights.length);\n\n// Helper functions for enrichment\nfunction enrichDescription(existingDesc, aiDesc, restaurant) {\n  console.log('Enriching description:');\n  console.log('- Existing description from DB:', existingDesc?.substring(0, 50) + '...');\n  console.log('- AI-generated description:', aiDesc?.substring(0, 50) + '...');\n  \n  // If we have AI-generated description, use it\n  if (aiDesc && aiDesc.trim() !== '') {\n    console.log('- Using AI-generated description');\n    return aiDesc.trim();\n  }\n  \n  // Fallback to existing description\n  if (existingDesc && existingDesc.trim() !== '') {\n    console.log('- Using existing description from DB');\n    return existingDesc;\n  }\n  \n  // Final fallback\n  const fallbackDesc = `${restaurant.cuisine || 'Restaurant'} in ${restaurant.neighborhood || 'NYC'}`;\n  console.log('- Using fallback description:', fallbackDesc);\n  return fallbackDesc;\n}\n\nfunction enrichVibes(existingVibes, aiVibes, restaurant) {\n  const enriched = [...(existingVibes || [])];\n  \n  console.log('Enriching vibes:');\n  console.log('- Existing vibes from DB:', existingVibes);\n  console.log('- AI-generated vibes:', aiVibes);\n  \n  // Add AI-generated vibes if available\n  if (aiVibes && aiVibes.trim() !== '') {\n    const aiVibeArray = aiVibes.split(',').map(v => v.trim()).filter(Boolean);\n    console.log('- Adding AI-generated vibes:', aiVibeArray);\n    enriched.push(...aiVibeArray);\n  }\n  \n  // Add neighborhood-based vibes\n  if (restaurant.neighborhood === 'Manhattan' && !enriched.includes('Manhattan')) {\n    enriched.push('Manhattan');\n    console.log('- Added: Manhattan');\n  }\n  \n  // Add cuisine-based vibes\n  if (restaurant.cuisine && !enriched.includes(restaurant.cuisine)) {\n    enriched.push(restaurant.cuisine);\n    console.log('- Added cuisine:', restaurant.cuisine);\n  }\n  \n  // Remove duplicates and limit to 8 vibes\n  const finalVibes = [...new Set(enriched)].slice(0, 8);\n  console.log('- Final vibes:', finalVibes);\n  \n  return finalVibes;\n}\n\nreturn enrichedData;"
+      },
+      "id": "combine-and-enrich",
+      "name": "Combine and Enrich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": "public",
+        "table": "restaurants",
+        "updateKey": "id",
+        "columns": "description,vibe,menu_highlights,last_enhanced,updated_at",
+        "where": "id = {{ $json.id }}",
+        "returnFields": "*"
+      },
+      "id": "update-restaurant",
+      "name": "Update Restaurant",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "await new Promise(resolve => setTimeout(resolve, 3000)); return $input.first();"
+      },
+      "id": "rate-limit-delay",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ `🤖 OpenAI Restaurant Enrichment Report\\n\\n📊 Summary:\\n• Restaurants Processed: ${$json.length}\\n• Enhanced with AI Descriptions: ${$json.filter(r => r.description && r.description.trim() !== '').length}\\n• Enhanced with AI Vibes: ${$json.filter(r => r.vibe && r.vibe.length > 0).length}\\n\\n🏆 Top Enhanced Restaurants:\\n${$json.filter(r => r.description && r.vibe && r.vibe.length > 0).slice(0, 3).map(r => `• ${r.name} (${r.cuisine})`).join('\\n')}` }}"
+            }
+          ]
+        }
+      },
+      "id": "slack-notification",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Weekly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Restaurants from DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Restaurants from DB": {
+      "main": [
+        [
+          {
+            "node": "Validate Restaurants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Restaurants": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Description": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Vibes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Vibes": {
+      "main": [
+        [
+          {
+            "node": "Combine and Enrich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine and Enrich": {
+      "main": [
+        [
+          {
+            "node": "Update Restaurant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Restaurant": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "versionId": "1"
+}

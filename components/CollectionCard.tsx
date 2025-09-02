@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { Users, Heart } from 'lucide-react-native';
 import { Collection } from '@/types/restaurant';
 import { useCollectionRestaurants } from '@/hooks/restaurant-store';
 import { getMemberCount } from '@/utils/member-helpers';
+import { usePexelsImage } from '@/hooks/use-pexels-images';
+import { PexelsImageComponent } from './PexelsImage';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -11,9 +13,12 @@ const CARD_WIDTH = (width - 48) / 2;
 interface CollectionCardProps {
   collection: Collection;
   onPress: () => void;
+  showFollowButton?: boolean;
+  onFollowToggle?: (collectionId: string, isFollowing: boolean) => void;
+  isUserMember?: boolean;
 }
 
-export function CollectionCard({ collection, onPress }: CollectionCardProps) {
+export function CollectionCard({ collection, onPress, showFollowButton = false, onFollowToggle, isUserMember = false }: CollectionCardProps) {
   // Debug: Log what the component receives
   console.log(`[CollectionCard] Component received "${collection.name}":`, {
     collaborators: collection.collaborators,
@@ -24,6 +29,17 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   
   const restaurants = useCollectionRestaurants(collection.id);
   
+  // Get Pexels image for collection cover
+  const { image: pexelsImage, isLoading: imageLoading, error: imageError } = usePexelsImage(
+    collection.name,
+    'collection',
+    {
+      cuisines: restaurants?.map(r => r.cuisine).filter(Boolean) || [],
+      city: restaurants?.[0]?.city,
+      collectionId: collection.id
+    }
+  );
+  
   // Enhanced data validation and fallbacks
   const restaurantCount = restaurants && Array.isArray(restaurants) ? restaurants.length : 0;
   
@@ -33,8 +49,8 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   // Use memberCount from collection data if available, otherwise calculate it
   // If we have collaborators data, recalculate to ensure accuracy
   const calculatedTotalMembers = collection.collaborators && collection.collaborators.length > 0 
-    ? getMemberCount(collection) 
-    : ((collection as any).memberCount || getMemberCount(collection));
+    ? getMemberCount(collection.collaborators || []) 
+    : ((collection as any).memberCount || getMemberCount(collection.collaborators || []));
   
   // Preserve the correct member count when it's first available
   useEffect(() => {
@@ -70,11 +86,15 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
   
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
-      <Image 
-        source={{ 
+      <PexelsImageComponent
+        image={pexelsImage}
+        isLoading={imageLoading}
+        error={imageError}
+        style={styles.image}
+        fallbackSource={{ 
           uri: collection.cover_image || collection.coverImage || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' 
-        }} 
-        style={styles.image} 
+        }}
+        showLoadingIndicator={false}
       />
       <View style={styles.overlay} />
       
@@ -82,6 +102,26 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
       <View style={styles.typeBadge}>
         <Text style={styles.typeText}>{getCollectionType()}</Text>
       </View>
+      
+      {/* Follow/Unfollow button in top right corner */}
+      {showFollowButton && collection.is_public && onFollowToggle && (
+        <TouchableOpacity 
+          style={[styles.followButtonTopRight, (collection.isFollowing || isUserMember) && styles.followingButtonTopRight]}
+          onPress={() => onFollowToggle(collection.id, !(collection.isFollowing || isUserMember))}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.followButtonText, (collection.isFollowing || isUserMember) && styles.followingButtonText]}>
+            {(collection.isFollowing || isUserMember) ? 'Unfollow' : 'Follow'}
+          </Text>
+        </TouchableOpacity>
+      )}
+      
+      {/* Following badge for public collections */}
+      {collection.is_public && (collection.isFollowing || isUserMember) && (
+        <View style={styles.followingBadge}>
+          <Text style={styles.followingBadgeText}>Following</Text>
+        </View>
+      )}
       
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{collection.name}</Text>
@@ -101,6 +141,7 @@ export function CollectionCard({ collection, onPress }: CollectionCardProps) {
             <Text style={styles.statText}>{likeCount}</Text>
           </View>
         )}
+        
         <View style={styles.stat}>
           <Users size={14} color="#FFF" />
           <Text style={[styles.statText, { 
@@ -189,5 +230,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 1,
+  },
+  // Follow button styles (top right corner)
+  followButtonTopRight: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 10,
+  },
+  followingButtonTopRight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  followButtonText: {
+    fontSize: 11,
+    color: '#FFF',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  followingButtonText: {
+    color: '#FFF',
+  },
+  // Following badge styles
+  followingBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  followingBadgeText: {
+    fontSize: 10,
+    color: '#FFF',
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });
