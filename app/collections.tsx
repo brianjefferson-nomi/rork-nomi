@@ -170,15 +170,13 @@ export default function CollectionsPage() {
                 {filteredCollections.map((collection, index) => (
                   <View 
                     key={collection.id} 
-                    style={[
-                      styles.masonryItem,
-                      index % 2 === 0 ? styles.leftColumn : styles.rightColumn
-                    ]}
+                    style={styles.masonryItem}
                   >
                     <CollectionCard
                       collection={collection as Collection}
                       showFollowButton={true}
                       isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+                      isUserCreator={collection.created_by === user?.id}
                       onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
                         try {
                           if (isFollowing) {
@@ -309,24 +307,16 @@ const styles = StyleSheet.create({
   },
   collectionsList: {
     flex: 1,
-    padding: 8, // Reduced padding for tighter layout
+    paddingHorizontal: 16, // Match lists page padding
   },
   masonryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: 0,
-    gap: 8, // Reduced gap for tighter layout
+    marginTop: 16, // Push cards down from the search bar divider
   },
   masonryItem: {
-    width: '48%', // Balanced width for equal spacing
-    marginBottom: 8, // Reduced margin for tighter layout
-  },
-  leftColumn: {
-    alignSelf: 'flex-start',
-  },
-  rightColumn: {
-    alignSelf: 'flex-start',
+    marginBottom: 12, // Match lists page spacing exactly
   },
   emptyContainer: {
     flex: 1,

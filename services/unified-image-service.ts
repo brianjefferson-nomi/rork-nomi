@@ -158,9 +158,9 @@ export class UnifiedImageService {
       }
     });
 
-    // If no valid images, use varied default
+    // If no valid images, use the standard default image
     if (validImages.length === 0) {
-      const defaultImage = this.getVariedDefaultImage(restaurant);
+      const defaultImage = this.getDefaultImage();
       validImages.push(defaultImage);
     }
 
@@ -172,78 +172,12 @@ export class UnifiedImageService {
     };
   }
 
-  /**
-   * Get a varied default image based on restaurant characteristics
-   */
-  private static getVariedDefaultImage(restaurant: any): string {
-    const name = restaurant.name?.toLowerCase() || '';
-    const cuisine = restaurant.cuisine?.toLowerCase() || '';
-    
-    // Enhanced food category-based images with better variety
-    const foodImages = [
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', // Restaurant interior
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400', // Pizza
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400', // Burger
-      'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400', // Sushi
-      'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400', // Pasta
-      'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400', // Japanese
-      'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400', // Mexican
-      'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400', // Thai
-      'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400', // Indian
-      'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400', // American
-      'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=400', // Chinese
-      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400', // Mediterranean
-      'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400', // Korean
-      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400', // French
-      'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400', // Fine dining
-    ];
-    
-    // Use restaurant name to generate a consistent but varied image
-    let imageIndex = 0;
-    for (let i = 0; i < name.length; i++) {
-      imageIndex += name.charCodeAt(i);
-    }
-    imageIndex = imageIndex % foodImages.length;
-    
-    // Enhanced cuisine-based overrides
-    if (cuisine.includes('pizza') || name.includes('pizza')) {
-      imageIndex = 1; // Pizza image
-    } else if (cuisine.includes('burger') || name.includes('burger') || name.includes('king')) {
-      imageIndex = 2; // Burger image
-    } else if (cuisine.includes('sushi') || cuisine.includes('japanese') || name.includes('sushi')) {
-      imageIndex = 3; // Sushi image
-    } else if (cuisine.includes('italian') || name.includes('pasta') || name.includes('pizza')) {
-      imageIndex = 4; // Italian image
-    } else if (cuisine.includes('japanese') || name.includes('sushi') || name.includes('ramen')) {
-      imageIndex = 5; // Japanese image
-    } else if (cuisine.includes('mexican') || name.includes('taco') || name.includes('burrito')) {
-      imageIndex = 6; // Mexican image
-    } else if (cuisine.includes('thai') || name.includes('thai')) {
-      imageIndex = 7; // Thai image
-    } else if (cuisine.includes('indian') || name.includes('curry') || name.includes('tandoor')) {
-      imageIndex = 8; // Indian image
-    } else if (cuisine.includes('american') || name.includes('burger') || name.includes('diner')) {
-      imageIndex = 9; // American image
-    } else if (cuisine.includes('chinese') || name.includes('wok') || name.includes('dragon')) {
-      imageIndex = 10; // Chinese image
-    } else if (cuisine.includes('mediterranean') || name.includes('greek') || name.includes('falafel')) {
-      imageIndex = 11; // Mediterranean image
-    } else if (cuisine.includes('korean') || name.includes('bbq') || name.includes('seoul')) {
-      imageIndex = 12; // Korean image
-    } else if (cuisine.includes('french') || name.includes('bistro') || name.includes('le ')) {
-      imageIndex = 13; // French image
-    } else if (cuisine.includes('fine dining') || name.includes('steak') || name.includes('grill')) {
-      imageIndex = 14; // Fine dining image
-    }
-    
-    return foodImages[imageIndex];
-  }
 
   /**
    * Get default image
    */
   private static getDefaultImage(): string {
-    return 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400';
+    return 'https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg';
   }
 
   /**

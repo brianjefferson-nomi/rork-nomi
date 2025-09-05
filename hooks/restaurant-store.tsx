@@ -7,6 +7,7 @@ import { Restaurant, RestaurantVote, RankedRestaurantMeta, RestaurantDiscussion,
 import { computeRankings, generateGroupRecommendations } from '@/utils/ranking';
 import { aggregateRestaurantData, getUserLocation, getCollectionCoverImage, getEnhancedCollectionCoverImage, getUnsplashCollectionCoverImage, getCollectionCoverImageFallback, searchRestaurantsWithAPI, deduplicateRestaurants } from '@/services/api';
 import { dbHelpers, Database, supabase } from '@/services/supabase';
+import { realtimeSubscriptionService, RestaurantUpdate, RestaurantPhotoUpdate } from '@/services/realtime-subscriptions';
 
 
 
@@ -160,99 +161,36 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     uploadedPhotos: [] // Placeholder - actual photos loaded by UnifiedImageService
   }), []);
 
-  // Load restaurants from database
-  console.log('[RestaurantStore] About to create restaurantsQuery with currentCity:', currentCity);
+  // Load restaurants from database - optimized for performance
   const restaurantsQuery = useQuery({
-    queryKey: ['restaurants', currentCity], // Add currentCity to query key to refetch when city changes
-    enabled: true, // Explicitly enable the query
-    retry: 3,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ['restaurants', currentCity],
+    enabled: true,
+    retry: 1,
+    retryDelay: 500,
+    staleTime: 30 * 60 * 1000, // 30 minutes - increased for better performance
+    gcTime: 60 * 60 * 1000, // 1 hour - increased for better performance
+    placeholderData: [], // Provide empty array for faster initial render
     queryFn: async () => {
       try {
-        console.log(`[RestaurantStore] 🚀 QUERY EXECUTING - Loading restaurants for ${currentCity.toUpperCase()}...`);
-        console.log(`[RestaurantStore] Current city: ${currentCity}`);
-        
-        // For LA, load from database (same as NYC for now)
-        if (currentCity === 'la') {
-          console.log('[RestaurantStore] Loading LA restaurants from database...');
-        }
-        
-        // For NYC, load from database
-        console.log('[RestaurantStore] Loading NYC restaurants from database...');
         const restaurantsData = await dbHelpers.getAllRestaurants();
-        console.log('[RestaurantStore] Raw restaurant data:', restaurantsData?.length || 0);
-        console.log('[RestaurantStore] Sample restaurant data:', restaurantsData?.slice(0, 2));
         
         if (!restaurantsData) throw new Error('No restaurants data returned');
         
         if (restaurantsData && restaurantsData.length > 0) {
           const mappedRestaurants = restaurantsData.map(mapDatabaseRestaurant);
-          console.log('[RestaurantStore] Mapped restaurants:', mappedRestaurants.length);
-          console.log('[RestaurantStore] Sample restaurant IDs:', mappedRestaurants.slice(0, 3).map(r => r.id));
-          console.log('[RestaurantStore] All restaurant IDs from database:', mappedRestaurants.map(r => r.id));
-          
-          // Enhance restaurants with Google Places data if they don't have it
-          console.log('[RestaurantStore] Checking for restaurants without Google Places data...');
-          
-          // Log sample restaurants to see what data they have
-          const sampleRestaurants = mappedRestaurants.slice(0, 3);
-          sampleRestaurants.forEach((r, index) => {
-            console.log(`[RestaurantStore] Sample restaurant ${index + 1}: ${r.name}`);
-            console.log(`  - Google Place ID: ${r.googlePlaceId || 'None'}`);
-            console.log(`  - Google Rating: ${r.googleRating || 'None'}`);
-            console.log(`  - Google Photos: ${r.googlePhotos || 'None'}`);
-            console.log(`  - Editorial Summary: ${r.editorialSummary || 'None'}`);
-          });
-          
-          const restaurantsNeedingEnhancement = mappedRestaurants.filter(r => 
-            !r.googlePlaceId || !r.googleRating || !r.googlePhotos
-          );
-          console.log('[RestaurantStore] Restaurants needing enhancement:', restaurantsNeedingEnhancement.length);
-          
-          // Log the names of restaurants that need enhancement
-          if (restaurantsNeedingEnhancement.length > 0) {
-            console.log('[RestaurantStore] Restaurants needing enhancement:');
-            restaurantsNeedingEnhancement.slice(0, 5).forEach((r, index) => {
-              console.log(`  ${index + 1}. ${r.name} (${r.cuisine}) - ${r.neighborhood}`);
-            });
-            if (restaurantsNeedingEnhancement.length > 5) {
-              console.log(`  ... and ${restaurantsNeedingEnhancement.length - 5} more`);
-            }
-          }
-          
-          if (restaurantsNeedingEnhancement.length > 0) {
-            console.log('[RestaurantStore] Google Places enhancement disabled for now, skipping...');
-            return mappedRestaurants;
-          }
-          
           return mappedRestaurants;
         } else {
-          console.log('[RestaurantStore] No restaurants in database');
           return [];
         }
       } catch (error) {
-        console.error('[RestaurantStore] Error loading restaurants from database:', error);
         return [];
       }
-    },
-    retry: 2,
-    retryDelay: 1000,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000 // 30 minutes
+    }
   });
 
-  // Debug the query status immediately after creation
-  console.log('[RestaurantStore] restaurantsQuery status:', {
-    isLoading: restaurantsQuery.isLoading,
-    isError: restaurantsQuery.isError,
-    error: restaurantsQuery.error,
-    data: restaurantsQuery.data?.length || 0,
-    status: restaurantsQuery.status
-  });
+  // Query status tracking (removed debug logging for performance)
 
-  // Load user votes from database
+  // Load user votes from database - optimized
   const votesQuery = useQuery({
     queryKey: ['userVotes', user?.id || ''],
     queryFn: async () => {
@@ -274,77 +212,67 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         return storedVotes ? JSON.parse(storedVotes) : [];
       }
     },
-    enabled: true, // Always enabled to maintain hook order
+    enabled: !!user?.id, // Only load when user is authenticated
     retry: 1,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    retryDelay: 500,
+    staleTime: 15 * 60 * 1000, // 15 minutes - increased
+    gcTime: 30 * 60 * 1000, // 30 minutes - increased
+    placeholderData: [] // Provide empty array for faster initial render
   });
 
-  // Load favorites from database
+  // Load favorites from database - optimized
   const favoritesQuery = useQuery({
     queryKey: ['userFavorites', user?.id || ''],
     queryFn: async () => {
       try {
-        // Only fetch from database if we have a user ID
         if (user?.id) {
           const favorites = await dbHelpers.getUserFavorites(user.id);
-          console.log('[favoritesQuery] Fetched favorites from database:', favorites);
-        return favorites;
+          return favorites;
         } else {
-          console.log('[favoritesQuery] No user ID, falling back to AsyncStorage');
           // Fallback to AsyncStorage when no user ID
           const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
-          const parsedFavorites = storedFavorites ? JSON.parse(storedFavorites) : [];
-          console.log('[favoritesQuery] Fetched favorites from AsyncStorage:', parsedFavorites);
-          return parsedFavorites;
+          return storedFavorites ? JSON.parse(storedFavorites) : [];
         }
       } catch (error) {
-        console.error('[favoritesQuery] Error fetching favorites:', error);
         // Fallback to AsyncStorage
         const storedFavorites = await AsyncStorage.getItem('favoriteRestaurants');
-        const parsedFavorites = storedFavorites ? JSON.parse(storedFavorites) : [];
-        console.log('[favoritesQuery] Fallback to AsyncStorage:', parsedFavorites);
-        return parsedFavorites;
+        return storedFavorites ? JSON.parse(storedFavorites) : [];
       }
     },
     enabled: !!user?.id, // Only enable when we have a user ID
     retry: 1,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    retryDelay: 500,
+    staleTime: 15 * 60 * 1000, // 15 minutes - increased
+    gcTime: 30 * 60 * 1000, // 30 minutes - increased
+    placeholderData: [] // Provide empty array for faster initial render
   });
 
-  // Load discussions from database
+  // Load discussions from database - optimized
   const discussionsQuery = useQuery({
     queryKey: ['discussions'],
     queryFn: async () => {
       try {
-        // For now, we'll use the existing discussions from AsyncStorage
-        // In the future, we can implement a function to get all discussions across collections
         const storedDiscussions = await AsyncStorage.getItem('discussions');
-        const discussions = storedDiscussions ? JSON.parse(storedDiscussions) : [];
-        return discussions;
+        return storedDiscussions ? JSON.parse(storedDiscussions) : [];
       } catch (error) {
         return [];
       }
     },
     retry: 1,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    retryDelay: 500,
+    staleTime: 30 * 60 * 1000, // 30 minutes - increased
+    gcTime: 60 * 60 * 1000, // 1 hour - increased
+    placeholderData: [] // Provide empty array for faster initial render
   });
 
-  // Load initial data and user location
+  // Load initial data and user location - optimized
   const dataQuery = useQuery({
     queryKey: ['restaurantData'],
     queryFn: async () => {
-      const [storedVotes, storedDiscussions, storedNotes, storedSearchHistory, storedFavorites, location] = await Promise.all([
-        AsyncStorage.getItem('userVotes'),
-        AsyncStorage.getItem('discussions'),
+      // Batch storage operations for better performance
+      const [storedNotes, storedSearchHistory, location] = await Promise.all([
         AsyncStorage.getItem('restaurantNotes'),
         AsyncStorage.getItem('searchHistory'),
-        AsyncStorage.getItem('favoriteRestaurants'),
         getUserLocation()
       ]);
 
@@ -356,52 +284,40 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
       return {
         restaurants: restaurantsWithNotes,
-        userVotes: votesQuery.data || (storedVotes ? JSON.parse(storedVotes) : []),
-        discussions: discussionsQuery.data || (storedDiscussions ? JSON.parse(storedDiscussions) : []),
-        favoriteRestaurants: favoritesQuery.data || (storedFavorites ? JSON.parse(storedFavorites) : []),
+        userVotes: votesQuery.data || [],
+        discussions: discussionsQuery.data || [],
+        favoriteRestaurants: favoritesQuery.data || [],
         searchHistory: storedSearchHistory ? JSON.parse(storedSearchHistory) : [],
         userLocation: location
       };
     },
-    enabled: true, // Always enabled to maintain hook order
+    enabled: true,
     retry: 1,
-    retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000 // 10 minutes
+    retryDelay: 500,
+    staleTime: 15 * 60 * 1000, // 15 minutes - increased
+    gcTime: 30 * 60 * 1000, // 30 minutes - increased
+    placeholderData: {
+      restaurants: [],
+      userVotes: [],
+      discussions: [],
+      favoriteRestaurants: [],
+      searchHistory: [],
+      userLocation: null
+    }
   });
 
   // Ensure restaurants are always available
   useEffect(() => {
-    console.log('[RestaurantStore] useEffect triggered:');
-    console.log('  - restaurants.length:', restaurants.length);
-    console.log('  - restaurantsQuery.data:', restaurantsQuery.data?.length || 0);
-    console.log('  - restaurantsQuery.isLoading:', restaurantsQuery.isLoading);
-    console.log('  - restaurantsQuery.error:', restaurantsQuery.error);
-    console.log('  - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length || 0);
-    console.log('  - dataQuery.isLoading:', dataQuery.isLoading);
-    console.log('  - dataQuery.error:', dataQuery.error);
-    console.log('  - user ID:', user?.id);
-    
     // Only set restaurants from query data if we don't have any restaurants yet
     // This prevents overwriting manually added restaurants
     if (restaurants.length === 0) {
       if (restaurantsQuery.data && restaurantsQuery.data.length > 0) {
-        console.log('[RestaurantStore] ✅ Setting restaurants from restaurantsQuery.data:', restaurantsQuery.data.length);
         setRestaurants(restaurantsQuery.data);
       } else if (dataQuery.data?.restaurants && dataQuery.data.restaurants.length > 0) {
-        console.log('[RestaurantStore] ✅ Setting restaurants from dataQuery.data:', dataQuery.data.restaurants.length);
         setRestaurants(dataQuery.data.restaurants);
       } else {
-        console.log('[RestaurantStore] ❌ No restaurants available from any source');
-        console.log('  - restaurantsQuery.data exists:', !!restaurantsQuery.data);
-        console.log('  - restaurantsQuery.data length:', restaurantsQuery.data?.length || 0);
-        console.log('  - dataQuery.data exists:', !!dataQuery.data);
-        console.log('  - dataQuery.data.restaurants exists:', !!dataQuery.data?.restaurants);
-        console.log('  - dataQuery.data.restaurants length:', dataQuery.data?.restaurants?.length || 0);
         setRestaurants([]);
       }
-    } else {
-      console.log('[RestaurantStore] Preserving existing restaurants (including manually added ones)');
     }
   }, [restaurantsQuery.data, dataQuery.data, restaurants.length, user?.id]);
 
@@ -481,7 +397,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
             },
             // Add computed fields
             restaurantCount: Array.isArray(collection.restaurant_ids) ? collection.restaurant_ids.length : 0,
-            memberCount: getMemberCount(collection),
+            memberCount: getMemberCount(collection) + 1, // +1 for creator
             isOwner: isCreator(collection, user?.id || ''),
             isMember: isMember(user?.id || '', collection.collaborators || [])
           };
@@ -567,6 +483,72 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     }
   }, [user?.id, queryClient]);
 
+  // Real-time subscriptions for restaurant data updates
+  useEffect(() => {
+    console.log('[RestaurantStore] Setting up real-time subscriptions...');
+    
+    const unsubscribe = realtimeSubscriptionService.subscribeToAllRestaurantUpdates({
+      onRestaurantUpdate: (update: RestaurantUpdate) => {
+        console.log('[RestaurantStore] Real-time restaurant update received:', update);
+        
+        // Update the restaurant in the local state
+        setRestaurants(prevRestaurants => 
+          prevRestaurants.map(restaurant => 
+            restaurant.id === update.id 
+              ? {
+                  ...restaurant,
+                  hours: update.hours || restaurant.hours,
+                  priceRange: update.price_range || restaurant.priceRange,
+                  website: update.website || restaurant.website,
+                  googlePhotos: update.google_photos || restaurant.googlePhotos,
+                  tripadvisor_photos: update.tripadvisor_photos || restaurant.tripadvisor_photos,
+                  updated_at: update.updated_at
+                }
+              : restaurant
+          )
+        );
+        
+        // Invalidate relevant queries to ensure UI updates
+        queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+        queryClient.invalidateQueries({ queryKey: ['restaurant', update.id] });
+        queryClient.invalidateQueries({ queryKey: ['collectionRestaurants'] });
+      },
+      
+      onRestaurantPhotoInsert: (photo: RestaurantPhotoUpdate) => {
+        console.log('[RestaurantStore] Real-time restaurant photo insert received:', photo);
+        
+        // Invalidate photo-related queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ['restaurantPhotos', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['unifiedImages', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['restaurant', photo.restaurant_id] });
+      },
+      
+      onRestaurantPhotoUpdate: (photo: RestaurantPhotoUpdate) => {
+        console.log('[RestaurantStore] Real-time restaurant photo update received:', photo);
+        
+        // Invalidate photo-related queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ['restaurantPhotos', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['unifiedImages', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['restaurant', photo.restaurant_id] });
+      },
+      
+      onRestaurantPhotoDelete: (photo) => {
+        console.log('[RestaurantStore] Real-time restaurant photo delete received:', photo);
+        
+        // Invalidate photo-related queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ['restaurantPhotos', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['unifiedImages', photo.restaurant_id] });
+        queryClient.invalidateQueries({ queryKey: ['restaurant', photo.restaurant_id] });
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('[RestaurantStore] Cleaning up real-time subscriptions...');
+      unsubscribe();
+    };
+  }, [queryClient]);
+
   // Load collections for the current user
   const allCollectionsQuery = useQuery({
     queryKey: ['allCollections', user?.id],
@@ -605,7 +587,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           });
           
           // Calculate member count after collaborators is properly set
-          enhancedCollection.memberCount = getMemberCount(enhancedCollection);
+          enhancedCollection.memberCount = getMemberCount(enhancedCollection) + 1; // +1 for creator
           
           console.log(`[RestaurantStore] Final "${enhancedCollection.name}" (${new Date().toISOString()}): memberCount = ${enhancedCollection.memberCount}`);
           
@@ -664,7 +646,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           });
           
           // Calculate member count after collaborators is properly set
-          enhancedCollection.memberCount = getMemberCount(enhancedCollection);
+          enhancedCollection.memberCount = getMemberCount(enhancedCollection) + 1; // +1 for creator
           
           console.log(`[RestaurantStore] Final user collection "${enhancedCollection.name}" (${new Date().toISOString()}): memberCount = ${enhancedCollection.memberCount}`);
           
@@ -1553,11 +1535,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   const followCollection = useCallback(async (collectionId: string) => {
     if (!user?.id) {
-      console.warn('[RestaurantStore] Cannot follow collection: user not authenticated');
       return { success: false, isFollowing: false };
     }
 
     try {
+      // Follow collection in database
+      await dbHelpers.followCollection(user.id, collectionId);
+
       // Add to following list
       setFollowingCollections(prev => {
         if (prev.includes(collectionId)) return prev;
@@ -1581,21 +1565,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         queryClient.setQueryData(['allCollections', user?.id], updatedCollections);
       }
 
-      console.log(`[RestaurantStore] Successfully followed collection: ${collectionId}`);
       return { success: true, isFollowing: true };
     } catch (error) {
-      console.error(`[RestaurantStore] Error following collection: ${collectionId}`, error);
       return { success: false, isFollowing: false };
     }
   }, [user?.id, queryClient]);
 
   const unfollowCollection = useCallback(async (collectionId: string) => {
     if (!user?.id) {
-      console.warn('[RestaurantStore] Cannot unfollow collection: user not authenticated');
       return { success: false, isFollowing: false };
     }
 
     try {
+      // Unfollow collection in database
+      await dbHelpers.unfollowCollection(user.id, collectionId);
+
       // Remove from following list
       setFollowingCollections(prev => prev.filter(id => id !== collectionId));
 
@@ -1616,10 +1600,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         queryClient.setQueryData(['allCollections', user?.id], updatedCollections);
       }
 
-      console.log(`[RestaurantStore] Successfully unfollowed collection: ${collectionId}`);
       return { success: true, isFollowing: false };
     } catch (error) {
-      console.error(`[RestaurantStore] Error unfollowing collection: ${collectionId}`, error);
       return { success: false, isFollowing: false };
     }
   }, [user?.id, queryClient]);
@@ -1756,8 +1738,135 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     isFollowingCollection,
     getFollowingCollections,
     
-    // Enhance restaurant with website data from Google Places
+    // Enhance restaurant with website and hours data from Google Places or TripAdvisor
+    enhanceRestaurantWithWebsiteAndHours: async (restaurantId: string) => {
+      try {
+        console.log(`[RestaurantStore] Enhancing restaurant ${restaurantId} with website and hours data...`);
+        
+        // Get the restaurant from the database
+        const { data: restaurant, error: fetchError } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('id', restaurantId)
+          .single();
+        
+        if (fetchError || !restaurant) {
+          console.error('[RestaurantStore] Error fetching restaurant:', fetchError);
+          return null;
+        }
+        
+        const updateData: any = {
+          updated_at: new Date().toISOString()
+        };
+        let hasUpdates = false;
+        
+        // Check if we need to fetch website or hours
+        const needsWebsite = !restaurant.website;
+        const needsHours = !restaurant.hours || restaurant.hours === 'Hours vary';
+        
+        if (!needsWebsite && !needsHours) {
+          console.log(`[RestaurantStore] Restaurant ${restaurant.name} already has website and hours`);
+          return restaurant;
+        }
+        
+        console.log(`[RestaurantStore] Restaurant ${restaurant.name} needs:`, { needsWebsite, needsHours });
+        
+        // Try Google Places first if we have a Google Place ID
+        if (restaurant.google_place_id && (needsWebsite || needsHours)) {
+          console.log(`[RestaurantStore] Getting data from Google Places for ${restaurant.name}...`);
+          
+          try {
+            const { getGooglePlaceDetails, parseRestaurantHours } = await import('@/services/api');
+            const placeDetails = await getGooglePlaceDetails(restaurant.google_place_id);
+            
+            if (placeDetails) {
+              // Update website if needed and available
+              if (needsWebsite && placeDetails.website) {
+                updateData.website = placeDetails.website;
+                hasUpdates = true;
+                console.log(`[RestaurantStore] Found website from Google Places: ${placeDetails.website}`);
+              }
+              
+              // Update hours if needed and available
+              if (needsHours && placeDetails.opening_hours) {
+                const parsedHours = parseRestaurantHours(placeDetails.opening_hours.weekday_text);
+                if (parsedHours && parsedHours !== 'Hours vary') {
+                  updateData.hours = parsedHours;
+                  hasUpdates = true;
+                  console.log(`[RestaurantStore] Found hours from Google Places: ${parsedHours}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[RestaurantStore] Error getting Google Places data:', error);
+          }
+        }
+        
+        // Try TripAdvisor if we still need data and have a TripAdvisor location ID
+        if (restaurant.tripadvisor_location_id && (needsWebsite || needsHours)) {
+          console.log(`[RestaurantStore] Getting data from TripAdvisor for ${restaurant.name}...`);
+          
+          try {
+            const { tripAdvisorService } = await import('@/services/tripadvisor');
+            const tripAdvisorData = await tripAdvisorService.getLocationData(restaurant.tripadvisor_location_id, false);
+            
+            if (tripAdvisorData.details) {
+              // Update website if needed and available
+              if (needsWebsite && tripAdvisorData.details.website) {
+                updateData.website = tripAdvisorData.details.website;
+                hasUpdates = true;
+                console.log(`[RestaurantStore] Found website from TripAdvisor: ${tripAdvisorData.details.website}`);
+              }
+              
+              // Update hours if needed and available
+              if (needsHours && tripAdvisorData.details.hours) {
+                const { parseRestaurantHours } = await import('@/services/api');
+                const parsedHours = parseRestaurantHours(tripAdvisorData.details.hours);
+                if (parsedHours && parsedHours !== 'Hours vary') {
+                  updateData.hours = parsedHours;
+                  hasUpdates = true;
+                  console.log(`[RestaurantStore] Found hours from TripAdvisor: ${parsedHours}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[RestaurantStore] Error getting TripAdvisor data:', error);
+          }
+        }
+        
+        // Update the restaurant if we found new data
+        if (hasUpdates) {
+          const { data: updatedRestaurant, error: updateError } = await supabase
+            .from('restaurants')
+            .update(updateData)
+            .eq('id', restaurantId)
+            .select()
+            .single();
+          
+          if (updateError) {
+            console.error('[RestaurantStore] Error updating restaurant:', updateError);
+            return restaurant;
+          }
+          
+          console.log(`[RestaurantStore] Successfully updated ${restaurant.name} with:`, updateData);
+          return updatedRestaurant;
+        }
+        
+        console.log(`[RestaurantStore] No additional data found for ${restaurant.name}`);
+        return restaurant;
+        
+      } catch (error) {
+        console.error('[RestaurantStore] Error enhancing restaurant with website and hours:', error);
+        return null;
+      }
+    },
+
+    // Legacy function for backward compatibility - deprecated, use enhanceRestaurantWithWebsiteAndHours instead
     enhanceRestaurantWithWebsite: async (restaurantId: string) => {
+      // Since we can't reference the new function from within this object context,
+      // we'll duplicate the implementation for backward compatibility
+      console.warn('[RestaurantStore] enhanceRestaurantWithWebsite is deprecated, use enhanceRestaurantWithWebsiteAndHours instead');
+      
       try {
         console.log(`[RestaurantStore] Enhancing restaurant ${restaurantId} with website data...`);
         
@@ -1773,42 +1882,73 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
           return null;
         }
         
-        // If restaurant already has website, return it
-        if (restaurant.website) {
-          console.log(`[RestaurantStore] Restaurant ${restaurant.name} already has website: ${restaurant.website}`);
+        const updateData: any = {
+          updated_at: new Date().toISOString()
+        };
+        let hasUpdates = false;
+        
+        // Check if we need to fetch website
+        const needsWebsite = !restaurant.website;
+        
+        if (!needsWebsite) {
+          console.log(`[RestaurantStore] Restaurant ${restaurant.name} already has website`);
           return restaurant;
         }
         
-        // If restaurant has Google Place ID, get website from Google Places
-        if (restaurant.google_place_id) {
+        console.log(`[RestaurantStore] Restaurant ${restaurant.name} needs website`);
+        
+        // Try Google Places first if we have a Google Place ID
+        if (restaurant.google_place_id && needsWebsite) {
           console.log(`[RestaurantStore] Getting website from Google Places for ${restaurant.name}...`);
           
-          // Import the Google Places function
-          const { getGooglePlaceDetails } = await import('@/services/api');
-          const placeDetails = await getGooglePlaceDetails(restaurant.google_place_id);
-          
-          if (placeDetails?.website) {
-            console.log(`[RestaurantStore] Found website for ${restaurant.name}: ${placeDetails.website}`);
+          try {
+            const { getGooglePlaceDetails } = await import('@/services/api');
+            const placeDetails = await getGooglePlaceDetails(restaurant.google_place_id);
             
-            // Update the restaurant with website data
-            const { data: updatedRestaurant, error: updateError } = await supabase
-              .from('restaurants')
-              .update({ 
-                website: placeDetails.website,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', restaurantId)
-              .select()
-              .single();
-            
-            if (updateError) {
-              console.error('[RestaurantStore] Error updating restaurant with website:', updateError);
-              return restaurant;
+            if (placeDetails && placeDetails.website) {
+              updateData.website = placeDetails.website;
+              hasUpdates = true;
+              console.log(`[RestaurantStore] Found website from Google Places: ${placeDetails.website}`);
             }
-            
-            console.log(`[RestaurantStore] Successfully updated ${restaurant.name} with website`);
-            return updatedRestaurant;
+          } catch (error) {
+            console.error('[RestaurantStore] Error getting Google Places data:', error);
           }
+        }
+        
+        // Try TripAdvisor if we still need data and have a TripAdvisor location ID
+        if (restaurant.tripadvisor_location_id && needsWebsite && !hasUpdates) {
+          console.log(`[RestaurantStore] Getting website from TripAdvisor for ${restaurant.name}...`);
+          
+          try {
+            const { tripAdvisorService } = await import('@/services/tripadvisor');
+            const tripAdvisorData = await tripAdvisorService.getLocationData(restaurant.tripadvisor_location_id, false);
+            
+            if (tripAdvisorData.details && tripAdvisorData.details.website) {
+              updateData.website = tripAdvisorData.details.website;
+              hasUpdates = true;
+              console.log(`[RestaurantStore] Found website from TripAdvisor: ${tripAdvisorData.details.website}`);
+            }
+          } catch (error) {
+            console.error('[RestaurantStore] Error getting TripAdvisor data:', error);
+          }
+        }
+        
+        // Update the restaurant if we found new data
+        if (hasUpdates) {
+          const { data: updatedRestaurant, error: updateError } = await supabase
+            .from('restaurants')
+            .update(updateData)
+            .eq('id', restaurantId)
+            .select()
+            .single();
+          
+          if (updateError) {
+            console.error('[RestaurantStore] Error updating restaurant:', updateError);
+            return restaurant;
+          }
+          
+          console.log(`[RestaurantStore] Successfully updated ${restaurant.name} with website: ${updateData.website}`);
+          return updatedRestaurant;
         }
         
         console.log(`[RestaurantStore] No website data found for ${restaurant.name}`);
@@ -1870,6 +2010,15 @@ export function useRestaurantVotes(restaurantId: string | undefined, planId?: st
 export function useCollectionRestaurants(collectionId: string | undefined) {
   const { plans, allCollections } = useRestaurants();
   
+  // Debug: Log when hook is called (only for specific collections)
+  if (collectionId === 'a272c104-933a-4936-84ae-894424132a93') {
+    console.log(`[useCollectionRestaurants] Hook called for collection:`, {
+      collectionId,
+      plansLength: plans?.length || 0,
+      allCollectionsLength: allCollections?.length || 0
+    });
+  }
+  
   // Fetch restaurants directly from database for this collection
   const collectionRestaurantsQuery = useQuery({
     queryKey: ['collectionRestaurants', collectionId || ''],
@@ -1879,10 +2028,28 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
       try {
         // Find the collection
         let collection = allCollections?.find((c: any) => c && c.id === collectionId);
+        let foundIn = 'allCollections';
         
         // If not found in allCollections, try plans (private collections)
         if (!collection) {
           collection = plans?.find((p: any) => p && p.id === collectionId);
+          foundIn = 'plans';
+        }
+        
+        // Debug for LA's Hidden Gems
+        if (collectionId === 'a272c104-933a-4936-84ae-894424132a93') {
+          console.log(`[useCollectionRestaurants] LA's Hidden Gems collection lookup:`, {
+            collectionId,
+            foundIn,
+            collection: collection ? {
+              id: collection.id,
+              name: collection.name,
+              restaurant_ids: collection.restaurant_ids?.length || 0,
+              is_public: collection.is_public
+            } : null,
+            allCollectionsLength: allCollections?.length || 0,
+            plansLength: plans?.length || 0
+          });
         }
         
         if (!collection) {
@@ -1897,8 +2064,29 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
         
         console.log(`[useCollectionRestaurants] Collection ${collectionId} has ${collection.restaurant_ids.length} restaurant IDs:`, collection.restaurant_ids);
         
+        // Debug for LA's Hidden Gems
+        if (collection.name === "LA's Hidden Gems") {
+          console.log(`[useCollectionRestaurants] LA's Hidden Gems debug:`, {
+            collectionId,
+            collectionName: collection.name,
+            restaurantIds: collection.restaurant_ids,
+            foundInAllCollections: !!allCollections?.find((c: any) => c && c.id === collectionId),
+            foundInPlans: !!plans?.find((p: any) => p && p.id === collectionId)
+          });
+        }
+        
         // Fetch restaurants directly from database by IDs using dbHelpers
         const restaurants = await dbHelpers.getRestaurantsByIds(collection.restaurant_ids);
+        
+        // Debug for LA's Hidden Gems
+        if (collectionId === 'a272c104-933a-4936-84ae-894424132a93') {
+          console.log(`[useCollectionRestaurants] LA's Hidden Gems restaurant fetching:`, {
+            collectionId,
+            restaurantIds: collection.restaurant_ids,
+            restaurantsReturned: restaurants?.length || 0,
+            restaurants: restaurants?.map(r => ({ id: r.id, name: r.name })) || []
+          });
+        }
         
         if (!restaurants) {
           console.log(`[useCollectionRestaurants] No restaurants found for collection ${collectionId}`);
@@ -1957,9 +2145,20 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
     enabled: !!collectionId,
     retry: 2,
     retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - shorter for more responsive updates
     gcTime: 10 * 60 * 1000 // 10 minutes
   });
+  
+  // Debug: Log query result (only for specific collections)
+  if (collectionId === 'a272c104-933a-4936-84ae-894424132a93') {
+    console.log(`[useCollectionRestaurants] Query result for ${collectionId}:`, {
+      data: collectionRestaurantsQuery.data,
+      dataLength: collectionRestaurantsQuery.data?.length || 0,
+      isLoading: collectionRestaurantsQuery.isLoading,
+      isError: collectionRestaurantsQuery.isError,
+      error: collectionRestaurantsQuery.error
+    });
+  }
   
   return collectionRestaurantsQuery.data || [];
 }

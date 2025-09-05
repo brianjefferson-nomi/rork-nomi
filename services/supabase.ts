@@ -264,6 +264,28 @@ export interface Database {
           joined_at?: string;
         };
       };
+      collection_follows: {
+        Row: {
+          id: string;
+          user_id: string;
+          collection_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          collection_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          collection_id?: string;
+          updated_at?: string;
+        };
+      };
       restaurant_votes: {
         Row: {
           id: string;
@@ -1684,6 +1706,152 @@ export const dbHelpers = {
       }
     } catch (error) {
       console.error('[incrementCollectionViews] Unexpected error:', error);
+    }
+  },
+
+  // Collection follow operations
+  async followCollection(userId: string, collectionId: string) {
+    try {
+      // Check if collection_follows table exists by trying to query it
+      const { data, error } = await supabase
+        .from('collection_follows')
+        .insert({
+          user_id: userId,
+          collection_id: collectionId
+        })
+        .select();
+      
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === '401')) {
+        // Store in localStorage as fallback for table not found, RLS policy issues, or auth issues
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        follows[`${userId}_${collectionId}`] = {
+          user_id: userId,
+          collection_id: collectionId,
+          created_at: new Date().toISOString()
+        };
+        localStorage.setItem('collection_follows', JSON.stringify(follows));
+        return [{ user_id: userId, collection_id: collectionId }];
+      }
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data;
+    } catch (error: any) {
+      // Check if this is a table not found, RLS policy error, or auth error
+      if (error?.code === 'PGRST205' || error?.code === '42501' || error?.code === '401') {
+        // Store in localStorage as fallback
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        follows[`${userId}_${collectionId}`] = {
+          user_id: userId,
+          collection_id: collectionId,
+          created_at: new Date().toISOString()
+        };
+        localStorage.setItem('collection_follows', JSON.stringify(follows));
+        return [{ user_id: userId, collection_id: collectionId }];
+      }
+      
+      throw error;
+    }
+  },
+
+  async unfollowCollection(userId: string, collectionId: string) {
+    try {
+      const { error } = await supabase
+        .from('collection_follows')
+        .delete()
+        .eq('user_id', userId)
+        .eq('collection_id', collectionId);
+      
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === '401')) {
+        // Remove from localStorage as fallback for table not found, RLS policy issues, or auth issues
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        delete follows[`${userId}_${collectionId}`];
+        localStorage.setItem('collection_follows', JSON.stringify(follows));
+        return;
+      }
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      // Check if this is a table not found, RLS policy error, or auth error
+      if (error?.code === 'PGRST205' || error?.code === '42501' || error?.code === '401') {
+        // Remove from localStorage as fallback
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        delete follows[`${userId}_${collectionId}`];
+        localStorage.setItem('collection_follows', JSON.stringify(follows));
+        return;
+      }
+      
+      throw error;
+    }
+  },
+
+  async isFollowingCollection(userId: string, collectionId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('collection_follows')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('collection_id', collectionId)
+        .single();
+      
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === '401')) {
+        // Check localStorage as fallback for table not found, RLS policy issues, or auth issues
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        return !!follows[`${userId}_${collectionId}`];
+      }
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        throw error;
+      }
+      
+      return !!data;
+    } catch (error: any) {
+      // Check if this is a table not found, RLS policy error, or auth error
+      if (error?.code === 'PGRST205' || error?.code === '42501' || error?.code === '401') {
+        // Check localStorage as fallback
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        return !!follows[`${userId}_${collectionId}`];
+      }
+      
+      throw error;
+    }
+  },
+
+  async getFollowingCollections(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('collection_follows')
+        .select('collection_id')
+        .eq('user_id', userId);
+      
+      if (error && (error.code === 'PGRST205' || error.code === '42501' || error.code === '401')) {
+        // Get from localStorage as fallback for table not found, RLS policy issues, or auth issues
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        return Object.keys(follows)
+          .filter(key => key.startsWith(`${userId}_`))
+          .map(key => key.split('_')[1]);
+      }
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data?.map(follow => follow.collection_id) || [];
+    } catch (error: any) {
+      // Check if this is a table not found, RLS policy error, or auth error
+      if (error?.code === 'PGRST205' || error?.code === '42501' || error?.code === '401') {
+        // Get from localStorage as fallback
+        const follows = JSON.parse(localStorage.getItem('collection_follows') || '{}');
+        return Object.keys(follows)
+          .filter(key => key.startsWith(`${userId}_`))
+          .map(key => key.split('_')[1]);
+      }
+      
+      throw error;
     }
   },
 

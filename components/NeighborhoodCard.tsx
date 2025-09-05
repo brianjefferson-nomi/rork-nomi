@@ -44,17 +44,12 @@ export function NeighborhoodCard({
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>{neighborhood}</Text>
         <Text style={styles.city}>{city}</Text>
-        <Text style={styles.count}>{restaurantCount} places</Text>
       </View>
       
       <View style={styles.footer}>
         <View style={styles.stat}>
           <MapPin size={14} color="#FFF" />
           <Text style={styles.statText}>{neighborhood}</Text>
-        </View>
-        <View style={styles.stat}>
-          <Users size={14} color="#FFF" />
-          <Text style={styles.statText}>{restaurantCount}</Text>
         </View>
       </View>
     </TouchableOpacity>

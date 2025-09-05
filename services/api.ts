@@ -378,43 +378,90 @@ export const cleanupExpiredCache = async (): Promise<void> => {
   }
 };
 
-// Enhanced image assignment with robust fallbacks and URL validation
+// Enhanced image assignment with database-first approach
 export const assignRestaurantImages = async (restaurant: any): Promise<string[]> => {
   const images: string[] = [];
 
   try {
-    // 1) Accept only absolute, directly fetchable image URLs (no endpoints requiring headers)
-    if (Array.isArray(restaurant.photos)) {
-      for (const p of restaurant.photos.slice(0, 6)) {
-        const url = typeof p === 'string' ? p : p?.url || p?.image_url || '';
-        if (typeof url === 'string' && url.startsWith('http') && !url.includes('rapidapi.com')) {
-          images.push(url);
+    console.log(`[assignRestaurantImages] Processing images for ${restaurant.name}`);
+    
+    // 1) First priority: User-uploaded photos from database
+    if (restaurant.id) {
+      try {
+        const { PhotoUploadService } = await import('./photo-upload');
+        const uploadedPhotos = await PhotoUploadService.getRestaurantPhotos(restaurant.id);
+        if (uploadedPhotos.length > 0) {
+          const uploadedUrls = uploadedPhotos.map(photo => photo.url).filter(Boolean);
+          images.push(...uploadedUrls);
+          console.log(`[assignRestaurantImages] Found ${uploadedUrls.length} uploaded photos for ${restaurant.name}`);
         }
+      } catch (error) {
+        console.warn(`[assignRestaurantImages] Error fetching uploaded photos for ${restaurant.name}:`, error);
       }
     }
 
-    // 2) If we need more images or photos are missing/invalid, use Unsplash based on cuisine/name
+    // 2) Second priority: Google Places photos from database
+    if (restaurant.googlePhotos) {
+      let googlePhotoUrls: string[] = [];
+      
+      if (typeof restaurant.googlePhotos === 'string') {
+        // Google Photos can be a comma-separated string of URLs
+        googlePhotoUrls = restaurant.googlePhotos.split(',')
+          .map(url => typeof url === 'string' ? url.trim() : '')
+          .filter(url => url.length > 0 && url.startsWith('http'));
+      } else if (Array.isArray(restaurant.googlePhotos)) {
+        // Google Photos can also be an array of URLs
+        googlePhotoUrls = restaurant.googlePhotos
+          .filter(url => typeof url === 'string' && url.trim().length > 0 && url.startsWith('http'))
+          .map(url => url.trim());
+      }
+      
+      if (googlePhotoUrls.length > 0) {
+        images.push(...googlePhotoUrls);
+        console.log(`[assignRestaurantImages] Found ${googlePhotoUrls.length} Google Photos for ${restaurant.name}`);
+      }
+    }
+
+    // 3) Third priority: TripAdvisor photos from database
+    if (restaurant.tripadvisor_photos && Array.isArray(restaurant.tripadvisor_photos) && restaurant.tripadvisor_photos.length > 0) {
+      const validTripAdvisorPhotos = restaurant.tripadvisor_photos
+        .filter((img: any) => typeof img === 'string' && img.startsWith('http'));
+      images.push(...validTripAdvisorPhotos);
+      console.log(`[assignRestaurantImages] Found ${validTripAdvisorPhotos.length} TripAdvisor photos for ${restaurant.name}`);
+    }
+
+    // 4) Fourth priority: Other images from restaurant data
+    if (restaurant.images && Array.isArray(restaurant.images) && restaurant.images.length > 0) {
+      const validImages = restaurant.images
+        .filter((img: any) => typeof img === 'string' && img.startsWith('http') && !img.includes('rapidapi.com'));
+      images.push(...validImages);
+      console.log(`[assignRestaurantImages] Found ${validImages.length} other images for ${restaurant.name}`);
+    }
+
+    // 5) Fifth priority: Main image URL if different
+    if (restaurant.imageUrl && typeof restaurant.imageUrl === 'string' && 
+        restaurant.imageUrl.startsWith('http') && !images.includes(restaurant.imageUrl)) {
+      images.push(restaurant.imageUrl);
+      console.log(`[assignRestaurantImages] Added main image URL for ${restaurant.name}`);
+    }
+
+    // 6) No external API calls for restaurants - only use database images
     if (images.length < 3) {
-      const searchTerm = (restaurant.cuisine || restaurant.name || 'restaurant').toString();
-      const needed = Math.max(0, 3 - images.length);
-      const unsplashImages = await getUnsplashImage(searchTerm, needed);
-      if (Array.isArray(unsplashImages)) {
-        images.push(...unsplashImages.filter(Boolean));
-      } else if (unsplashImages) {
-        images.push(unsplashImages);
-      }
+      console.log(`[assignRestaurantImages] Only ${images.length} database images found for ${restaurant.name}, using default image as fallback`);
     }
 
-    // 3) Ensure at least 3 images with themed placeholders
-    while (images.length < 3) {
-      images.push(getDefaultRestaurantImage(restaurant.cuisine));
+    // 7) Final fallback: Ensure at least 1 image with standard default
+    if (images.length === 0) {
+      console.log(`[assignRestaurantImages] No images found for ${restaurant.name}, using default image`);
+      images.push('https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg');
     }
 
     const unique = [...new Set(images)].filter(Boolean);
-    return unique.length > 0 ? unique : [getDefaultRestaurantImage(restaurant.cuisine)];
+    console.log(`[assignRestaurantImages] Final result for ${restaurant.name}: ${unique.length} unique images`);
+    return unique.length > 0 ? unique : ['https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg'];
   } catch (error) {
-    console.error('Error assigning restaurant images:', error);
-    return [getDefaultRestaurantImage(restaurant.cuisine)];
+    console.error(`[assignRestaurantImages] Error assigning images for ${restaurant.name}:`, error);
+    return ['https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg'];
   }
 };
 
@@ -1019,20 +1066,8 @@ export const getUnsplashImage = async (query: string, count: number = 1) => {
 
 // Default placeholder images for fallback
 export const getDefaultRestaurantImage = (cuisine?: string) => {
-  const defaultImages = {
-    'Italian': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop&q=80',
-    'Japanese': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&h=600&fit=crop&q=80',
-    'Mexican': 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=800&h=600&fit=crop&q=80',
-    'French': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop&q=80',
-    'Thai': 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&h=600&fit=crop&q=80',
-    'Indian': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop&q=80',
-    'American': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&h=600&fit=crop&q=80',
-    'Chinese': 'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=800&h=600&fit=crop&q=80',
-    'Mediterranean': 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop&q=80',
-    'Korean': 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=800&h=600&fit=crop&q=80'
-  };
-  
-  return defaultImages[cuisine as keyof typeof defaultImages] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop&q=80';
+  // Use the standard default image for all cases to maintain consistency
+  return 'https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg';
 };
 
 // Generate unique collection cover images based on occasion

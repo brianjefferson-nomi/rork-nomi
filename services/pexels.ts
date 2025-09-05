@@ -441,12 +441,13 @@ export class PexelsService {
       const coverImageUrl = collection.cover_image;
       
       // Try to get additional metadata from pexels_images table if available
-      const { data: pexelsData } = await supabase
+      const { data: pexelsDataArray } = await supabase
         .from('pexels_images')
         .select('*')
-        .eq('collection_id', collectionId)
-        .eq('image_url', coverImageUrl)
-        .single();
+        .eq('collection_id', collectionId);
+      
+      // Find the matching image by URL (to avoid URL encoding issues)
+      const pexelsData = pexelsDataArray?.find(img => img.image_url === coverImageUrl);
 
       if (pexelsData) {
         // Return PexelsImage with full metadata

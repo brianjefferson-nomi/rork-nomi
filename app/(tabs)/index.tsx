@@ -19,6 +19,9 @@ import { filterCollectionsByCity, getCityDisplayName, getCollectionStats } from 
 import { usePexelsImage } from '@/hooks/use-pexels-images';
 import { PexelsImageComponent } from '@/components/PexelsImage';
 import { isMember } from '@/utils/member-helpers';
+import { HomeScreenSkeleton } from '@/components/SkeletonComponents';
+import { FadeInView, ScaleInView, BounceInView } from '@/components/AnimatedContent';
+import { ProgressiveLoader, ProgressiveRestaurantList, ProgressiveCollectionList, ProgressiveNeighborhoodList, ProgressiveSection } from '@/components/ProgressiveLoader';
 
 type CityKey = 'nyc' | 'la';
 
@@ -49,9 +52,6 @@ function NeighborhoodCard({ neighborhood, count, cityName, onPress }: {
       />
       <View style={styles.localOverlay}>
         <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
-        <Text style={styles.localNeighborhood}>
-          {count} restaurant{count !== 1 ? 's' : ''}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -387,26 +387,20 @@ export default function HomeScreen() {
 
   // Check if hooks are properly initialized
   if (!restaurantsData || !authData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.loadingText}>Initializing...</Text>
-      </View>
-    );
+    return <HomeScreenSkeleton />;
   }
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
+  // Show skeleton while loading, but allow content to render progressively
+  const showSkeleton = isLoading && restaurants.length === 0 && collections.length === 0;
   
   const handleCityToggle = () => {
-            switchToCity(currentCity === 'nyc' ? 'la' : 'nyc');
+    switchToCity(currentCity === 'nyc' ? 'la' : 'nyc');
   };
+
+  // Show skeleton if no content is available yet
+  if (showSkeleton) {
+    return <HomeScreenSkeleton />;
+  }
 
   // Render sections based on city configuration
 
@@ -557,12 +551,13 @@ export default function HomeScreen() {
               });
               
               return (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collectionCopy as Collection}
-                  showFollowButton={true}
-                  isUserMember={isMember(user?.id || '', collection.collaborators || [])}
-                  onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
+                <View key={collection.id} style={styles.collectionCardWrapper}>
+                  <CollectionCard
+                    collection={collectionCopy as Collection}
+                    showFollowButton={true}
+                    isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+                    isUserCreator={collection.created_by === user?.id}
+                    onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
                     try {
                       if (isFollowing) {
                         await unfollowCollection(collectionId);
@@ -582,6 +577,7 @@ export default function HomeScreen() {
                     }
                   }}
                 />
+                </View>
               );
             })}
           </View>
@@ -602,7 +598,8 @@ export default function HomeScreen() {
         }} 
       />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <FadeInView delay={0} duration={600}>
+          <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerText}>
               <Text style={styles.greeting}>{cityConfig.greeting}</Text>
@@ -682,33 +679,44 @@ export default function HomeScreen() {
           </View>
 
           <SearchWizard testID="search-wizard" />
-        </View>
+          </View>
+        </FadeInView>
 
         {/* Nearby Restaurants based on user location */}
-        <NearbyRestaurants 
-          restaurants={restaurants}
-          radius={5}
-          maxResults={8}
-          showDistance={true}
-          showWhenEmpty={true}
-        />
+        <FadeInView delay={200} duration={500}>
+          <NearbyRestaurants 
+            restaurants={restaurants}
+            radius={5}
+            maxResults={8}
+            showDistance={true}
+            showWhenEmpty={true}
+          />
+        </FadeInView>
 
         {/* New Engagement-Based Restaurant Components */}
-        <TrendingRestaurantsComponent
-          userLocation={userLocation}
-          currentCity={currentCity}
-          onRestaurantPress={handleRestaurantPress}
-        />
+        <FadeInView delay={400} duration={500}>
+          <TrendingRestaurantsComponent
+            userLocation={userLocation}
+            currentCity={currentCity}
+            onRestaurantPress={handleRestaurantPress}
+          />
+        </FadeInView>
         
-        <NewAndNotableComponent
-          userLocation={userLocation}
-          currentCity={currentCity}
-          onRestaurantPress={handleRestaurantPress}
-        />
+        <FadeInView delay={600} duration={500}>
+          <NewAndNotableComponent
+            userLocation={userLocation}
+            currentCity={currentCity}
+            onRestaurantPress={handleRestaurantPress}
+          />
+        </FadeInView>
 
-        {renderNeighborhoodSection()}
+        <FadeInView delay={800} duration={500}>
+          {renderNeighborhoodSection()}
+        </FadeInView>
 
-        {renderCollectionsSection()}
+        <FadeInView delay={1000} duration={500}>
+          {renderCollectionsSection()}
+        </FadeInView>
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -840,6 +848,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     justifyContent: 'space-between',
+  },
+  collectionCardWrapper: {
+    marginBottom: 12, // Add spacing back since we removed it from CollectionCard
   },
   profileButton: {
     padding: 4,

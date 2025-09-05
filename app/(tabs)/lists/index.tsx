@@ -165,6 +165,28 @@ export default function ListsScreen() {
     console.log(`[ListsScreen] filteredCollections: ${filtered.length} collections for type: ${selectedCollectionType}`);
     console.log(`[ListsScreen] sortedCollections total: ${sortedCollections.length}`);
     
+    // Debug for LA's Hidden Gems
+    const hiddenGems = sortedCollections.find((c: any) => c.name === "LA's Hidden Gems");
+    if (hiddenGems) {
+      const isCreator = hiddenGems.created_by === user?.id;
+      const isCollaborator = hiddenGems.collaborators && 
+        Array.isArray(hiddenGems.collaborators) &&
+        user?.id &&
+        hiddenGems.collaborators.includes(user.id);
+      
+      console.log(`[ListsScreen] LA's Hidden Gems debug:`, {
+        collectionId: hiddenGems.id,
+        isPublic: hiddenGems.is_public,
+        isCreator,
+        isCollaborator,
+        userId: user?.id,
+        createdBy: hiddenGems.created_by,
+        collaborators: hiddenGems.collaborators,
+        selectedType: selectedCollectionType,
+        willShowInFilter: filtered.includes(hiddenGems)
+      });
+    }
+    
     return filtered;
   }, [sortedCollections, selectedCollectionType, user?.id]);
 
@@ -786,6 +808,7 @@ const styles = StyleSheet.create({
   },
   collectionCardContainer: {
     position: 'relative',
+    marginBottom: 12, // Add spacing back since we removed it from CollectionCard
   },
   deleteButton: {
     position: 'absolute',

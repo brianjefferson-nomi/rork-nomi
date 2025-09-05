@@ -56,9 +56,6 @@ function NeighborhoodCard({ neighborhood, count, cityName, onPress }: {
       />
       <View style={styles.localOverlay}>
         <Text style={styles.localName} numberOfLines={1}>{neighborhood}</Text>
-        <Text style={styles.localNeighborhood}>
-          {count} restaurant{count !== 1 ? 's' : ''}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -157,7 +154,16 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
     return planCollections || [];
   }, [planCollections, isAuthenticated, cityConfig.mockCollections]);
   
-  const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => b.likes - a.likes).slice(0, 4), [displayCollections]);
+  const popularCollections = useMemo(() => (displayCollections || []).sort((a, b) => {
+    // Sort by member count (collaborators length) first, then by creation date
+    const aMembers = a.collaborators?.length || 0;
+    const bMembers = b.collaborators?.length || 0;
+    if (aMembers !== bMembers) {
+      return bMembers - aMembers;
+    }
+    // If member count is the same, sort by creation date (newest first)
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  }).slice(0, 4), [displayCollections]);
 
   // Load Mapbox restaurants for the city
   useEffect(() => {
@@ -417,6 +423,7 @@ export default function CityHomePage({ cityConfig }: CityHomePageProps) {
             collection={collection}
             showFollowButton={true}
             isUserMember={isMember(user?.id || '', collection.collaborators || [])}
+            isUserCreator={collection.created_by === user?.id}
             onFollowToggle={async (collectionId: string, isFollowing: boolean) => {
               try {
                 if (isFollowing) {

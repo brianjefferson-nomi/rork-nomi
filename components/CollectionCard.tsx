@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Users, Heart } from 'lucide-react-native';
+import { Users } from 'lucide-react-native';
 import { Collection } from '@/types/restaurant';
 import { useCollectionRestaurants } from '@/hooks/restaurant-store';
 import { getMemberCount } from '@/utils/member-helpers';
@@ -16,18 +16,31 @@ interface CollectionCardProps {
   showFollowButton?: boolean;
   onFollowToggle?: (collectionId: string, isFollowing: boolean) => void;
   isUserMember?: boolean;
+  isUserCreator?: boolean;
 }
 
-export function CollectionCard({ collection, onPress, showFollowButton = false, onFollowToggle, isUserMember = false }: CollectionCardProps) {
-  // Debug: Log what the component receives
-  console.log(`[CollectionCard] Component received "${collection.name}":`, {
-    collaborators: collection.collaborators,
-    collaboratorsLength: collection.collaborators?.length || 0,
-    memberCount: (collection as any).memberCount,
-    id: collection.id
-  });
+export function CollectionCard({ collection, onPress, showFollowButton = false, onFollowToggle, isUserMember = false, isUserCreator = false }: CollectionCardProps) {
+  // Debug: Log what the component receives (only for specific collections)
+  if (collection.name === "LA's Hidden Gems") {
+    console.log(`[CollectionCard] Component received "${collection.name}":`, {
+      collaborators: collection.collaborators,
+      collaboratorsLength: collection.collaborators?.length || 0,
+      memberCount: (collection as any).memberCount,
+      id: collection.id
+    });
+  }
   
   const restaurants = useCollectionRestaurants(collection.id);
+  
+  // Debug: Log restaurant data (only for specific collections)
+  if (collection.name === "LA's Hidden Gems") {
+    console.log(`[CollectionCard] "${collection.name}" restaurants:`, {
+      collectionId: collection.id,
+      restaurants: restaurants,
+      restaurantsLength: restaurants?.length || 0,
+      restaurantIds: (collection as any).restaurant_ids?.length || 0
+    });
+  }
   
   // Get Pexels image for collection cover
   const { image: pexelsImage, isLoading: imageLoading, error: imageError } = usePexelsImage(
@@ -43,42 +56,75 @@ export function CollectionCard({ collection, onPress, showFollowButton = false, 
   // Enhanced data validation and fallbacks
   const restaurantCount = restaurants && Array.isArray(restaurants) ? restaurants.length : 0;
   
+  // Fallback to collection.restaurant_ids if restaurants array is empty
+  const finalRestaurantCount = restaurantCount > 0 ? restaurantCount : ((collection as any).restaurant_ids?.length || 0);
+  
+  // Debug: Log restaurant count information for LA's Hidden Gems
+  if (collection.name === "LA's Hidden Gems") {
+    console.log(`[CollectionCard] LA's Hidden Gems debug:`, {
+      collectionId: collection.id,
+      restaurantCount,
+      finalRestaurantCount,
+      restaurantsArray: restaurants?.length || 0,
+      restaurantIds: (collection as any).restaurant_ids?.length || 0,
+      restaurants: restaurants,
+      restaurantNames: restaurants?.map(r => r.name) || []
+    });
+  }
+  
+  
   // State to preserve the correct member count when it's first available
   const [preservedMemberCount, setPreservedMemberCount] = useState<number | null>(null);
   
-  // Use memberCount from collection data if available, otherwise calculate it
-  // If we have collaborators data, recalculate to ensure accuracy
-  const calculatedTotalMembers = collection.collaborators && collection.collaborators.length > 0 
-    ? getMemberCount(collection.collaborators || []) 
-    : ((collection as any).memberCount || getMemberCount(collection.collaborators || []));
+  // Calculate member count from collaborators + 1 for creator
+  const calculatedTotalMembers = getMemberCount(collection.collaborators || []) + 1; // +1 for creator
   
   // Preserve the correct member count when it's first available
   useEffect(() => {
     if (calculatedTotalMembers > 0 && preservedMemberCount === null) {
       setPreservedMemberCount(calculatedTotalMembers);
-      console.log(`[CollectionCard] Preserving member count for "${collection.name}": ${calculatedTotalMembers}`);
+      if (collection.name === "LA's Hidden Gems") {
+        console.log(`[CollectionCard] Preserving member count for "${collection.name}": ${calculatedTotalMembers}`);
+      }
     }
   }, [calculatedTotalMembers, preservedMemberCount, collection.name]);
   
   // Use preserved count if available, otherwise use calculated
   const totalMembers = preservedMemberCount || calculatedTotalMembers;
   const memberCountText = totalMembers.toString();
-  const likeCount = collection.likes || 0;
   
-             // Debug: Log what we're calculating
-           console.log(`[CollectionCard] "${collection.name}" (${new Date().toISOString()}):`, {
-             memberCount: (collection as any).memberCount,
-             calculatedTotalMembers,
-             preservedMemberCount,
-             finalTotalMembers: totalMembers,
-             memberCountText,
-             collaborators: collection.collaborators?.length || 0
-           });
+  // Debug: Log what we're calculating (only for specific collections)
+  if (collection.name === "LA's Hidden Gems") {
+    console.log(`[CollectionCard] "${collection.name}" (${new Date().toISOString()}):`, {
+      memberCount: (collection as any).memberCount,
+      calculatedTotalMembers,
+      preservedMemberCount,
+      finalTotalMembers: totalMembers,
+      memberCountText,
+      collaborators: collection.collaborators?.length || 0
+    });
+  }
   
 
   
-  // Determine collection type for display
+  // Determine collection type for display - use database values as source of truth
   const getCollectionType = () => {
+    if (collection.name === "LA's Hidden Gems") {
+      console.log(`[CollectionCard] Determining type for "${collection.name}":`, {
+        is_public: collection.is_public,
+        collection_type: (collection as any).collection_type,
+        totalMembers,
+        collaborators: collection.collaborators?.length || 0
+      });
+    }
+    
+    // Use database collection_type if available, otherwise fall back to calculated logic
+    if ((collection as any).collection_type) {
+      const dbType = (collection as any).collection_type;
+      return dbType.charAt(0).toUpperCase() + dbType.slice(1); // Capitalize first letter
+    }
+    
+    // Fallback to calculated logic
     if (collection.is_public) return 'Public';
     if (totalMembers > 1) return 'Shared';
     return 'Private';
@@ -103,15 +149,15 @@ export function CollectionCard({ collection, onPress, showFollowButton = false, 
         <Text style={styles.typeText}>{getCollectionType()}</Text>
       </View>
       
-      {/* Follow/Unfollow button in top right corner */}
-      {showFollowButton && collection.is_public && onFollowToggle && (
+      {/* Follow/Unfollow button in top right corner - only show if user is not already following, a member, or the creator */}
+      {showFollowButton && collection.is_public && onFollowToggle && !(collection.isFollowing || isUserMember || isUserCreator) && (
         <TouchableOpacity 
-          style={[styles.followButtonTopRight, (collection.isFollowing || isUserMember) && styles.followingButtonTopRight]}
-          onPress={() => onFollowToggle(collection.id, !(collection.isFollowing || isUserMember))}
+          style={styles.followButtonTopRight}
+          onPress={() => onFollowToggle(collection.id, false)}
           activeOpacity={0.8}
         >
-          <Text style={[styles.followButtonText, (collection.isFollowing || isUserMember) && styles.followingButtonText]}>
-            {(collection.isFollowing || isUserMember) ? 'Unfollow' : 'Follow'}
+          <Text style={styles.followButtonText}>
+            Follow
           </Text>
         </TouchableOpacity>
       )}
@@ -123,9 +169,13 @@ export function CollectionCard({ collection, onPress, showFollowButton = false, 
         </View>
       )}
       
-      <View style={styles.content}>
+      <View style={[
+        styles.content,
+        /* Extend content area for private collections to move text up */
+        !(collection.is_public || totalMembers > 1) && styles.contentPrivate
+      ]}>
         <Text style={styles.name} numberOfLines={2}>{collection.name}</Text>
-        <Text style={styles.count}>{restaurantCount} places</Text>
+        <Text style={styles.count}>{finalRestaurantCount} places</Text>
         {collection.description && (
           <Text style={styles.description} numberOfLines={1}>
             {collection.description}
@@ -134,23 +184,18 @@ export function CollectionCard({ collection, onPress, showFollowButton = false, 
       </View>
       
       <View style={styles.footer}>
-        {/* Only show likes for non-public collections */}
-        {!collection.is_public && (
+        {/* Show members for public and shared collections only */}
+        {(collection.is_public || totalMembers > 1) && (
           <View style={styles.stat}>
-            <Heart size={14} color="#FFF" fill="#FFF" />
-            <Text style={styles.statText}>{likeCount}</Text>
+            <Users size={14} color="#FFF" />
+            <Text style={[styles.statText, { 
+              fontWeight: 'bold', 
+              fontSize: 14
+            }]}>
+              {memberCountText}
+            </Text>
           </View>
         )}
-        
-        <View style={styles.stat}>
-          <Users size={14} color="#FFF" />
-          <Text style={[styles.statText, { 
-            fontWeight: 'bold', 
-            fontSize: 14
-          }]}>
-            {memberCountText}
-          </Text>
-        </View>
       </View>
     </TouchableOpacity>
   );
@@ -162,7 +207,6 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -182,6 +226,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 8,
     justifyContent: 'flex-end',
+  },
+  contentPrivate: {
+    paddingBottom: 24, // Extend content area down more for private collections
   },
   name: {
     fontSize: 18,

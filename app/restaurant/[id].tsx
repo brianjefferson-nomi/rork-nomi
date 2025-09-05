@@ -11,6 +11,7 @@ import { RestaurantPhotoGallery } from '@/components/RestaurantPhotoGallery';
 import { PhotoPickerModal } from '@/components/PhotoPickerModal';
 import { PhotoUploadService } from '@/services/photo-upload';
 import { useUnifiedImages } from '@/hooks/use-unified-images';
+import { useRestaurantRealtime } from '@/hooks/use-restaurant-realtime';
 import { formatAddressForDisplay } from '@/utils/address-formatting';
 
 const { width } = Dimensions.get('window');
@@ -39,7 +40,7 @@ export default function RestaurantDetailScreen() {
   console.log('[RestaurantDetail] Looking for restaurant with ID:', id);
   const restaurant = useRestaurantById(id || '');
   console.log('[RestaurantDetail] Found restaurant:', restaurant?.name || 'NOT FOUND');
-  const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection, enhanceRestaurantWithWebsite } = useRestaurants();
+  const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection, enhanceRestaurantWithWebsiteAndHours } = useRestaurants();
   const { user } = useAuth();
   const votes = useRestaurantVotes(id || '');
   const [editingNote, setEditingNote] = useState(false);
@@ -49,7 +50,32 @@ export default function RestaurantDetailScreen() {
   const [loadingEnhancements, setLoadingEnhancements] = useState(true);
   
   // Use unified images hook
-  const { images: unifiedImages, hasUploadedPhotos, uploadedPhotoCount, refreshImages } = useUnifiedImages(restaurant);
+  const { images: unifiedImages, hasUploadedPhotos, uploadedPhotoCount, refreshImages, isLoading: imagesLoading } = useUnifiedImages(restaurant);
+  
+  // Real-time updates for this restaurant
+  const { isConnected } = useRestaurantRealtime({
+    restaurantId: restaurant?.id,
+    onRestaurantUpdate: (update) => {
+      console.log(`[RestaurantDetail] Real-time update received for ${restaurant?.name}:`, update);
+      // The restaurant store will handle the update automatically
+      // We can add additional UI feedback here if needed
+    },
+    onPhotoInsert: (photo) => {
+      console.log(`[RestaurantDetail] Real-time photo insert for ${restaurant?.name}:`, photo);
+      // Refresh images to show the new photo
+      refreshImages();
+    },
+    onPhotoUpdate: (photo) => {
+      console.log(`[RestaurantDetail] Real-time photo update for ${restaurant?.name}:`, photo);
+      // Refresh images to show the updated photo
+      refreshImages();
+    },
+    onPhotoDelete: (photo) => {
+      console.log(`[RestaurantDetail] Real-time photo delete for ${restaurant?.name}:`, photo);
+      // Refresh images to remove the deleted photo
+      refreshImages();
+    }
+  });
   const [following, setFollowing] = useState<Record<string, boolean>>({});
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -58,13 +84,18 @@ export default function RestaurantDetailScreen() {
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
 
-  // Enhance restaurant with website data if missing
+  // Enhance restaurant with website and hours data if missing
   useEffect(() => {
-    if (restaurant && !restaurant.website && restaurant.googlePlaceId) {
-      console.log(`[RestaurantDetail] Enhancing ${restaurant.name} with website data...`);
-      enhanceRestaurantWithWebsite(restaurant.id);
+    if (restaurant && (restaurant.googlePlaceId || restaurant.tripadvisor_location_id)) {
+      const needsWebsite = !restaurant.website;
+      const needsHours = !restaurant.hours || restaurant.hours === 'Hours vary';
+      
+      if (needsWebsite || needsHours) {
+        console.log(`[RestaurantDetail] Enhancing ${restaurant.name} with website and hours data...`);
+        enhanceRestaurantWithWebsiteAndHours(restaurant.id);
+      }
     }
-  }, [restaurant, enhanceRestaurantWithWebsite]);
+  }, [restaurant, enhanceRestaurantWithWebsiteAndHours]);
 
   // Images are now handled entirely by the useUnifiedImages hook
   // No need for separate image loading logic
@@ -227,7 +258,9 @@ export default function RestaurantDetailScreen() {
   };
 
   // Use unified images as the only source - no fallback to Pexels
-  const images = unifiedImages;
+  // Show default image while loading
+  const defaultImage = 'https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg';
+  const images = imagesLoading ? [defaultImage] : unifiedImages;
   const hasMultipleImages = images.length > 1;
   
   const toggleFollow = (id: string) => {
@@ -257,10 +290,19 @@ export default function RestaurantDetailScreen() {
         }}
           />
           
-          {loadingEnhancements && (
+          {(loadingEnhancements || imagesLoading) && (
             <View style={styles.imageLoadingOverlay}>
               <ActivityIndicator size="small" color="#FFF" />
-              <Text style={styles.imageLoadingText}>Loading images...</Text>
+              <Text style={styles.imageLoadingText}>
+                {imagesLoading ? 'Loading images...' : 'Loading menu items...'}
+              </Text>
+            </View>
+          )}
+          
+          {/* Real-time connection indicator */}
+          {isConnected && (
+            <View style={styles.realtimeIndicator}>
+              <View style={styles.realtimeDot} />
             </View>
           )}
           
@@ -1121,5 +1163,19 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  realtimeIndicator: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 6,
+    borderRadius: 12,
+  },
+  realtimeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4CAF50',
   },
 });

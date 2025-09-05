@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { UnifiedImageService, UnifiedImageData } from '@/services/unified-image-service';
+import { realtimeSubscriptionService } from '@/services/realtime-subscriptions';
 
 /**
  * Hook for managing unified restaurant images
@@ -39,12 +40,45 @@ export function useUnifiedImages(restaurant: any, autoRefresh: boolean = true) {
     loadImages();
   }, [loadImages]);
 
-  // Auto-refresh when restaurant changes (if enabled)
+  // Real-time subscription for photo updates
+  useEffect(() => {
+    if (!restaurant?.id) return;
+
+    console.log(`[useUnifiedImages] Setting up real-time subscription for restaurant ${restaurant.id}`);
+    
+    const unsubscribe = realtimeSubscriptionService.subscribeToRestaurantPhotos({
+      onRestaurantPhotoInsert: (photo) => {
+        if (photo.restaurant_id === restaurant.id) {
+          console.log(`[useUnifiedImages] Real-time photo insert for ${restaurant.name}, refreshing images...`);
+          loadImages(true);
+        }
+      },
+      onRestaurantPhotoUpdate: (photo) => {
+        if (photo.restaurant_id === restaurant.id) {
+          console.log(`[useUnifiedImages] Real-time photo update for ${restaurant.name}, refreshing images...`);
+          loadImages(true);
+        }
+      },
+      onRestaurantPhotoDelete: (photo) => {
+        if (photo.restaurant_id === restaurant.id) {
+          console.log(`[useUnifiedImages] Real-time photo delete for ${restaurant.name}, refreshing images...`);
+          loadImages(true);
+        }
+      }
+    });
+
+    return () => {
+      console.log(`[useUnifiedImages] Cleaning up real-time subscription for restaurant ${restaurant.id}`);
+      unsubscribe();
+    };
+  }, [restaurant?.id, loadImages]);
+
+  // Auto-refresh when restaurant changes (if enabled) - reduced frequency since we have real-time
   useEffect(() => {
     if (autoRefresh && restaurant?.id) {
       const interval = setInterval(() => {
         loadImages(true); // Force refresh
-      }, 30000); // Refresh every 30 seconds
+      }, 300000); // Refresh every 5 minutes (reduced from 30 seconds since we have real-time)
 
       return () => clearInterval(interval);
     }
