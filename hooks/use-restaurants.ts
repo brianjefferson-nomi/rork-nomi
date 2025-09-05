@@ -31,6 +31,24 @@ export function useTrendingRestaurants(city?: 'nyc' | 'la', limit: number = 8) {
       let filtered = restaurants.filter(restaurant => {
         if (!restaurant) return false;
         
+        // Get the best available rating (prioritize Google > TripAdvisor > original)
+        const getBestRating = (restaurant: any): number => {
+          if (restaurant.googleRating && restaurant.googleRating > 0) {
+            return Number(restaurant.googleRating);
+          }
+          if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+            return Number(restaurant.tripadvisor_rating);
+          }
+          return Number(restaurant.rating) || 0;
+        };
+        
+        const bestRating = getBestRating(restaurant);
+        
+        // Only show restaurants with ratings 4.0 and above, never show unrated restaurants
+        if (bestRating < 4.0) {
+          return false;
+        }
+        
         // Filter by city if specified
         if (city) {
           const restaurantCity = restaurant.city?.toLowerCase();
@@ -48,8 +66,19 @@ export function useTrendingRestaurants(city?: 'nyc' | 'la', limit: number = 8) {
 
       // Sort by rating (highest first) and then by recent activity
       filtered.sort((a, b) => {
-        const ratingA = a.rating || 0;
-        const ratingB = b.rating || 0;
+        // Get the best available rating for both restaurants
+        const getBestRating = (restaurant: any): number => {
+          if (restaurant.googleRating && restaurant.googleRating > 0) {
+            return Number(restaurant.googleRating);
+          }
+          if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+            return Number(restaurant.tripadvisor_rating);
+          }
+          return Number(restaurant.rating) || 0;
+        };
+        
+        const ratingA = getBestRating(a);
+        const ratingB = getBestRating(b);
         
         if (ratingA !== ratingB) {
           return ratingB - ratingA; // Higher rating first
@@ -67,6 +96,7 @@ export function useTrendingRestaurants(city?: 'nyc' | 'la', limit: number = 8) {
         return scoreB - scoreA;
       });
 
+      
       // Take the top restaurants up to the limit, avoiding duplicates from new & notable
       const trending = [];
       const seenIds = new Set<string>();

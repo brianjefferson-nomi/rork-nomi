@@ -1,17 +1,22 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams, usePathname } from 'expo-router';
-import { Search, Filter, X, MapPin } from 'lucide-react-native';
+import { Search, Filter, X, MapPin, ArrowUpDown } from 'lucide-react-native';
 import { SimpleRestaurantCard } from '@/components/restaurant-cards';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { searchRestaurants } from '@/services/restaurant-search-api';
 import { NYC_CONFIG, LA_CONFIG } from '@/config/cities';
 
 
 const cuisineTypes = ['All', 'Italian', 'French', 'Chinese', 'American', 'Deli', 'Bakery', 'Gastropub'];
 const priceRanges = ['All', '$', '$$', '$$$', '$$$$'];
+const sortOptions = [
+  { key: 'distance', label: 'Closest Distance' },
+  { key: 'rating', label: 'Top Rated' }
+];
 
 export default function DiscoverScreen() {
-  const { restaurants, userLocation, addRestaurantToStore } = useRestaurants();
+  const { userLocation, addRestaurantToStore } = useRestaurants();
   const params = useLocalSearchParams();
   const pathname = usePathname();
   
@@ -22,8 +27,17 @@ export default function DiscoverScreen() {
   const [selectedPrice, setSelectedPrice] = useState('All');
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<Set<string>>(new Set(['All']));
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedSort, setSelectedSort] = useState<'distance' | 'rating'>('distance');
 
-  // No need to auto-detect city here - just use the current city from the store
+
+  // State for API results
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Handle URL parameters for neighborhood filtering (only if explicitly provided)
   useEffect(() => {
@@ -35,41 +49,61 @@ export default function DiscoverScreen() {
   // Get city configuration
   const cityConfig = currentCity === 'nyc' ? NYC_CONFIG : LA_CONFIG;
 
-  // Filter restaurants for current city
-  const cityRestaurants = useMemo(() => {
-    return restaurants.filter(r => {
-      if (!r) return false;
-      const address = (r.address || r.neighborhood || 'Unknown').toLowerCase();
-      return cityConfig.filterPattern.test(address);
-    });
-  }, [restaurants, cityConfig]);
-
-  // Get ALL restaurants (not just current city) for neighborhood filtering
-  const allRestaurants = useMemo(() => {
-    return restaurants.filter(r => r && r.neighborhood);
-  }, [restaurants]);
-
-  // Get restaurants from current city (for when "All" neighborhoods is selected)
-  const currentCityRestaurants = useMemo(() => {
-    return restaurants.filter(r => {
-      if (!r) return false;
-      // Check if restaurant belongs to current city by checking city/state fields
-      const restaurantCity = r.city?.toLowerCase();
-      const restaurantState = r.state?.toLowerCase();
-      const currentCityName = cityConfig.name.toLowerCase();
+  // API call function
+  const fetchRestaurants = useCallback(async () => {
+    setIsLoading(true);
+    setIsError(false);
+    setError(null);
+    
+    // Set isSearching based on whether there's a search query
+    setIsSearching(!!searchQuery.trim());
+    
+    try {
+      // Add neighborhood filter
+      const neighborhoods = Array.from(selectedNeighborhoods).filter(n => n !== 'All');
       
-      // Match by city name or state
-      return restaurantCity === currentCityName || 
-             (currentCity === 'nyc' && restaurantState === 'ny') ||
-             (currentCity === 'la' && restaurantState === 'ca');
-    });
-  }, [restaurants, cityConfig, currentCity]);
+      const result = await searchRestaurants({
+        q: searchQuery.trim() || undefined,
+        limit: 100,
+        sort: selectedSort,
+        city: cityConfig.name,
+        cuisine: selectedCuisine !== 'All' ? selectedCuisine : undefined,
+        price_range: selectedPrice !== 'All' ? selectedPrice : undefined,
+        neighborhood: neighborhoods.length > 0 ? neighborhoods.join(',') : undefined,
+        lat: userLocation?.lat,
+        lng: userLocation?.lng,
+        include_total: true
+      });
+      
+      setRestaurants(result.restaurants || []);
+      setTotalCount(result.totalCount || 0);
+      setHasMore(result.hasMore || false);
+      console.log(`[Discover] API result:`, result.restaurants?.length || 0, 'restaurants');
+      console.log(`[Discover] User location:`, userLocation);
+      console.log(`[Discover] Search query:`, searchQuery);
+      console.log(`[Discover] City config:`, cityConfig.name);
+      console.log(`[Discover] Total count:`, result.totalCount);
+    } catch (error) {
+      console.error('[Discover] API error:', error);
+      setIsError(true);
+      setError(error instanceof Error ? error.message : 'Search failed');
+      setRestaurants([]);
+      setTotalCount(0);
+      setHasMore(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, selectedCuisine, selectedPrice, selectedNeighborhoods, cityConfig.name, userLocation, selectedSort]);
 
-  // Get unique neighborhoods from NYC Open Data for NYC, fallback to local data for LA
+  // Trigger API call when filters change
+  useEffect(() => {
+    fetchRestaurants();
+  }, [fetchRestaurants]);
+
+  // Get unique neighborhoods from the pagination system
   const availableNeighborhoods = useMemo(() => {
     if (currentCity === 'nyc') {
       // For NYC, we'll use a predefined list of popular neighborhoods
-      // In a real implementation, you'd fetch this from NYC Open Data
       const nycNeighborhoods = [
         'All', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
         'Upper East Side', 'Upper West Side', 'Midtown', 'Downtown',
@@ -78,37 +112,14 @@ export default function DiscoverScreen() {
       ];
       return nycNeighborhoods;
     } else {
-      // For LA, use local data
-      const neighborhoods = [...new Set(cityRestaurants.map(r => r.neighborhood).filter(Boolean))];
-      return ['All', ...neighborhoods.sort()];
+      // For LA, use a predefined list
+      const laNeighborhoods = [
+        'All', 'Hollywood', 'Beverly Hills', 'Santa Monica', 'Venice', 'West Hollywood',
+        'Downtown LA', 'Silver Lake', 'Echo Park', 'Los Feliz', 'Pasadena', 'Glendale'
+      ];
+      return laNeighborhoods;
     }
-  }, [cityRestaurants, currentCity]);
-
-  // Filter restaurants based on all criteria
-  const filteredRestaurants = useMemo(() => {
-    // Use current city restaurants when "All" is selected, otherwise use all restaurants for neighborhood filtering
-    const baseRestaurants = !selectedNeighborhoods.has('All') ? allRestaurants : currentCityRestaurants;
-    
-    return baseRestaurants.filter(restaurant => {
-      const matchesSearch = restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           restaurant.cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           restaurant.neighborhood.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesCuisine = selectedCuisine === 'All' || 
-                             restaurant.cuisine.includes(selectedCuisine);
-      
-      const matchesPrice = selectedPrice === 'All' || 
-                          restaurant.priceRange === selectedPrice;
-      
-      // Fixed: Case-insensitive neighborhood matching for multiple neighborhoods
-      const matchesNeighborhood = selectedNeighborhoods.has('All') || 
-                                 Array.from(selectedNeighborhoods).filter(n => n !== 'All').some(n => 
-                                   restaurant.neighborhood?.toLowerCase() === n?.toLowerCase()
-                                 );
-      
-      return matchesSearch && matchesCuisine && matchesPrice && matchesNeighborhood;
-    });
-  }, [currentCityRestaurants, allRestaurants, searchQuery, selectedCuisine, selectedPrice, selectedNeighborhoods]);
+  }, [currentCity]);
 
   const handleCityToggle = () => {
     const newCity = currentCity === 'nyc' ? 'la' : 'nyc';
@@ -117,15 +128,36 @@ export default function DiscoverScreen() {
     setSelectedCuisine('All');
     setSelectedPrice('All');
     setSelectedNeighborhoods(new Set(['All']));
+    setSearchQuery('');
   };
 
   const resetFilters = () => {
     setSelectedCuisine('All');
     setSelectedPrice('All');
     setSelectedNeighborhoods(new Set(['All']));
+    setSearchQuery('');
+    setSelectedSort('distance');
   };
 
-  const hasActiveFilters = selectedCuisine !== 'All' || selectedPrice !== 'All' || !selectedNeighborhoods.has('All');
+  const reset = () => {
+    resetFilters();
+  };
+
+  const hasActiveFilters = selectedCuisine !== 'All' || selectedPrice !== 'All' || !selectedNeighborhoods.has('All') || searchQuery.trim().length > 0 || selectedSort !== 'distance';
+
+  // Handle load more (simplified for now)
+  const handleLoadMore = useCallback(async () => {
+    // For now, just refetch with more results
+    if (hasMore && !isLoading) {
+      await fetchRestaurants();
+    }
+  }, [hasMore, isLoading, fetchRestaurants]);
+
+  // Handle restaurant press
+  const handleRestaurantPress = useCallback((restaurant: any) => {
+    addRestaurantToStore(restaurant);
+    router.push(`/restaurant/${restaurant.id}`);
+  }, [addRestaurantToStore]);
 
   return (
     <View style={styles.container}>
@@ -144,7 +176,7 @@ export default function DiscoverScreen() {
           </View>
         </View>
 
-        {/* City toggle and filters button */}
+        {/* City toggle, sort button, and filters button */}
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.cityToggle}
@@ -154,39 +186,107 @@ export default function DiscoverScreen() {
             <Text style={styles.cityToggleText}>{cityConfig.name}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.filtersButton, hasActiveFilters && styles.filtersButtonActive]}
-            onPress={() => setShowFilters(true)}
-          >
-            <Filter size={20} color={hasActiveFilters ? "#FFF" : "#666"} />
-            <Text style={[styles.filtersButtonText, hasActiveFilters && styles.filtersButtonTextActive]}>
-              Filters
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={[styles.sortButton, selectedSort !== 'distance' && styles.sortButtonActive]}
+              onPress={() => setSelectedSort(selectedSort === 'distance' ? 'rating' : 'distance')}
+            >
+              <ArrowUpDown size={16} color={selectedSort !== 'distance' ? "#FFF" : "#666"} />
+              <Text style={[styles.sortButtonText, selectedSort !== 'distance' && styles.sortButtonTextActive]}>
+                {sortOptions.find(option => option.key === selectedSort)?.label}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.filtersButton, hasActiveFilters && styles.filtersButtonActive]}
+              onPress={() => setShowFilters(true)}
+            >
+              <Filter size={20} color={hasActiveFilters ? "#FFF" : "#666"} />
+              <Text style={[styles.filtersButtonText, hasActiveFilters && styles.filtersButtonTextActive]}>
+                Filters
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
       {/* Results */}
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
         <Text style={styles.resultsCount}>
-          {filteredRestaurants.length} restaurants found in {cityConfig.name}
+          {totalCount} restaurants found
           {!selectedNeighborhoods.has('All') && selectedNeighborhoods.size > 0 && 
             ` • ${Array.from(selectedNeighborhoods).filter(n => n !== 'All').join(', ')}`}
         </Text>
         
-        <View style={styles.restaurantsList}>
-          {filteredRestaurants.map(restaurant => (
-            <SimpleRestaurantCard
-              key={restaurant.id}
-              restaurant={restaurant}
-              onPress={() => {
-                addRestaurantToStore(restaurant);
-                router.push(`/restaurant/${restaurant.id}` as any);
-              }}
-              compact
-            />
-          ))}
-        </View>
+        {/* Loading state */}
+        {isLoading && restaurants.length === 0 && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF6B6B" />
+            <Text style={styles.loadingText}>
+              {isSearching ? 'Searching restaurants...' : 'Loading restaurants...'}
+            </Text>
+          </View>
+        )}
+
+        {/* Error state */}
+        {isError && restaurants.length === 0 && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>Error Loading Restaurants</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={reset}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Restaurant list */}
+        {!isLoading && !isError && (
+          <View style={styles.restaurantsList}>
+            {restaurants.map((restaurant: any) => (
+              <SimpleRestaurantCard
+                key={restaurant.id}
+                restaurant={restaurant}
+                onPress={() => handleRestaurantPress(restaurant)}
+                compact
+              />
+            ))}
+            
+                         {/* Load more button */}
+             {hasMore && (
+               <TouchableOpacity 
+                 style={styles.loadMoreButton}
+                 onPress={handleLoadMore}
+                 disabled={isLoading}
+               >
+                 {isLoading ? (
+                   <ActivityIndicator size="small" color="#FFFFFF" />
+                 ) : (
+                   <Text style={styles.loadMoreButtonText}>Load More Restaurants</Text>
+                 )}
+               </TouchableOpacity>
+             )}
+          </View>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && !isError && restaurants.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>
+              {isSearching ? 'No restaurants found' : 'No restaurants available'}
+            </Text>
+            <Text style={styles.emptyMessage}>
+              {isSearching 
+                ? `No restaurants match your search "${searchQuery}"`
+                : 'Try adjusting your filters or check back later'
+              }
+            </Text>
+            <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
+              <Text style={styles.resetButtonText}>
+                {isSearching ? 'Clear Search' : 'Reset Filters'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -207,6 +307,30 @@ export default function DiscoverScreen() {
           </View>
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Sort Options */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Sort By</Text>
+              <View style={styles.filterChips}>
+                {sortOptions.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.filterChip,
+                      selectedSort === option.key && styles.filterChipActive
+                    ]}
+                    onPress={() => setSelectedSort(option.key as 'distance' | 'rating')}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedSort === option.key && styles.filterChipTextActive
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Cuisine Filter */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Cuisine</Text>
@@ -361,6 +485,11 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 12,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   cityToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,6 +503,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FF6B6B',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  sortButtonActive: {
+    backgroundColor: '#FF6B6B',
+  },
+  sortButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  sortButtonTextActive: {
+    color: '#FFF',
   },
   filtersButton: {
     flexDirection: 'row',
@@ -489,5 +638,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#FFF',
+  },
+  // New pagination styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  loadMoreButton: {
+    backgroundColor: '#FF6B6B',
+    marginHorizontal: 16,
+    marginVertical: 20,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  loadMoreButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

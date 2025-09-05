@@ -39,6 +39,18 @@ export function SimpleCollectionRestaurantCard({
     return cleanPrice.length > 0 ? cleanPrice : '$$';
   };
 
+  // Get the best available rating (prioritize Google > TripAdvisor > original)
+  const getBestRating = (restaurant: any): number => {
+    // Priority: Google > TripAdvisor > original
+    if (restaurant.googleRating && restaurant.googleRating > 0) {
+      return Number(restaurant.googleRating);
+    }
+    if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+      return Number(restaurant.tripadvisor_rating);
+    }
+    return Number(restaurant.rating) || 0;
+  };
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.95}>
       <View style={styles.imageContainer}>
@@ -69,9 +81,14 @@ export function SimpleCollectionRestaurantCard({
       </View>
       
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
-          {restaurant?.name || 'Restaurant'}
-        </Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {restaurant?.name || 'Restaurant'}
+          </Text>
+          {getBestRating(restaurant) > 0 && (
+            <Text style={styles.rating}>★ {getBestRating(restaurant).toFixed(1)}</Text>
+          )}
+        </View>
         <Text style={styles.cuisine}>
           {formatPriceRange(restaurant?.priceRange)} • {restaurant?.cuisine || 'Restaurant'}
         </Text>
@@ -127,12 +144,24 @@ const styles = StyleSheet.create({
   content: {
     padding: 12,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   name: {
     fontSize: 16,
     fontWeight: '600',
     color: '#222222',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
     lineHeight: 20,
+  },
+  rating: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   cuisine: {
     fontSize: 13,

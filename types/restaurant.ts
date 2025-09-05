@@ -65,6 +65,8 @@ export interface Restaurant {
   tripadvisor_review_count?: number;
   tripadvisor_photos?: string[];
   tripadvisor_last_updated?: string;
+  // User uploaded photos
+  uploadedPhotos?: string[]; // Array of uploaded photo URLs
   // Engagement tracking fields
   views?: number;
   favorites?: number; // Changed from favorited to match your database

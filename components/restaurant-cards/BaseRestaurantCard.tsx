@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Heart, MapPin, ChevronLeft, ChevronRight, Star, X } from 'lucide-react-native';
 import { Restaurant } from '@/types/restaurant';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useUnifiedImages } from '@/hooks/use-unified-images';
 
 interface BaseRestaurantCardProps {
   restaurant: Restaurant;
@@ -28,6 +29,9 @@ export function BaseRestaurantCard({
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [imageError, setImageError] = useState<boolean>(false);
   const [imageLoading, setImageLoading] = useState<boolean>(true);
+  
+  // Use unified images hook
+  const { images, hasUploadedPhotos, uploadedPhotoCount } = useUnifiedImages(restaurant);
 
   const handleFavoritePress = (e: any) => {
     e.stopPropagation();
@@ -51,19 +55,7 @@ export function BaseRestaurantCard({
     setImageError(true);
   };
 
-  // Ensure we have valid images with fallbacks
-  const getValidImages = () => {
-    if (!restaurant) return ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'];
-    
-    const images = restaurant.images || [restaurant.imageUrl];
-    const validImages = images.filter(img => {
-      const isValid = img && img.trim().length > 0 && img.startsWith('http');
-      return isValid;
-    });
-    return validImages.length > 0 ? validImages : ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400'];
-  };
-
-  const images = getValidImages();
+  // Use unified images from the hook
   const hasMultipleImages = images.length > 1;
 
   // Format price range to show proper dollar signs
@@ -74,11 +66,24 @@ export function BaseRestaurantCard({
     return cleanPrice.length > 0 ? cleanPrice : '$$';
   };
 
+  // Get the best available rating (prioritize Google > TripAdvisor > original)
+  const getBestRating = (restaurant: any): number => {
+    // Priority: Google > TripAdvisor > original
+    if (restaurant.googleRating && restaurant.googleRating > 0) {
+      return Number(restaurant.googleRating);
+    }
+    if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+      return Number(restaurant.tripadvisor_rating);
+    }
+    return Number(restaurant.rating) || 0;
+  };
+
   // Create star rating component
   const renderStarRating = (rating: number) => {
+    const bestRating = getBestRating(restaurant);
     return (
       <View style={styles.ratingContainer}>
-        <Text style={styles.ratingText}>★ {rating.toFixed(1)}</Text>
+        <Text style={styles.ratingText}>★ {bestRating.toFixed(1)}</Text>
       </View>
     );
   };
@@ -109,6 +114,12 @@ export function BaseRestaurantCard({
               <Text style={styles.compactPrice}>{formatPriceRange(restaurant?.priceRange)}</Text>
               <Text style={styles.compactDot}>•</Text>
               <Text style={styles.compactNeighborhood}>{restaurant?.neighborhood || 'Location'}</Text>
+              {(restaurant as any)?.distance_display && (
+                <>
+                  <Text style={styles.compactDot}>•</Text>
+                  <Text style={styles.compactDistance}>{(restaurant as any).distance_display}</Text>
+                </>
+              )}
             </View>
           </View>
           {showFavoriteButton && (
@@ -170,9 +181,9 @@ export function BaseRestaurantCard({
           <View style={styles.header}>
             <View style={styles.titleSection}>
               <Text style={styles.name} numberOfLines={1}>{restaurant?.name || 'Restaurant'}</Text>
-              {restaurant?.rating && (
+              {getBestRating(restaurant) > 0 && (
                 <View style={styles.ratingContainer}>
-                  <Text style={styles.ratingText}>★ {restaurant.rating.toFixed(1)}</Text>
+                  <Text style={styles.ratingText}>★ {getBestRating(restaurant).toFixed(1)}</Text>
                 </View>
               )}
             </View>
@@ -204,7 +215,10 @@ export function BaseRestaurantCard({
             {restaurant?.neighborhood && (
               <View style={styles.locationRow}>
                 <MapPin size={12} color="#666" />
-                <Text style={styles.locationText}>{restaurant.neighborhood}</Text>
+                <Text style={styles.locationText}>
+                  {restaurant.neighborhood}
+                  {(restaurant as any)?.distance_display && ` • ${(restaurant as any).distance_display}`}
+                </Text>
               </View>
             )}
             
@@ -430,6 +444,11 @@ const styles = StyleSheet.create({
   compactNeighborhood: {
     fontSize: 13,
     color: '#717171',
+  },
+  compactDistance: {
+    fontSize: 13,
+    color: '#FF6B6B',
+    fontWeight: '500',
   },
   compactFavorite: {
     justifyContent: 'center',

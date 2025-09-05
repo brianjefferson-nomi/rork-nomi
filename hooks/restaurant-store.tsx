@@ -29,7 +29,6 @@ interface RestaurantStore {
   searchResults: Restaurant[];
   userLocation: { city: string; lat: number; lng: number } | null;
   currentCity: 'nyc' | 'la';
-  searchRestaurants: (query: string) => Promise<Restaurant[]>;
   addSearchQuery: (query: string) => void;
   clearSearchHistory: () => void;
   getQuickSuggestions: () => string[];
@@ -116,6 +115,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [currentCity, setCurrentCity] = useState<'nyc' | 'la'>('nyc');
   const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
 
+  console.log('[RestaurantStore] Hook initialized with currentCity:', currentCity);
+
   // Remove mock data fallback - only use real data from database
 
   // Helper function to map database restaurant format to component format
@@ -145,18 +146,33 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     city: dbRestaurant.city,
     state: dbRestaurant.state,
     // Google Places enhancement fields
-    googlePlaceId: dbRestaurant.google_place_id,
-    googleRating: dbRestaurant.google_rating,
-    googlePhotos: dbRestaurant.google_photos,
-    editorialSummary: dbRestaurant.editorial_summary
+    googlePlaceId: dbRestaurant.googlePlaceId,
+    googleRating: dbRestaurant.googleRating,
+    googlePhotos: dbRestaurant.googlePhotos,
+    editorialSummary: dbRestaurant.editorial_summary,
+    // TripAdvisor integration fields
+    tripadvisor_location_id: dbRestaurant.tripadvisor_location_id,
+    tripadvisor_rating: dbRestaurant.tripadvisor_rating,
+    tripadvisor_review_count: dbRestaurant.tripadvisor_review_count,
+    tripadvisor_photos: dbRestaurant.tripadvisor_photos,
+    tripadvisor_last_updated: dbRestaurant.tripadvisor_last_updated,
+    // Uploaded photos will be handled by UnifiedImageService
+    uploadedPhotos: [] // Placeholder - actual photos loaded by UnifiedImageService
   }), []);
 
   // Load restaurants from database
+  console.log('[RestaurantStore] About to create restaurantsQuery with currentCity:', currentCity);
   const restaurantsQuery = useQuery({
     queryKey: ['restaurants', currentCity], // Add currentCity to query key to refetch when city changes
+    enabled: true, // Explicitly enable the query
+    retry: 3,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
     queryFn: async () => {
       try {
-        console.log(`[RestaurantStore] Loading restaurants for ${currentCity.toUpperCase()}...`);
+        console.log(`[RestaurantStore] 🚀 QUERY EXECUTING - Loading restaurants for ${currentCity.toUpperCase()}...`);
+        console.log(`[RestaurantStore] Current city: ${currentCity}`);
         
         // For LA, load from database (same as NYC for now)
         if (currentCity === 'la') {
@@ -167,6 +183,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
         console.log('[RestaurantStore] Loading NYC restaurants from database...');
         const restaurantsData = await dbHelpers.getAllRestaurants();
         console.log('[RestaurantStore] Raw restaurant data:', restaurantsData?.length || 0);
+        console.log('[RestaurantStore] Sample restaurant data:', restaurantsData?.slice(0, 2));
         
         if (!restaurantsData) throw new Error('No restaurants data returned');
         
@@ -224,6 +241,15 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     retryDelay: 1000,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000 // 30 minutes
+  });
+
+  // Debug the query status immediately after creation
+  console.log('[RestaurantStore] restaurantsQuery status:', {
+    isLoading: restaurantsQuery.isLoading,
+    isError: restaurantsQuery.isError,
+    error: restaurantsQuery.error,
+    data: restaurantsQuery.data?.length || 0,
+    status: restaurantsQuery.status
   });
 
   // Load user votes from database
@@ -346,22 +372,32 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
 
   // Ensure restaurants are always available
   useEffect(() => {
-    console.log('[RestaurantStore] useEffect - restaurants.length:', restaurants.length);
-    console.log('[RestaurantStore] useEffect - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length);
-    console.log('[RestaurantStore] useEffect - restaurantsQuery.data:', restaurantsQuery.data?.length);
-    console.log('[RestaurantStore] useEffect - user ID:', user?.id);
+    console.log('[RestaurantStore] useEffect triggered:');
+    console.log('  - restaurants.length:', restaurants.length);
+    console.log('  - restaurantsQuery.data:', restaurantsQuery.data?.length || 0);
+    console.log('  - restaurantsQuery.isLoading:', restaurantsQuery.isLoading);
+    console.log('  - restaurantsQuery.error:', restaurantsQuery.error);
+    console.log('  - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length || 0);
+    console.log('  - dataQuery.isLoading:', dataQuery.isLoading);
+    console.log('  - dataQuery.error:', dataQuery.error);
+    console.log('  - user ID:', user?.id);
     
     // Only set restaurants from query data if we don't have any restaurants yet
     // This prevents overwriting manually added restaurants
     if (restaurants.length === 0) {
       if (restaurantsQuery.data && restaurantsQuery.data.length > 0) {
-        console.log('[RestaurantStore] Setting restaurants from restaurantsQuery.data');
+        console.log('[RestaurantStore] ✅ Setting restaurants from restaurantsQuery.data:', restaurantsQuery.data.length);
         setRestaurants(restaurantsQuery.data);
       } else if (dataQuery.data?.restaurants && dataQuery.data.restaurants.length > 0) {
-        console.log('[RestaurantStore] Setting restaurants from dataQuery.data');
+        console.log('[RestaurantStore] ✅ Setting restaurants from dataQuery.data:', dataQuery.data.restaurants.length);
         setRestaurants(dataQuery.data.restaurants);
       } else {
-        console.log('[RestaurantStore] No restaurants available from any source');
+        console.log('[RestaurantStore] ❌ No restaurants available from any source');
+        console.log('  - restaurantsQuery.data exists:', !!restaurantsQuery.data);
+        console.log('  - restaurantsQuery.data length:', restaurantsQuery.data?.length || 0);
+        console.log('  - dataQuery.data exists:', !!dataQuery.data);
+        console.log('  - dataQuery.data.restaurants exists:', !!dataQuery.data?.restaurants);
+        console.log('  - dataQuery.data.restaurants length:', dataQuery.data?.restaurants?.length || 0);
         setRestaurants([]);
       }
     } else {
@@ -733,89 +769,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   });
 
   // Helper functions
-  const searchRestaurants = useCallback(async (query: string): Promise<Restaurant[]> => {
-    console.log(`[RestaurantStore] searchRestaurants called with query: "${query}"`);
-    console.log(`[RestaurantStore] User location:`, userLocation);
-    
-
-    
-    try {
-      // Search across ALL restaurants regardless of city
-      const searchTerm = query.toLowerCase().trim();
-      console.log(`[RestaurantStore] Searching for: "${searchTerm}"`);
-      
-      // Enhanced search with multiple criteria and fuzzy matching
-      const filtered = restaurants.filter(restaurant => {
-        if (!restaurant) return false;
-        
-        const name = restaurant.name?.toLowerCase() || '';
-        const cuisine = restaurant.cuisine?.toLowerCase() || '';
-        const neighborhood = restaurant.neighborhood?.toLowerCase() || '';
-        const address = restaurant.address?.toLowerCase() || '';
-        
-        // Exact name match (highest priority)
-        if (name === searchTerm) {
-          console.log(`[RestaurantStore] Exact name match found: ${restaurant.name}`);
-          return true;
-        }
-        
-        // Name contains search term
-        if (name.includes(searchTerm)) {
-          console.log(`[RestaurantStore] Name contains search term: ${restaurant.name}`);
-          return true;
-        }
-        
-        // Cuisine contains search term
-        if (cuisine.includes(searchTerm)) {
-          console.log(`[RestaurantStore] Cuisine match: ${restaurant.name} (${cuisine})`);
-          return true;
-        }
-        
-        // Neighborhood contains search term
-        if (neighborhood.includes(searchTerm)) {
-          console.log(`[RestaurantStore] Neighborhood match: ${restaurant.name} (${neighborhood})`);
-          return true;
-        }
-        
-        // Address contains search term
-        if (address.includes(searchTerm)) {
-          console.log(`[RestaurantStore] Address match: ${restaurant.name} (${address})`);
-          return true;
-        }
-        
-        return false;
-      });
-      
-      console.log(`[RestaurantStore] Search found ${filtered.length} results`);
-      
-      // Log sample results for debugging
-      if (filtered.length > 0) {
-        console.log(`[RestaurantStore] Sample results:`);
-        filtered.slice(0, 3).forEach((r, i) => {
-          console.log(`  ${i + 1}. ${r.name} - ${r.cuisine} - ${r.neighborhood}`);
-        });
-      }
-      
-      const deduplicatedResults = deduplicateRestaurants(filtered);
-      setSearchResults(deduplicatedResults);
-      return deduplicatedResults;
-      
-    } catch (error) {
-      console.error(`[RestaurantStore] Search failed:`, error);
-      
-      // Fallback to simple search
-      console.log(`[RestaurantStore] Falling back to simple search`);
-      const filtered = restaurants.filter(restaurant =>
-        restaurant?.name?.toLowerCase().includes(query.toLowerCase()) ||
-        restaurant?.cuisine?.toLowerCase().includes(query.toLowerCase()) ||
-        restaurant?.neighborhood?.toLowerCase().includes(query.toLowerCase())
-      );
-      
-      const deduplicatedResults = deduplicateRestaurants(filtered);
-      setSearchResults(deduplicatedResults);
-      return deduplicatedResults;
-    }
-  }, [restaurants]);
 
 
 
@@ -1717,6 +1670,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   // Debug logging for return values
   console.log('[RestaurantStore] Return values:');
   console.log('  - restaurants:', restaurants.length);
+  console.log('  - restaurantsQuery.data:', restaurantsQuery.data?.length || 0);
+  console.log('  - restaurantsQuery.isLoading:', restaurantsQuery.isLoading);
+  console.log('  - restaurantsQuery.error:', restaurantsQuery.error);
+  console.log('  - dataQuery.data?.restaurants:', dataQuery.data?.restaurants?.length || 0);
+  console.log('  - dataQuery.isLoading:', dataQuery.isLoading);
+  console.log('  - dataQuery.error:', dataQuery.error);
   console.log('  - plans:', plansQuery.data?.length || 0);
   console.log('  - allCollections:', allCollectionsQuery.data?.length || 0);
   console.log('  - isLoading:', restaurantsQuery.isLoading || plansQuery.isLoading || allCollectionsQuery.isLoading);
@@ -1748,7 +1707,6 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     searchResults,
     userLocation,
     currentCity,
-    searchRestaurants,
     addSearchQuery,
     clearSearchHistory,
     getQuickSuggestions,
@@ -1796,7 +1754,71 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
     followCollection,
     unfollowCollection,
     isFollowingCollection,
-    getFollowingCollections
+    getFollowingCollections,
+    
+    // Enhance restaurant with website data from Google Places
+    enhanceRestaurantWithWebsite: async (restaurantId: string) => {
+      try {
+        console.log(`[RestaurantStore] Enhancing restaurant ${restaurantId} with website data...`);
+        
+        // Get the restaurant from the database
+        const { data: restaurant, error: fetchError } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('id', restaurantId)
+          .single();
+        
+        if (fetchError || !restaurant) {
+          console.error('[RestaurantStore] Error fetching restaurant:', fetchError);
+          return null;
+        }
+        
+        // If restaurant already has website, return it
+        if (restaurant.website) {
+          console.log(`[RestaurantStore] Restaurant ${restaurant.name} already has website: ${restaurant.website}`);
+          return restaurant;
+        }
+        
+        // If restaurant has Google Place ID, get website from Google Places
+        if (restaurant.google_place_id) {
+          console.log(`[RestaurantStore] Getting website from Google Places for ${restaurant.name}...`);
+          
+          // Import the Google Places function
+          const { getGooglePlaceDetails } = await import('@/services/api');
+          const placeDetails = await getGooglePlaceDetails(restaurant.google_place_id);
+          
+          if (placeDetails?.website) {
+            console.log(`[RestaurantStore] Found website for ${restaurant.name}: ${placeDetails.website}`);
+            
+            // Update the restaurant with website data
+            const { data: updatedRestaurant, error: updateError } = await supabase
+              .from('restaurants')
+              .update({ 
+                website: placeDetails.website,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', restaurantId)
+              .select()
+              .single();
+            
+            if (updateError) {
+              console.error('[RestaurantStore] Error updating restaurant with website:', updateError);
+              return restaurant;
+            }
+            
+            console.log(`[RestaurantStore] Successfully updated ${restaurant.name} with website`);
+            return updatedRestaurant;
+          }
+        }
+        
+        console.log(`[RestaurantStore] No website data found for ${restaurant.name}`);
+        return restaurant;
+        
+      } catch (error) {
+        console.error('[RestaurantStore] Error enhancing restaurant with website:', error);
+        return null;
+      }
+    }
   };
 });
 
@@ -1909,10 +1931,16 @@ export function useCollectionRestaurants(collectionId: string | undefined) {
           restaurant_code: dbRestaurant.restaurant_code,
           city: dbRestaurant.city,
           state: dbRestaurant.state,
-          googlePlaceId: dbRestaurant.google_place_id,
-          googleRating: dbRestaurant.google_rating,
-          googlePhotos: dbRestaurant.google_photos,
-          editorialSummary: dbRestaurant.editorial_summary
+          googlePlaceId: dbRestaurant.googlePlaceId,
+          googleRating: dbRestaurant.googleRating,
+          googlePhotos: dbRestaurant.googlePhotos,
+          editorialSummary: dbRestaurant.editorial_summary,
+          // TripAdvisor integration fields
+          tripadvisor_location_id: dbRestaurant.tripadvisor_location_id,
+          tripadvisor_rating: dbRestaurant.tripadvisor_rating,
+          tripadvisor_review_count: dbRestaurant.tripadvisor_review_count,
+          tripadvisor_photos: dbRestaurant.tripadvisor_photos,
+          tripadvisor_last_updated: dbRestaurant.tripadvisor_last_updated
         }));
         
         console.log(`[useCollectionRestaurants] Found ${mappedRestaurants.length} restaurants for collection ${collectionId}`);

@@ -62,16 +62,40 @@ export const TrendingRestaurantsComponent: React.FC<RestaurantComponentProps> = 
     sampleRestaurants: trendingRestaurants.slice(0, 3).map((r: Restaurant) => ({ id: r.id, name: r.name }))
   });
 
-  // Filter restaurants within geo-fence
+  // Filter restaurants within geo-fence and sort by distance
   const filteredRestaurants = useMemo(() => {
     const filtered = trendingRestaurants.filter((restaurant: Restaurant) => 
       isWithinGeoFence(restaurant, userLocation, 50)
     );
     
-    console.log('[TrendingRestaurantsComponent] Geo-fence filtering:', {
+    // Sort by distance if user location is available
+    if (userLocation) {
+      filtered.sort((a, b) => {
+        if (!a.coordinates || !b.coordinates) return 0;
+        
+        const distanceA = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          a.coordinates.latitude,
+          a.coordinates.longitude
+        );
+        
+        const distanceB = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          b.coordinates.latitude,
+          b.coordinates.longitude
+        );
+        
+        return distanceA - distanceB;
+      });
+    }
+    
+    console.log('[TrendingRestaurantsComponent] Geo-fence filtering and distance sorting:', {
       before: trendingRestaurants.length,
       after: filtered.length,
-      userLocation
+      userLocation,
+      sortedByDistance: !!userLocation
     });
     
     return filtered;
@@ -161,16 +185,40 @@ export const NewAndNotableComponent: React.FC<RestaurantComponentProps> = ({
     sampleRestaurants: notableRestaurants.slice(0, 3).map((r: Restaurant) => ({ id: r.id, name: r.name }))
   });
 
-  // Filter restaurants within geo-fence
+  // Filter restaurants within geo-fence and sort by distance
   const filteredRestaurants = useMemo(() => {
     const filtered = notableRestaurants.filter((restaurant: Restaurant) => 
       isWithinGeoFence(restaurant, userLocation, 40)
     );
     
-    console.log('[NewAndNotableComponent] Geo-fence filtering:', {
+    // Sort by distance if user location is available
+    if (userLocation) {
+      filtered.sort((a, b) => {
+        if (!a.coordinates || !b.coordinates) return 0;
+        
+        const distanceA = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          a.coordinates.latitude,
+          a.coordinates.longitude
+        );
+        
+        const distanceB = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          b.coordinates.latitude,
+          b.coordinates.longitude
+        );
+        
+        return distanceA - distanceB;
+      });
+    }
+    
+    console.log('[NewAndNotableComponent] Geo-fence filtering and distance sorting:', {
       before: notableRestaurants.length,
       after: filtered.length,
-      userLocation
+      userLocation,
+      sortedByDistance: !!userLocation
     });
     
     return filtered;

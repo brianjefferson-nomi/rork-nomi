@@ -1,10 +1,16 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Alert, Dimensions, ActivityIndicator, Linking } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Utensils } from 'lucide-react-native';
+import { MapPin, Clock, DollarSign, Heart, ThumbsUp, ThumbsDown, Edit2, Bookmark, ChevronLeft, ChevronRight, Award, UserPlus, UserMinus, Eye, Utensils, Camera, Globe } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useRestaurantById, useRestaurants, useRestaurantVotes } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
 import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
+import { PhotoUploadButton } from '@/components/PhotoUploadButton';
+import { RestaurantPhotoGallery } from '@/components/RestaurantPhotoGallery';
+import { PhotoPickerModal } from '@/components/PhotoPickerModal';
+import { PhotoUploadService } from '@/services/photo-upload';
+import { useUnifiedImages } from '@/hooks/use-unified-images';
 import { formatAddressForDisplay } from '@/utils/address-formatting';
 
 const { width } = Dimensions.get('window');
@@ -33,19 +39,35 @@ export default function RestaurantDetailScreen() {
   console.log('[RestaurantDetail] Looking for restaurant with ID:', id);
   const restaurant = useRestaurantById(id || '');
   console.log('[RestaurantDetail] Found restaurant:', restaurant?.name || 'NOT FOUND');
-  const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection } = useRestaurants();
+  const { favoriteRestaurants, toggleFavorite, voteRestaurant, addUserNote, collections, addRestaurantToCollection, enhanceRestaurantWithWebsite } = useRestaurants();
   const { user } = useAuth();
   const votes = useRestaurantVotes(id || '');
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(restaurant?.userNotes || null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
-  const [enhancedImages, setEnhancedImages] = useState<string[]>([]);
   const [foodRecommendations, setFoodRecommendations] = useState<string[]>([]);
   const [loadingEnhancements, setLoadingEnhancements] = useState(true);
+  
+  // Use unified images hook
+  const { images: unifiedImages, hasUploadedPhotos, uploadedPhotoCount, refreshImages } = useUnifiedImages(restaurant);
   const [following, setFollowing] = useState<Record<string, boolean>>({});
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [photoGalleryRefreshTrigger, setPhotoGalleryRefreshTrigger] = useState(0);
   
   const sortedContributors = useMemo(() => (restaurant?.contributors?.slice().sort((a, b) => b.thumbsUp - a.thumbsUp) || []), [restaurant?.contributors]);
+
+  // Enhance restaurant with website data if missing
+  useEffect(() => {
+    if (restaurant && !restaurant.website && restaurant.googlePlaceId) {
+      console.log(`[RestaurantDetail] Enhancing ${restaurant.name} with website data...`);
+      enhanceRestaurantWithWebsite(restaurant.id);
+    }
+  }, [restaurant, enhanceRestaurantWithWebsite]);
+
+  // Images are now handled entirely by the useUnifiedImages hook
+  // No need for separate image loading logic
 
   // Get available collections (collections where restaurant is not already added and user has permission to add)
   const availableCollections = useMemo(() => {
@@ -69,25 +91,18 @@ export default function RestaurantDetailScreen() {
     });
   }, [restaurant, collections, user]);
 
-  // Enhanced restaurant data loading with proper image assignment and caching
+  // Load food recommendations only (images are handled by useUnifiedImages hook)
   useEffect(() => {
-    const loadData = async () => {
+    const loadFoodRecommendations = async () => {
       if (!restaurant) return;
       
       setLoadingEnhancements(true);
       try {
-        // Import the image assignment function
-        const { assignRestaurantImages, generateValidatedMenuItems, cleanupExpiredCache } = await import('@/services/api');
+        // Import the menu generation function
+        const { generateValidatedMenuItems, cleanupExpiredCache } = await import('@/services/api');
         
         // Clean up expired cache periodically
         cleanupExpiredCache();
-        
-        // Assign proper images with fallback logic
-        const assignedImages = await assignRestaurantImages({
-          photos: restaurant.images || [restaurant.imageUrl],
-          cuisine: restaurant.cuisine,
-          name: restaurant.name
-        });
         
         // Generate validated menu items with caching
         let validatedMenuItems: string[] = [];
@@ -103,26 +118,25 @@ export default function RestaurantDetailScreen() {
           validatedMenuItems = generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name);
         }
         
-        setEnhancedImages(assignedImages);
         // Only use actual menu highlights, not generated fallback dishes
         const actualMenuItems = restaurant.aiTopPicks || restaurant.menuHighlights || [];
         setFoodRecommendations(validatedMenuItems.length > 0 ? validatedMenuItems : 
           (actualMenuItems.length > 0 ? actualMenuItems : []).slice(0, 8)
         );
       } catch (error) {
-        console.error('Error loading enhanced restaurant data:', error);
-        // Fallback to original data
-        setEnhancedImages(restaurant.images || [restaurant.imageUrl]);
+        console.error('Error loading food recommendations:', error);
         // Only use actual menu highlights, not generated fallback dishes
         const actualMenuItems = restaurant.aiTopPicks || restaurant.menuHighlights || [];
-        setFoodRecommendations(actualMenuItems.length > 0 ? actualMenuItems.slice(0, 8) : []);
+        setFoodRecommendations(actualMenuItems.length > 0 ? actualMenuItems.slice(0, 8) : 
+          generateCuisineSpecificDishes(restaurant.cuisine, restaurant.name)
+        );
       } finally {
         setLoadingEnhancements(false);
       }
     };
-    
+
     if (restaurant) {
-      loadData();
+      loadFoodRecommendations();
     }
   }, [restaurant]);
 
@@ -182,7 +196,38 @@ export default function RestaurantDetailScreen() {
     router.push('/create-collection');
   };
 
-  const images = enhancedImages.length > 0 ? enhancedImages : (restaurant?.images || [restaurant?.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400']).filter(img => img && img.trim().length > 0);
+  const handlePhotoUploaded = async (photo: any) => {
+    console.log('[RestaurantDetail] Photo uploaded successfully:', photo.url);
+    
+    // Refresh the photo gallery
+    setPhotoGalleryRefreshTrigger(prev => prev + 1);
+    
+    // Refresh unified images to include the new photo
+    refreshImages();
+  };
+
+  const handleMainImageSet = async (imageUrl: string) => {
+    console.log('[RestaurantDetail] Setting main image:', imageUrl);
+    
+    // Update the main image in the database
+    if (restaurant?.id) {
+      try {
+        await PhotoUploadService.updateRestaurantMainImage(restaurant.id, imageUrl);
+        console.log('[RestaurantDetail] Updated restaurant main image in database');
+      } catch (error) {
+        console.error('[RestaurantDetail] Error updating restaurant main image:', error);
+      }
+    }
+    
+    // Refresh unified images to reflect the change
+    refreshImages();
+    
+    // Refresh the photo gallery
+    setPhotoGalleryRefreshTrigger(prev => prev + 1);
+  };
+
+  // Use unified images as the only source - no fallback to Pexels
+  const images = unifiedImages;
   const hasMultipleImages = images.length > 1;
   
   const toggleFollow = (id: string) => {
@@ -205,17 +250,11 @@ export default function RestaurantDetailScreen() {
           <Image 
             source={{ uri: images[currentImageIndex] }} 
             style={styles.heroImage}
-            onError={() => {
-              console.log('Image failed to load:', images[currentImageIndex]);
-              const fallback = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=800&fit=crop&q=80';
-              if (enhancedImages.length > 0) {
-                setEnhancedImages(prev => {
-                  const next = [...prev];
-                  next[currentImageIndex] = fallback;
-                  return next;
-                });
-              }
-            }}
+                    onError={() => {
+          console.log('Image failed to load:', images[currentImageIndex]);
+          // Image error handling is now managed by the useUnifiedImages hook
+          // No need to manually set fallback images
+        }}
           />
           
           {loadingEnhancements && (
@@ -259,7 +298,16 @@ export default function RestaurantDetailScreen() {
               <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
             </View>
             <View style={styles.rating}>
-              <Text style={styles.ratingText}>★ {restaurant.rating}</Text>
+              <Text style={styles.ratingText}>★ {(() => {
+                // Get the best available rating (prioritize Google > TripAdvisor > original)
+                if (restaurant.googleRating && restaurant.googleRating > 0) {
+                  return Number(restaurant.googleRating).toFixed(1);
+                }
+                if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+                  return Number(restaurant.tripadvisor_rating).toFixed(1);
+                }
+                return (Number(restaurant.rating) || 0).toFixed(1);
+              })()}</Text>
             </View>
           </View>
 
@@ -302,14 +350,20 @@ export default function RestaurantDetailScreen() {
               <Bookmark size={20} color="#FF6B6B" />
             </TouchableOpacity>
 
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => setShowPhotoModal(true)}
+              testID="add-photo-btn"
+            >
+              <Camera size={20} color="#FF6B6B" />
+            </TouchableOpacity>
+
             {restaurant.bookingUrl && (
-              <TouchableOpacity style={styles.reserveButton} onPress={() => {
+              <TouchableOpacity style={styles.reserveButton} onPress={async () => {
                 try {
                   console.log('Opening booking URL', restaurant.bookingUrl);
                   // Using WebBrowser for a consistent in-app experience
-                  import('expo-web-browser').then(WebBrowser => {
-                    WebBrowser.openBrowserAsync(restaurant.bookingUrl ?? '');
-                  });
+                  await WebBrowser.openBrowserAsync(restaurant.bookingUrl ?? '');
                 } catch (e) {
                   console.error('Failed to open browser', e);
                   Alert.alert('Unable to open reservation', 'Please try again later.');
@@ -343,6 +397,27 @@ export default function RestaurantDetailScreen() {
                 <Text style={styles.infoText}>{restaurant.priceRange}</Text>
               </View>
             </View>
+            {restaurant.website && (
+              <View style={styles.infoItem}>
+                <Globe size={18} color="#666" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Website</Text>
+                  <TouchableOpacity onPress={async () => {
+                    try {
+                      console.log('Opening website URL', restaurant.website);
+                      await WebBrowser.openBrowserAsync(restaurant.website ?? '');
+                    } catch (e) {
+                      console.error('Failed to open website', e);
+                      Alert.alert('Unable to open website', 'Please try again later.');
+                    }
+                  }}>
+                    <Text style={[styles.infoText, styles.websiteLink]}>
+                      {restaurant.website}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
 
 
@@ -503,6 +578,50 @@ export default function RestaurantDetailScreen() {
               </Text>
             )}
           </View>
+
+          {/* Photo Gallery Section */}
+          <View style={styles.photoSection}>
+            <View style={styles.photoSectionHeader}>
+              <Text style={styles.sectionTitle}>Photos</Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  setShowPhotoGallery(!showPhotoGallery);
+                  if (!showPhotoGallery) {
+                    // Trigger refresh when opening gallery
+                    setPhotoGalleryRefreshTrigger(prev => prev + 1);
+                  }
+                }}
+                style={styles.toggleButton}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {showPhotoGallery ? 'Hide' : 'View All'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {showPhotoGallery ? (
+              <RestaurantPhotoGallery
+                restaurantId={restaurant.id}
+                userId={user?.id || ''}
+                onMainImageSet={handleMainImageSet}
+                style={styles.photoGallery}
+                refreshTrigger={photoGalleryRefreshTrigger}
+              />
+            ) : (
+              <View style={styles.photoPreview}>
+                <Text style={styles.photoPreviewText}>
+                  Tap "View All" to see and manage photos
+                </Text>
+                <PhotoUploadButton
+                  restaurantId={restaurant.id}
+                  userId={user?.id || ''}
+                  onPhotoUploaded={handlePhotoUploaded}
+                  variant="outline"
+                  size="small"
+                />
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={{ height: 32 }} />
@@ -516,6 +635,15 @@ export default function RestaurantDetailScreen() {
           onSelectCollection={handleSelectCollection}
           onCreateCollection={handleCreateCollection}
           restaurantName={restaurant?.name}
+        />
+
+        {/* Photo Picker Modal */}
+        <PhotoPickerModal
+          visible={showPhotoModal}
+          onClose={() => setShowPhotoModal(false)}
+          restaurantId={restaurant.id}
+          userId={user?.id || ''}
+          onPhotoUploaded={handlePhotoUploaded}
         />
       </>
     );
@@ -714,6 +842,10 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 15,
     color: '#333',
+  },
+  websiteLink: {
+    color: '#FF6B6B',
+    textDecorationLine: 'underline',
   },
   infoSubtext: {
     fontSize: 14,
@@ -952,5 +1084,42 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     color: '#666',
+  },
+  photoSection: {
+    backgroundColor: '#FFF',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  photoSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  photoGallery: {
+    minHeight: 200,
+  },
+  photoPreview: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  photoPreviewText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });

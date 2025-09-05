@@ -364,6 +364,12 @@ export class PexelsService {
     context?: { city?: string; cuisine?: string }
   ): Promise<boolean> {
     try {
+      // Validate UUID format for collectionId
+      const isValidUUID = (uuid: string): boolean => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
+      };
+
       // First save to pexels_images table
       const savedImage = await PexelsImageStorageService.savePexelsImage(pexelsImage, 'collection', {
         collectionId,
@@ -376,21 +382,26 @@ export class PexelsService {
         return false;
       }
 
-      // Then update the collection's cover_image field
-      const { error: updateError } = await supabase
-        .from('collections')
-        .update({
-          cover_image: pexelsImage.src.large,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', collectionId);
+      // Only update the collection table if collectionId is a valid UUID
+      if (isValidUUID(collectionId)) {
+        const { error: updateError } = await supabase
+          .from('collections')
+          .update({
+            cover_image: pexelsImage.src.large,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', collectionId);
 
-      if (updateError) {
-        console.error('[PexelsService] Error updating collection cover_image:', updateError);
-        return false;
+        if (updateError) {
+          console.error('[PexelsService] Error updating collection cover_image:', updateError);
+          return false;
+        }
+
+        console.log(`[PexelsService] Successfully saved cover image for collection ${collectionId}`);
+      } else {
+        console.log(`[PexelsService] Skipping collection table update for mock ID: ${collectionId}`);
       }
 
-      console.log(`[PexelsService] Successfully saved cover image for collection ${collectionId}`);
       return true;
 
     } catch (error) {
@@ -404,6 +415,18 @@ export class PexelsService {
    */
   private static async getExistingCollectionCoverImage(collectionId: string): Promise<PexelsImage | null> {
     try {
+      // Validate UUID format for collectionId
+      const isValidUUID = (uuid: string): boolean => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
+      };
+
+      // Skip database query for mock IDs
+      if (!isValidUUID(collectionId)) {
+        console.log(`[PexelsService] Skipping database query for mock collection ID: ${collectionId}`);
+        return null;
+      }
+
       const { data: collection, error } = await supabase
         .from('collections')
         .select('cover_image')

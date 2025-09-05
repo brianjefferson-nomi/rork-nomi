@@ -24,7 +24,7 @@ interface RestaurantSuggestion {
 }
 
 export default function AIScreen() {
-  const { restaurants, userLocation, searchRestaurants, switchToCity } = useRestaurants();
+  const { restaurants, userLocation, switchToCity } = useRestaurants();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -53,31 +53,40 @@ export default function AIScreen() {
           
           // Search with the user's query
           const mapboxResults = await searchMapboxRestaurants(userMessage, lat, lng, 5000, 10);
-          const transformedMapbox = mapboxResults.map((restaurant: any) => ({
-            id: restaurant.id,
-            name: restaurant.name,
-            cuisine: restaurant.cuisine || 'Restaurant',
-            rating: restaurant.rating || 4.0,
-            priceRange: restaurant.price || '$',
-            neighborhood: restaurant.location?.city || userLocation?.city || 'NYC',
-            address: restaurant.location?.formattedAddress || '',
-            description: restaurant.description || 'A great dining experience awaits.',
-            vibe: restaurant.attributes || []
-          }));
+          const transformedMapbox = mapboxResults.map((restaurant: any) => {
+            // Get the best available rating (prioritize Google > TripAdvisor > original)
+            const getBestRating = (restaurant: any): number => {
+              if (restaurant.googleRating && restaurant.googleRating > 0) {
+                return Number(restaurant.googleRating);
+              }
+              if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+                return Number(restaurant.tripadvisor_rating);
+              }
+              return Number(restaurant.rating) || 0;
+            };
+            
+            const bestRating = getBestRating(restaurant);
+            return {
+              id: restaurant.id,
+              name: restaurant.name,
+              cuisine: restaurant.cuisine || 'Restaurant',
+              rating: bestRating || 4.0,
+              priceRange: restaurant.price || '$',
+              neighborhood: restaurant.location?.city || userLocation?.city || 'NYC',
+              address: restaurant.location?.formattedAddress || '',
+              description: restaurant.description || 'A great dining experience awaits.',
+              vibe: restaurant.attributes || []
+            };
+          });
           
           searchResults = transformedMapbox;
           console.log(`[AI] Found ${searchResults.length} new restaurants with Mapbox`);
         } catch (error) {
           console.error('[AI] Error searching restaurants:', error);
           
-          // Fallback to regular search
-          try {
-            const results = await searchRestaurants(userMessage);
-            searchResults = results;
-            console.log(`[AI] Found ${results.length} restaurants with fallback search`);
-          } catch (fallbackError) {
-            console.error('[AI] Fallback search also failed:', fallbackError);
-          }
+          // Fallback to using existing restaurants
+          console.log(`[AI] Using existing restaurants as fallback`);
+          searchResults = restaurants;
         }
       }
       
@@ -132,14 +141,26 @@ export default function AIScreen() {
       );
 
       mentionedRestaurants.forEach(restaurant => {
+        // Get the best available rating (prioritize Google > TripAdvisor > original)
+        const getBestRating = (restaurant: any): number => {
+          if (restaurant.googleRating && restaurant.googleRating > 0) {
+            return Number(restaurant.googleRating);
+          }
+          if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+            return Number(restaurant.tripadvisor_rating);
+          }
+          return Number(restaurant.rating) || 0;
+        };
+        
+        const bestRating = getBestRating(restaurant);
         suggestions.push({
           id: restaurant.id,
           name: restaurant.name,
           cuisine: restaurant.cuisine,
-          rating: restaurant.rating || 4.0,
+          rating: bestRating || 4.0,
           priceRange: restaurant.priceRange || '$'.repeat(Math.min(restaurant.priceLevel || 2, 4)),
           neighborhood: restaurant.neighborhood || restaurant.address?.split(',')[1]?.trim() || userLocation?.city || 'NYC',
-          reason: `${restaurant.cuisine} restaurant with ${restaurant.rating || 4.0}★ rating` + 
+          reason: `${restaurant.cuisine} restaurant with ${bestRating || 4.0}★ rating` + 
                   (restaurant.vibe && restaurant.vibe.length > 0 ? ` - ${restaurant.vibe.slice(0, 2).join(', ')}` : '')
         });
       });

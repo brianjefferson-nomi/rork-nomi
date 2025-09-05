@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useRestaurants } from '@/hooks/restaurant-store';
 import { Restaurant } from '@/types/restaurant';
 import { getYelpAutocompleteSuggestions, getYelpPopularSearches, searchMapboxRestaurants, deduplicateRestaurants } from '@/services/api';
+import { searchRestaurants } from '@/services/restaurant-search-api';
 
 import { capitalizeRestaurantName, formatNeighborhoodName } from '@/utils/text-formatting';
 
@@ -19,7 +20,12 @@ interface SuggestionItem {
 }
 
 export function SearchWizard({ testID }: SearchWizardProps) {
-  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, searchRestaurants, userLocation, switchToCity, searchResults, addRestaurantToStore } = useRestaurants();
+  const { restaurants, addSearchQuery, searchHistory, getQuickSuggestions, clearSearchHistory, userLocation, switchToCity, addRestaurantToStore } = useRestaurants();
+  
+  // Local state for search results
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [query, setQuery] = useState<string>('');
   const [openFilters, setOpenFilters] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
@@ -27,7 +33,6 @@ export function SearchWizard({ testID }: SearchWizardProps) {
   const [price, setPrice] = useState<'$' | '$$' | '$$$' | '$$$$' | 'All'>('All');
   const [rating, setRating] = useState<number>(0);
   const [isOpenNow, setIsOpenNow] = useState<boolean>(false);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
   const [yelpSuggestions, setYelpSuggestions] = useState<string[]>([]);
   const [yelpPopularSearches, setYelpPopularSearches] = useState<string[]>([]);
   const [isLoadingYelpSuggestions, setIsLoadingYelpSuggestions] = useState<boolean>(false);
@@ -151,13 +156,15 @@ export function SearchWizard({ testID }: SearchWizardProps) {
     const q = query.toLowerCase();
     
     console.log(`[SearchWizard] Filtering with query: "${q}"`);
-    console.log(`[SearchWizard] Search results length: ${searchResults.length}`);
+    console.log(`[SearchWizard] Search results length: ${searchResults?.length || 0}`);
+    console.log(`[SearchWizard] Search results:`, searchResults?.slice(0, 3).map(r => r.name) || 'none');
     console.log(`[SearchWizard] Restaurants length: ${restaurants.length}`);
     console.log(`[SearchWizard] Filters - price: ${price}, rating: ${rating}, isOpenNow: ${isOpenNow}`);
+    console.log(`[SearchWizard] isSearching: ${isSearching}`);
     
     // If we have a query and search results, show search results
-    if (q && searchResults.length > 0) {
-      console.log(`[SearchWizard] Using search results: ${searchResults.length} results`);
+    if (q && searchResults && searchResults.length > 0) {
+      console.log(`[SearchWizard] Using database search results: ${searchResults.length} results`);
       const filteredResults = searchResults.filter(r => {
         const matchPrice = price === 'All' || r.priceRange === price;
         const matchRating = !r.rating || r.rating >= rating;
@@ -172,63 +179,54 @@ export function SearchWizard({ testID }: SearchWizardProps) {
       return filteredResults;
     }
     
-    // If we have a query but no search results, filter from all restaurants
-    if (q) {
-      console.log(`[SearchWizard] Filtering from all restaurants for query: ${q}`);
-      const filteredRestaurants = restaurants.filter(r => {
-        const matchQuery = r.name.toLowerCase().includes(q) || (r.cuisine && r.cuisine.toLowerCase().includes(q)) || (r.neighborhood && r.neighborhood.toLowerCase().includes(q));
-        const matchPrice = price === 'All' || r.priceRange === price;
-        const matchRating = !r.rating || r.rating >= rating;
-        const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
-        return matchQuery && matchPrice && matchRating && matchHours;
-      });
-      console.log(`[SearchWizard] After filtering restaurants: ${filteredRestaurants.length} results`);
-      return filteredRestaurants;
+    // If no query, return empty array (don't show all restaurants by default)
+    if (!q) {
+      console.log(`[SearchWizard] No query provided, returning empty results`);
+      return [];
     }
     
-    // If no query, show all restaurants
-    console.log(`[SearchWizard] Showing all restaurants: ${restaurants.length} results`);
-    const allFiltered = restaurants.filter(r => {
-      const matchPrice = price === 'All' || r.priceRange === price;
-      const matchRating = !r.rating || r.rating >= rating;
-      const matchHours = !isOpenNow || (r.hours && (r.hours.toLowerCase().includes('daily') || r.hours.toLowerCase().includes('mon')));
-      return matchPrice && matchRating && matchHours;
-    });
-    console.log(`[SearchWizard] After filtering all restaurants: ${allFiltered.length} results`);
-    return allFiltered;
-  }, [restaurants, searchResults, query, price, rating, isOpenNow]);
+    // If we have a query but no search results yet, return empty array
+    console.log(`[SearchWizard] Query provided but no search results yet`);
+    return [];
+  }, [searchResults, query, price, rating, isOpenNow, isSearching]);
 
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
     
     setIsSearching(true);
+    setSearchError(null);
+    
     try {
-      console.log(`[SearchWizard] Performing search for: ${searchQuery}`);
+      console.log(`[SearchWizard] Performing database search for: ${searchQuery}`);
       console.log(`[SearchWizard] User location:`, userLocation);
       
-      // Get user location for proximity-based search
-      const location = userLocation;
-      if (!location) {
-        console.log('[SearchWizard] No user location available, using default search');
-        const results = await searchRestaurants(searchQuery);
-        console.log(`[SearchWizard] Search results:`, results?.length || 0);
-        addSearchQuery(searchQuery);
-        return;
-      }
+      // Use the new API function directly
+      const result = await searchRestaurants({
+        q: searchQuery,
+        limit: 20,
+        sort: 'distance',
+        lat: userLocation?.lat,
+        lng: userLocation?.lng,
+        price_range: price !== 'All' ? price : undefined,
+        include_total: true
+      });
       
-      // Use location-based search with user coordinates
-      const results = await searchRestaurants(searchQuery);
-      console.log(`[SearchWizard] Search results:`, results?.length || 0);
-      console.log(`[SearchWizard] Search results details:`, results?.slice(0, 3));
+      console.log(`[SearchWizard] API search result:`, result);
+      setSearchResults(result.restaurants || []);
       addSearchQuery(searchQuery);
-      console.log(`[SearchWizard] Search completed for: ${searchQuery}`);
+      console.log(`[SearchWizard] Database search completed for: ${searchQuery}`);
     } catch (error) {
       console.error('[SearchWizard] Search error:', error);
-      Alert.alert('Search Error', 'Failed to search restaurants. Please try again.');
+      setSearchError(error instanceof Error ? error.message : 'Search failed');
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [searchRestaurants, addSearchQuery, userLocation]);
+  }, [addSearchQuery, userLocation]);
 
   const onSubmit = () => {
     performSearch(query);
@@ -261,6 +259,8 @@ export function SearchWizard({ testID }: SearchWizardProps) {
             if (t.length === 0) {
               // Clear search results when input is empty
               console.log('[SearchWizard] Clearing search results - empty query');
+              setSearchResults([]);
+              setSearchError(null);
             }
           }}
           onFocus={() => setShowSuggestions(true)}
@@ -268,7 +268,11 @@ export function SearchWizard({ testID }: SearchWizardProps) {
           testID="search-input"
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')} accessibilityLabel="Clear search">
+          <TouchableOpacity onPress={() => {
+            setQuery('');
+            setSearchResults([]);
+            setSearchError(null);
+          }} accessibilityLabel="Clear search">
             <X size={18} color="#999" />
           </TouchableOpacity>
         )}
@@ -385,11 +389,11 @@ export function SearchWizard({ testID }: SearchWizardProps) {
         </View>
       )}
 
-      {(query.length > 0 && filtered.length > 0) && (
+      {(query.length > 0 && ((filtered && filtered.length > 0) || isSearching)) && (
         <View style={styles.liveResults}>
           <View style={styles.liveHeader}>
             <Text style={styles.liveTitle}>
-              {searchResults.length > 0 ? `Search Results (${filtered.length})` : `Local Results (${filtered.length})`}
+              {isSearching ? 'Searching...' : `Search Results (${filtered?.length || 0})`}
             </Text>
             {userLocation && (
               <View style={styles.locationBadge}>
@@ -405,7 +409,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
             </View>
           ) : (
             <>
-              {filtered.slice(0, 8).map(r => {
+              {filtered?.slice(0, 8).map(r => {
                 console.log('[SearchWizard] Rendering result:', {
                   name: r.name,
                   cuisine: r.cuisine,
@@ -428,17 +432,32 @@ export function SearchWizard({ testID }: SearchWizardProps) {
                     }}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.resultContent}>
-                      <Text style={styles.resultName}>{r.name}</Text>
-                      <Text style={styles.resultMeta}>
-                        {`${r.cuisine || 'Restaurant'} • ${r.location?.formattedAddress || r.location?.address || r.neighborhood || 'Location not available'}`}
-                      </Text>
-                      {(r.rating && r.rating > 0) && (
-                        <View style={styles.resultRating}>
-                          <Text style={styles.ratingText}>★ {r.rating.toFixed(1)}</Text>
-                          <Text style={styles.priceText}>{r.priceRange || '$$'}</Text>
-                        </View>
-                      )}
+                    <View style={styles.resultRow}>
+                      <View style={styles.resultContent}>
+                        <Text style={styles.resultName}>{r.name}</Text>
+                        <Text style={styles.resultMeta}>
+                          {`${r.cuisine || 'Restaurant'} • ${r.location?.formattedAddress || r.location?.address || r.neighborhood || 'Location not available'} • ${r.priceRange || '$$'}${r.distance_display ? ` • ${r.distance_display}` : ''}`}
+                        </Text>
+                      </View>
+                      {(() => {
+                        // Get the best available rating (prioritize Google > TripAdvisor > original)
+                        const getBestRating = (restaurant: any): number => {
+                          if (restaurant.googleRating && restaurant.googleRating > 0) {
+                            return Number(restaurant.googleRating);
+                          }
+                          if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+                            return Number(restaurant.tripadvisor_rating);
+                          }
+                          return Number(restaurant.rating) || 0;
+                        };
+                        
+                        const bestRating = getBestRating(r);
+                        return bestRating > 0 && (
+                          <View style={styles.resultRatingRight}>
+                            <Text style={styles.ratingText}>★ {bestRating.toFixed(1)}</Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                     {r.aiDescription && (
                       <Text style={styles.aiDescription} numberOfLines={2}>{r.aiDescription}</Text>
@@ -446,7 +465,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
                   </TouchableOpacity>
                 );
               })}
-              {filtered.length === 0 && (
+              {!isSearching && (!filtered || filtered.length === 0) && query.length > 0 && (
                 <View style={styles.noResultsContainer}>
                   <Text style={styles.noResults}>No matches found.</Text>
                   <Text style={styles.noResultsSubtext}>Try adjusting your filters or search terms.</Text>
@@ -526,10 +545,12 @@ const styles = StyleSheet.create({
   loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 8 },
   loadingText: { fontSize: 13, color: '#666' },
   resultItem: { paddingHorizontal: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F7F7F7' },
-  resultContent: { marginBottom: 4 },
+  resultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  resultContent: { flex: 1, marginRight: 12 },
   resultName: { fontSize: 15, color: '#1A1A1A', fontWeight: '600' },
   resultMeta: { fontSize: 12, color: '#666', marginTop: 2 },
   resultRating: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  resultRatingRight: { alignItems: 'flex-end', justifyContent: 'center' },
   ratingText: { fontSize: 12, color: '#FF6B6B', fontWeight: '600' },
   priceText: { fontSize: 12, color: '#999', fontWeight: '500' },
   aiDescription: { fontSize: 12, color: '#666', marginTop: 4, lineHeight: 16 },

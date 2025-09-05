@@ -43,6 +43,17 @@ export class PexelsImageStorageService {
         context
       });
 
+      // Validate UUID format for collectionId
+      const isValidUUID = (uuid: string): boolean => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
+      };
+
+      // Handle mock collection IDs by setting collection_id to null
+      const collectionId = context?.collectionId && isValidUUID(context.collectionId) 
+        ? context.collectionId 
+        : null;
+
       // Check if image already exists
       const { data: existingImage, error: checkError } = await supabase
         .from('pexels_images')
@@ -65,7 +76,7 @@ export class PexelsImageStorageService {
         const { data: updatedImage, error: updateError } = await supabase
           .from('pexels_images')
           .update({
-            collection_id: context?.collectionId || existingImage.collection_id,
+            collection_id: collectionId || existingImage.collection_id,
             neighborhood: context?.neighborhood || existingImage.neighborhood,
             city: context?.city || existingImage.city,
             cuisine: context?.cuisine || existingImage.cuisine,
@@ -88,7 +99,7 @@ export class PexelsImageStorageService {
         .from('pexels_images')
         .insert({
           pexels_id: pexelsImage.id,
-          collection_id: context?.collectionId,
+          collection_id: collectionId,
           neighborhood: context?.neighborhood,
           city: context?.city,
           cuisine: context?.cuisine,
@@ -182,6 +193,12 @@ export class PexelsImageStorageService {
     pexelsImage: PexelsImage
   ): Promise<boolean> {
     try {
+      // Validate UUID format for collectionId
+      const isValidUUID = (uuid: string): boolean => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(uuid);
+      };
+
       // Save the Pexels image
       const savedImage = await this.savePexelsImage(pexelsImage, 'collection', {
         collectionId
@@ -191,21 +208,26 @@ export class PexelsImageStorageService {
         return false;
       }
 
-      // Update the collection with the new cover image
-      const { error: updateError } = await supabase
-        .from('collections')
-        .update({
-          cover_image: savedImage.image_url,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', collectionId);
+      // Only update the collection table if collectionId is a valid UUID
+      if (isValidUUID(collectionId)) {
+        const { error: updateError } = await supabase
+          .from('collections')
+          .update({
+            cover_image: savedImage.image_url,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', collectionId);
 
-      if (updateError) {
-        console.error('[PexelsImageStorage] Error updating collection cover:', updateError);
-        return false;
+        if (updateError) {
+          console.error('[PexelsImageStorage] Error updating collection cover:', updateError);
+          return false;
+        }
+
+        console.log(`[PexelsImageStorage] Successfully updated collection ${collectionId} cover image`);
+      } else {
+        console.log(`[PexelsImageStorage] Skipping collection table update for mock ID: ${collectionId}`);
       }
 
-      console.log(`[PexelsImageStorage] Successfully updated collection ${collectionId} cover image`);
       return true;
 
     } catch (error) {

@@ -4,6 +4,7 @@ import { Heart, MapPin, DollarSign, Clock, ChevronLeft, ChevronRight, Star } fro
 import { Restaurant } from '@/types/restaurant';
 import { capitalizeRestaurantName, formatNeighborhoodName } from '@/utils/text-formatting';
 import { useRestaurants } from '@/hooks/restaurant-store';
+import { useUnifiedImages } from '@/hooks/use-unified-images';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -19,14 +20,16 @@ export function RestaurantCard({ restaurant, onPress, compact = false, showRemov
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [imageError, setImageError] = useState<boolean>(false);
   const [imageLoading, setImageLoading] = useState<boolean>(true);
+  
+  // Use unified images hook
+  const { images, hasUploadedPhotos, uploadedPhotoCount, isLoading: imagesLoading } = useUnifiedImages(restaurant);
 
-  // Debug: Log restaurant data for Google Places enhancement
+  // Debug: Log restaurant data and unified images
   console.log(`[RestaurantCard] Rendering: ${restaurant.name}`);
   console.log(`  - Rating: ${restaurant.rating}, Google Rating: ${restaurant.googleRating}`);
-  console.log(`  - Images: ${restaurant.images?.length || 0}, Google Photos: ${restaurant.googlePhotos ? 'Yes' : 'No'}`);
+  console.log(`  - Unified Images: ${images.length}, Uploaded: ${uploadedPhotoCount}, Has Uploaded: ${hasUploadedPhotos}`);
   console.log(`  - Editorial Summary: ${restaurant.editorialSummary ? 'Yes' : 'No'}`);
   console.log(`  - Google Place ID: ${restaurant.googlePlaceId ? 'Yes' : 'No'}`);
-  console.log(`  - Full restaurant object:`, restaurant);
 
   const handleFavoritePress = (e: any) => {
     e.stopPropagation();
@@ -46,110 +49,7 @@ export function RestaurantCard({ restaurant, onPress, compact = false, showRemov
     console.log('[RestaurantCard] Image failed to load:', images[currentImageIndex]);
   };
 
-  // Ensure we have valid images with fallbacks
-  const getValidImages = () => {
-    // Prioritize Google Places photos if available
-    let images = [];
-    
-    // First, try Google Places photos
-    if (restaurant.googlePhotos) {
-      images.push(restaurant.googlePhotos);
-    }
-    
-    // Then add any other images
-    if (restaurant.images && restaurant.images.length > 0) {
-      images = [...images, ...restaurant.images];
-    }
-    
-    // Finally, add the main image URL if different
-    if (restaurant.imageUrl && !images.includes(restaurant.imageUrl)) {
-      images.push(restaurant.imageUrl);
-    }
-    
-    console.log('[RestaurantCard] Raw images:', images);
-    const validImages = images.filter(img => {
-      const isValid = img && img.trim().length > 0 && img.startsWith('http');
-      if (!isValid) {
-        console.log('[RestaurantCard] Invalid image URL:', img);
-      }
-      return isValid;
-    });
-    console.log('[RestaurantCard] Valid images:', validImages);
-    
-    // If no valid images, generate a varied default based on restaurant name
-    if (validImages.length === 0) {
-      return [getVariedDefaultImage(restaurant)];
-    }
-    
-    return validImages;
-  };
-
-  // Function to get varied default images based on restaurant name/cuisine
-  const getVariedDefaultImage = (restaurant: Restaurant): string => {
-    const name = restaurant.name.toLowerCase();
-    const cuisine = restaurant.cuisine?.toLowerCase() || '';
-    
-    // Enhanced food category-based images with better variety
-    const foodImages = [
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400', // Restaurant interior
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400', // Pizza
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400', // Burger
-      'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400', // Sushi
-      'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400', // Pasta
-      'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400', // Japanese
-      'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400', // Mexican
-      'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400', // Thai
-      'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400', // Indian
-      'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400', // American
-      'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=400', // Chinese
-      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400', // Mediterranean
-      'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400', // Korean
-      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400', // French
-      'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400', // Fine dining
-    ];
-    
-    // Use restaurant name to generate a consistent but varied image
-    let imageIndex = 0;
-    for (let i = 0; i < name.length; i++) {
-      imageIndex += name.charCodeAt(i);
-    }
-    imageIndex = imageIndex % foodImages.length;
-    
-    // Enhanced cuisine-based overrides
-    if (cuisine.includes('pizza') || name.includes('pizza')) {
-      imageIndex = 1; // Pizza image
-    } else if (cuisine.includes('burger') || name.includes('burger') || name.includes('king')) {
-      imageIndex = 2; // Burger image
-    } else if (cuisine.includes('sushi') || cuisine.includes('japanese') || name.includes('sushi')) {
-      imageIndex = 3; // Sushi image
-    } else if (cuisine.includes('italian') || name.includes('pasta') || name.includes('pizza')) {
-      imageIndex = 4; // Italian image
-    } else if (cuisine.includes('japanese') || name.includes('sushi') || name.includes('ramen')) {
-      imageIndex = 5; // Japanese image
-    } else if (cuisine.includes('mexican') || name.includes('taco') || name.includes('burrito')) {
-      imageIndex = 6; // Mexican image
-    } else if (cuisine.includes('thai') || name.includes('thai')) {
-      imageIndex = 7; // Thai image
-    } else if (cuisine.includes('indian') || name.includes('curry') || name.includes('tandoor')) {
-      imageIndex = 8; // Indian image
-    } else if (cuisine.includes('american') || name.includes('burger') || name.includes('diner')) {
-      imageIndex = 9; // American image
-    } else if (cuisine.includes('chinese') || name.includes('wok') || name.includes('dragon')) {
-      imageIndex = 10; // Chinese image
-    } else if (cuisine.includes('mediterranean') || name.includes('greek') || name.includes('falafel')) {
-      imageIndex = 11; // Mediterranean image
-    } else if (cuisine.includes('korean') || name.includes('bbq') || name.includes('seoul')) {
-      imageIndex = 12; // Korean image
-    } else if (cuisine.includes('french') || name.includes('bistro') || name.includes('le ')) {
-      imageIndex = 13; // French image
-    } else if (cuisine.includes('fine dining') || name.includes('steak') || name.includes('grill')) {
-      imageIndex = 14; // Fine dining image
-    }
-    
-    return foodImages[imageIndex];
-  };
-
-  const images = getValidImages();
+  // Use unified images from the hook
   const hasMultipleImages = images.length > 1;
 
   // Format price range to show proper dollar signs
@@ -200,24 +100,24 @@ export function RestaurantCard({ restaurant, onPress, compact = false, showRemov
     return firstWord && firstWord.length > 0 ? firstWord : 'Hours vary';
   };
 
-  // Create star rating component - using original store design
+  // Get the best available rating (prioritize Google > TripAdvisor > original)
+  const getBestRating = (restaurant: any): number => {
+    // Priority: Google > TripAdvisor > original
+    if (restaurant.googleRating && restaurant.googleRating > 0) {
+      return Number(restaurant.googleRating);
+    }
+    if (restaurant.tripadvisor_rating && restaurant.tripadvisor_rating > 0) {
+      return Number(restaurant.tripadvisor_rating);
+    }
+    return Number(restaurant.rating) || 0;
+  };
+
+  // Create star rating component - using simple consistent style
   const renderStarRating = (rating: number) => {
-    // Show Google Places rating if available and different from original
-    const displayRating = restaurant.googleRating && restaurant.googleRating !== rating ? restaurant.googleRating : rating;
-    const isGoogleRating = restaurant.googleRating && restaurant.googleRating !== rating;
-    const hasGoogleData = restaurant.googlePlaceId || restaurant.googleRating || restaurant.googlePhotos;
-    
+    const bestRating = getBestRating(restaurant);
     return (
       <View style={styles.ratingContainer}>
-        <Text style={isGoogleRating ? [styles.ratingText, styles.googleRatingText] : styles.ratingText}>
-          ★ {displayRating.toFixed(1)}
-          {isGoogleRating && <Text style={styles.googleRatingLabel}> (Google)</Text>}
-        </Text>
-        {hasGoogleData && (
-          <View style={styles.googleBadge}>
-            <Text style={styles.googleBadgeText}>GP</Text>
-          </View>
-        )}
+        <Text style={styles.ratingText}>★ {bestRating.toFixed(1)}</Text>
       </View>
     );
   };
@@ -645,14 +545,6 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
   },
-  googleRatingText: {
-    color: '#4A90E2',
-  },
-  googleRatingLabel: {
-    fontSize: 12,
-    color: '#4A90E2',
-    fontWeight: '400',
-  },
   cuisine: {
     fontSize: 13,
     color: '#717171',
@@ -710,18 +602,6 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontWeight: '600',
     marginTop: 2,
-  },
-  googleBadge: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    marginLeft: 4,
-  },
-  googleBadgeText: {
-    fontSize: 8,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   topPicksContainer: {
     marginTop: 6,
