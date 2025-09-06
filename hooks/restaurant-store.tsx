@@ -101,6 +101,7 @@ interface RestaurantStore {
   unfollowCollection: (collectionId: string) => Promise<{ success: boolean; isFollowing: boolean }>;
   isFollowingCollection: (collectionId: string) => boolean;
   getFollowingCollections: () => string[];
+  enhanceRestaurantWithWebsiteAndHours: (restaurantId: string) => Promise<any>;
 }
 
 export const [RestaurantProvider, useRestaurants] = createContextHook<RestaurantStore>(() => {
@@ -498,10 +499,10 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
               ? {
                   ...restaurant,
                   hours: update.hours || restaurant.hours,
-                  priceRange: update.price_range || restaurant.priceRange,
+                  priceRange: (update.price_range as '$' | '$$' | '$$$' | '$$$$') || restaurant.priceRange,
                   website: update.website || restaurant.website,
                   googlePhotos: update.google_photos || restaurant.googlePhotos,
-                  tripadvisor_photos: update.tripadvisor_photos || restaurant.tripadvisor_photos,
+                  tripadvisor_photos: Array.isArray(update.tripadvisor_photos) ? update.tripadvisor_photos : (update.tripadvisor_photos ? [update.tripadvisor_photos] : restaurant.tripadvisor_photos),
                   updated_at: update.updated_at
                 }
               : restaurant
@@ -1534,17 +1535,21 @@ export const [RestaurantProvider, useRestaurants] = createContextHook<Restaurant
   const [followingCollections, setFollowingCollections] = useState<string[]>([]);
 
   const followCollection = useCallback(async (collectionId: string) => {
+    console.log(`[RestaurantStore] followCollection called for collection: ${collectionId}`);
     if (!user?.id) {
+      console.log('[RestaurantStore] No user ID, cannot follow collection');
       return { success: false, isFollowing: false };
     }
 
     try {
+      console.log(`[RestaurantStore] Attempting to follow collection ${collectionId} for user ${user.id}`);
       // Follow collection in database
       await dbHelpers.followCollection(user.id, collectionId);
 
       // Add to following list
       setFollowingCollections(prev => {
         if (prev.includes(collectionId)) return prev;
+        console.log(`[RestaurantStore] Adding collection ${collectionId} to following list`);
         return [...prev, collectionId];
       });
 

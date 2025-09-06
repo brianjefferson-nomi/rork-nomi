@@ -640,7 +640,7 @@ export default function HomeScreen() {
                   transform: [{
                     translateX: slideAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0, 200] // Match the slider width
+                      outputRange: [0, 170] // Match the slider width
                     })
                   }]
                 }
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     left: 4,
-    width: 190,
+    width: 180,
     height: 32,
     backgroundColor: '#FF6B6B',
     borderRadius: 6,

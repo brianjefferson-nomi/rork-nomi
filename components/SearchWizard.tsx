@@ -436,7 +436,7 @@ export function SearchWizard({ testID }: SearchWizardProps) {
                       <View style={styles.resultContent}>
                         <Text style={styles.resultName}>{r.name}</Text>
                         <Text style={styles.resultMeta}>
-                          {`${r.cuisine || 'Restaurant'} • ${r.location?.formattedAddress || r.location?.address || r.neighborhood || 'Location not available'} • ${r.priceRange || '$$'}${r.distance_display ? ` • ${r.distance_display}` : ''}`}
+                          {`${r.cuisine || 'Restaurant'} • ${r.location?.formattedAddress || r.location?.address || r.neighborhood || 'Location not available'} • ${r.priceRange || '$$'}${r.distance ? ` • ${r.distance}` : ''}`}
                         </Text>
                       </View>
                       {(() => {

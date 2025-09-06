@@ -174,9 +174,9 @@ export async function searchRestaurants(params: RestaurantSearchParams): Promise
         // and then sort by the best available rating (Google > TripAdvisor > Original)
         console.log('[API] Rating sorting requested, fetching restaurants with any rating source');
         supabaseQuery = supabaseQuery.or('googleRating.gt.0,tripadvisor_rating.gt.0,rating.gt.0')
-          .order('googleRating', { ascending: false, nullsLast: true })
-          .order('tripadvisor_rating', { ascending: false, nullsLast: true })
-          .order('rating', { ascending: false, nullsLast: true })
+          .order('googleRating', { ascending: false, nullsFirst: false })
+          .order('tripadvisor_rating', { ascending: false, nullsFirst: false })
+          .order('rating', { ascending: false, nullsFirst: false })
           .order('id', { ascending: true });
         
         // Increase the initial fetch size for rating sorting to get better results
@@ -204,9 +204,9 @@ export async function searchRestaurants(params: RestaurantSearchParams): Promise
           // Fallback to rating sorting when location is not available
           console.log('[API] Location not available, falling back to rating sorting');
           supabaseQuery = supabaseQuery.or('googleRating.gt.0,tripadvisor_rating.gt.0,rating.gt.0')
-            .order('googleRating', { ascending: false, nullsLast: true })
-            .order('tripadvisor_rating', { ascending: false, nullsLast: true })
-            .order('rating', { ascending: false, nullsLast: true })
+            .order('googleRating', { ascending: false, nullsFirst: false })
+            .order('tripadvisor_rating', { ascending: false, nullsFirst: false })
+            .order('rating', { ascending: false, nullsFirst: false })
             .order('id', { ascending: true });
         } else {
           // For distance sorting, we need to fetch more results initially
@@ -341,7 +341,7 @@ export async function searchRestaurants(params: RestaurantSearchParams): Promise
 
       const { count, error: countError } = await countQuery;
       if (!countError) {
-        totalCount = count;
+        totalCount = count || undefined;
       }
     }
 

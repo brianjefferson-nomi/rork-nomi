@@ -1,2758 +1,1307 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Share, Platform, Clipboard, Image, Animated, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image, 
+  Animated, 
+  Dimensions,
+  Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  FlatList
+} from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Users, Heart, Trash2, ThumbsUp, ThumbsDown, MessageCircle, Crown, TrendingUp, TrendingDown, Award, UserPlus, Share2, Copy, UserMinus, X } from 'lucide-react-native';
-import { SimpleCollectionRestaurantCard } from '@/components/restaurant-cards';
+import { 
+  Heart, 
+  X, 
+  MessageCircle, 
+  Star, 
+  Crown, 
+  MapPin,
+  Users,
+  Share2,
+  ThumbsUp,
+  ThumbsDown
+} from 'lucide-react-native';
 import { useCollectionById, useRestaurants } from '@/hooks/restaurant-store';
 import { useAuth } from '@/hooks/auth-store';
-import { useQuery } from '@tanstack/react-query';
-import { supabase, dbHelpers } from '@/services/supabase';
-import { getMemberCount, getMemberIds, isMember, isCreator, canManageRestaurants } from '@/utils/member-helpers';
+import { getMemberCount, getMemberIds } from '@/utils/member-helpers';
 
-function getConsensusStyle(consensus: string) {
-  switch (consensus) {
-    case 'strong': return { backgroundColor: '#D1FAE5' };
-    case 'moderate': return { backgroundColor: '#FEF3C7' };
-    case 'mixed': return { backgroundColor: '#FED7AA' };
-    case 'low': return { backgroundColor: '#FEE2E2' };
-    default: return { backgroundColor: '#F3F4F6' };
-  }
-}
+const { width } = Dimensions.get('window');
 
-// Separate component for Insights Tab
-interface InsightsTabProps {
-  collection: any;
-  rankedRestaurants: any[];
-  discussions: any[];
-  collectionMembers: string[];
-  styles: any;
-  setShowCommentModal: (restaurantId: string | null) => void;
-  user: any;
-  handleEditDiscussion: (discussionId: string, newMessage: string) => Promise<void>;
-  handleDeleteDiscussion: (discussionId: string) => Promise<void>;
-  setEditDiscussionMessage: (message: string) => void;
-  setShowEditDiscussionModal: (modal: { discussionId: string; currentMessage: string } | null) => void;
-  participationData?: {
-    totalMembers: number;
-    totalVotes: number;
-    participationRate: number;
-    has75PercentParticipation: boolean;
-  };
-}
+// Animated Confetti Component
+const Confetti = ({ visible, onComplete }: { visible: boolean; onComplete: () => void }) => {
+  const confettiAnim = useRef(new Animated.Value(0)).current;
+  const confettiPieces = Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    translateX: new Animated.Value(0),
+    translateY: new Animated.Value(0),
+    rotate: new Animated.Value(0),
+    scale: new Animated.Value(1),
+  }));
 
-function InsightsTab({ 
-  collection, 
-  rankedRestaurants, 
-  discussions, 
-  collectionMembers, 
-  styles, 
-  setShowCommentModal,
-  user,
-  handleEditDiscussion,
-  handleDeleteDiscussion,
-  setEditDiscussionMessage,
-  setShowEditDiscussionModal,
-  participationData
-}: InsightsTabProps) {
-  console.log('[InsightsTab] Component received props:', {
-    collectionId: collection?.id,
-    rankedRestaurantsLength: rankedRestaurants?.length || 0,
-    discussionsLength: discussions?.length || 0,
-    collectionMembersLength: collectionMembers?.length || 0,
-    discussions: discussions,
-    sampleDiscussion: discussions?.[0] ? {
-      id: discussions[0].id,
-      userId: discussions[0].userId,
-      userName: discussions[0].userName,
-      message: discussions[0].message?.substring(0, 50),
-      collectionId: discussions[0].collectionId,
-      keys: Object.keys(discussions[0])
-    } : null
-  });
-  return (
-    <View style={styles.insightsContainer}>
-      {/* Group Insights */}
-      <View style={styles.analyticsSection}>
-        <Text style={styles.sectionTitle}>Group Insights</Text>
-        <View style={styles.analyticsGrid}>
-          <View style={styles.analyticCard}>
-            <Text style={styles.analyticValue}>
-              {(() => {
-                const totalMembers = getMemberCount(collection);
-                const participatingMembers = rankedRestaurants.reduce((total, { meta }, restaurantIndex) => {
-                  // Filter votes to only include collection members
-                  // Extract first 8 characters from vote user IDs to match collection member format
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
-                    const voteUserIdShort = v.userId?.substring(0, 8);
-                    return collectionMembers.includes(voteUserIdShort);
-                  });
-                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
-                    const voteUserIdShort = v.userId?.substring(0, 8);
-                    return collectionMembers.includes(voteUserIdShort);
-                  });
-                  
-                  const uniqueVoters = new Set([
-                    ...memberLikeVoters.map((v: any, index: number) => `${v.userId?.substring(0, 8)}-${restaurantIndex}-${index}`),
-                    ...memberDislikeVoters.map((v: any, index: number) => `${v.userId?.substring(0, 8)}-${restaurantIndex}-${index}`)
-                  ]);
-                  return total + uniqueVoters.size;
-                }, 0);
-                
-                const participationRate = totalMembers > 0 ? Math.round((participatingMembers / totalMembers) * 100) : 0;
-                
-                console.log('[InsightsTab] Participation rate calculation:', {
-                  totalMembers,
-                  participatingMembers,
-                  participationRate,
-                  collectionMembers,
-                  rankedRestaurantsCount: rankedRestaurants.length
-                });
-                
-                return participationRate;
-              })()}%
-            </Text>
-            <Text style={styles.analyticLabel}>Participation Rate</Text>
-          </View>
-          
-          <View style={styles.analyticCard}>
-            <Text style={styles.analyticValue}>
-              {rankedRestaurants.reduce((total, { meta }) => {
-                // Filter votes to only include collection members
-                // Extract first 8 characters from vote user IDs to match collection member format
-                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  return collectionMembers.includes(voteUserIdShort);
-                });
-                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  return collectionMembers.includes(voteUserIdShort);
-                });
-                return total + memberLikeVoters.length + memberDislikeVoters.length;
-              }, 0)}
-            </Text>
-            <Text style={styles.analyticLabel}>Total Votes</Text>
-          </View>
-          
-          <View style={styles.analyticCard}>
-            <Text style={styles.analyticValue}>
-              {(() => {
-                const totalVotes = rankedRestaurants.reduce((total, { meta }) => {
-                  // Filter votes to only include collection members
-                  // Extract first 8 characters from vote user IDs to match collection member format
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
-                    const voteUserIdShort = v.userId?.substring(0, 8);
-                    return collectionMembers.includes(voteUserIdShort);
-                  });
-                  const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
-                    const voteUserIdShort = v.userId?.substring(0, 8);
-                    return collectionMembers.includes(voteUserIdShort);
-                  });
-                  return total + memberLikeVoters.length + memberDislikeVoters.length;
-                }, 0);
-                const likeVotes = rankedRestaurants.reduce((total, { meta }) => {
-                  // Filter votes to only include collection members
-                  // Extract first 8 characters from vote user IDs to match collection member format
-                  const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
-                    const voteUserIdShort = v.userId?.substring(0, 8);
-                    return collectionMembers.includes(voteUserIdShort);
-                  });
-                  return total + memberLikeVoters.length;
-                }, 0);
-                return totalVotes > 0 ? Math.round((likeVotes / totalVotes) * 100) : 0;
-              })()}%
-            </Text>
-            <Text style={styles.analyticLabel}>Positive Sentiment</Text>
-          </View>
-          
-          <View style={styles.analyticCard}>
-            <Text style={styles.analyticValue}>
-              {(() => {
-                console.log('[InsightsTab] Starting discussions calculation with:', {
-                  discussionsLength: discussions?.length || 0,
-                  collectionId: collection?.id,
-                  discussions: discussions
-                });
-                
-                // For group insights, show ALL discussions for the collection
-                // Don't filter by collection members since discussions should be visible to all members
-                const filteredDiscussions = discussions.filter((discussion: any) => {
-                  console.log('[InsightsTab] Filtering discussion:', {
-                    discussionId: discussion?.id,
-                    discussionCollectionId: discussion?.collectionId,
-                    targetCollectionId: collection?.id,
-                    matches: discussion?.collectionId === collection?.id
-                  });
-                  // Only filter by collection ID to ensure it's for this collection
-                  return discussion.collectionId === collection.id;
-                });
-                
-                console.log('[InsightsTab] Discussions calculation:', {
-                  totalDiscussions: discussions.length,
-                  filteredDiscussions: filteredDiscussions.length,
-                  collectionId: collection.id,
-                  allDiscussions: discussions.map(d => ({
-                    userId: d.userId,
-                    userName: d.userName,
-                    message: d.message?.substring(0, 50),
-                    collectionId: d.collectionId,
-                    restaurantId: d.restaurantId,
-                    matchesCollection: d.collectionId === collection.id,
-                    // Add raw data for debugging
-                    rawUserId: d.user_id,
-                    rawCollectionId: d.collection_id,
-                    rawRestaurantId: d.restaurant_id
-                  })),
-                  sampleDiscussion: discussions[0] ? {
-                    userId: discussions[0].userId,
-                    userName: discussions[0].userName,
-                    message: discussions[0].message,
-                    collectionId: discussions[0].collectionId,
-                    matchesCollection: discussions[0].collectionId === collection.id,
-                    // Add raw data for debugging
-                    rawUserId: discussions[0].user_id,
-                    rawCollectionId: discussions[0].collection_id,
-                    rawRestaurantId: discussions[0].restaurant_id,
-                    allKeys: Object.keys(discussions[0])
-                  } : null
-                });
-                
-                return filteredDiscussions.length;
-              })()}
-            </Text>
-            <Text style={styles.analyticLabel}>Discussions</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Voting Insights */}
-      <View style={styles.insightsSection}>
-        <Text style={styles.insightsTitle}>📊 Restaurant Voting Breakdown</Text>
-        <View style={styles.insightsGrid}>
-          {rankedRestaurants.slice(0, 6).map(({ restaurant, meta }, index) => (
-            <View key={restaurant.id} style={styles.insightsContent}>
-              <View style={styles.restaurantHeader}>
-                <View style={styles.restaurantImageContainer}>
-                  <View style={styles.restaurantImagePlaceholder}>
-                    <Text style={styles.restaurantImagePlaceholderText}>
-                      {restaurant.name?.charAt(0).toUpperCase() || 'R'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.restaurantTitleContainer}>
-                  <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
-                  <Text style={styles.restaurantSubtitle}>
-                    {participationData?.has75PercentParticipation ? 
-                      `Ranked #${index + 1} • ${restaurant.cuisine || 'Restaurant'}` :
-                      `${restaurant.cuisine || 'Restaurant'} • ${participationData?.participationRate || 0}% participation`
-                    }
-                  </Text>
-                </View>
-                <View style={styles.restaurantRank}>
-                  {participationData?.has75PercentParticipation ? (
-                    <Text style={styles.rankText}>#{index + 1}</Text>
-                  ) : null}
-                </View>
-              </View>
-              
-              {/* Vote Statistics */}
-              {(() => {
-                if (!meta?.voteDetails) return <></>;
-
-                // Filter votes to only include collection members
-                // Extract first 8 characters from vote user IDs to match collection member format
-                const memberLikeVoters = meta.voteDetails.likeVoters.filter((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  return collectionMembers.includes(voteUserIdShort);
-                });
-                const memberDislikeVoters = meta.voteDetails.dislikeVoters.filter((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  return collectionMembers.includes(voteUserIdShort);
-                });
-                
-                console.log('[InsightsTab] Vote filtering for restaurant:', restaurant.name, {
-                  allLikeVoters: meta.voteDetails.likeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
-                  allDislikeVoters: meta.voteDetails.dislikeVoters.map((v: any) => ({ userId: v.userId, name: v.name })),
-                  collectionMembers,
-                  filteredLikeVoters: memberLikeVoters.length,
-                  filteredDislikeVoters: memberDislikeVoters.length,
-                  // Add detailed debugging for each vote
-                  voteDetails: meta.voteDetails.likeVoters.map((v: any) => ({
-                    voteUserId: v.userId,
-                    voteUserIdType: typeof v.userId,
-                    isInCollection: collectionMembers.includes(v.userId),
-                    collectionMembersType: typeof collectionMembers[0]
-                  })),
-                  // Add specific debugging for the first vote
-                  firstVoteDetails: meta.voteDetails.likeVoters.length > 0 ? {
-                    voteUserId: meta.voteDetails.likeVoters[0].userId,
-                    voteUserIdLength: meta.voteDetails.likeVoters[0].userId?.length,
-                    voteUserIdStartsWith: meta.voteDetails.likeVoters[0].userId?.substring(0, 10),
-                    voteUserIdShort: meta.voteDetails.likeVoters[0].userId?.substring(0, 8),
-                    isInCollection: collectionMembers.includes(meta.voteDetails.likeVoters[0].userId?.substring(0, 8)),
-                    collectionMembersSample: collectionMembers.slice(0, 2)
-                  } : null
-                });
-                
-                const totalVotes = memberLikeVoters.length + memberDislikeVoters.length;
-                const approvalRate = totalVotes > 0 ? Math.round((memberLikeVoters.length / totalVotes) * 100) : 0;
-
-                return (
-                  <View style={styles.approvalSection}>
-                    <View style={styles.approvalHeader}>
-                      <Text style={styles.approvalTitle}>Approval</Text>
-                      <Text style={styles.approvalRate}>{approvalRate}% approval</Text>
-                    </View>
-                    <Text style={styles.voteBreakdown}>
-                      {`${memberLikeVoters.length} likes and ${memberDislikeVoters.length} dislikes`}
-                    </Text>
-                    <View style={styles.consensusBadge}>
-                      <Text style={styles.consensusBadgeText}>
-                        {approvalRate >= 70 ? 'strong consensus' : approvalRate >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })()}
-              
-              {/* Member Voting Details */}
-              {(() => {
-                if (!meta?.voteDetails) return <></>;
-
-                const filteredLikeVoters = meta.voteDetails.likeVoters.filter((voter: any) => {
-                  // Only show votes from collection members
-                  // Extract first 8 characters from vote user IDs to match collection member format
-                  const voteUserIdShort = voter.userId?.substring(0, 8);
-                  if (!collectionMembers.includes(voteUserIdShort)) {
-                    return false;
-                  }
-                  // Show all votes from members, even if name is 'Unknown'
-                  return true;
-                });
-
-                const filteredDislikeVoters = meta.voteDetails.dislikeVoters.filter((voter: any) => {
-                  // Only show votes from collection members
-                  // Extract first 8 characters from vote user IDs to match collection member format
-                  const voteUserIdShort = voter.userId?.substring(0, 8);
-                  if (!collectionMembers.includes(voteUserIdShort)) {
-                    return false;
-                  }
-                  // Show all votes from members, even if name is 'Unknown'
-                  return true;
-                });
-
-                return (
-                  <View style={styles.memberVotesSection}>
-                    <Text style={styles.memberVotesTitle}>{`Member Activity for ${restaurant.name}`}</Text>
-                    
-                    {/* Votes Section */}
-                    <View style={styles.activitySection}>
-                      <Text style={styles.activitySectionTitle}>{`Votes (${filteredLikeVoters.length + filteredDislikeVoters.length})`}</Text>
-                    <View style={styles.memberVotesList}>
-                      {filteredLikeVoters.map((voter: any, index: number) => (
-                        <View key={`${restaurant.id}-like-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                          <View style={styles.memberVoteAvatar}>
-                            <Text style={styles.memberVoteInitial}>
-                                {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
-                            </Text>
-                          </View>
-                            <Text style={styles.memberVoteName}>
-                              {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
-                            </Text>
-                          <ThumbsUp size={16} color="#10B981" />
-                        </View>
-                      ))}
-                      {filteredDislikeVoters.map((voter: any, index: number) => (
-                        <View key={`${restaurant.id}-dislike-${voter.userId}-${index}`} style={styles.memberVoteItem}>
-                          <View style={styles.memberVoteAvatar}>
-                            <Text style={styles.memberVoteInitial}>
-                                {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0]?.charAt(0).toUpperCase() : voter.userId?.substring(0, 1).toUpperCase() || 'U'}
-                            </Text>
-                          </View>
-                            <Text style={styles.memberVoteName}>
-                              {voter.name && voter.name !== 'Unknown' ? voter.name?.split(' ')[0] : `User ${voter.userId?.substring(0, 8)}`}
-                            </Text>
-                          <ThumbsDown size={16} color="#EF4444" />
-                        </View>
-                      ))}
-                      {filteredLikeVoters.length === 0 && filteredDislikeVoters.length === 0 && (
-                        <Text style={styles.noVotes}>No votes yet</Text>
-                      )}
-                    </View>
-                    </View>
-
-
-                  </View>
-                );
-              })()}
-
-              {/* User Discussions */}
-              {(() => {
-                // Get discussions
-                const filteredDiscussions = discussions.filter((discussion: any) => {
-                  const matchesRestaurant = discussion.restaurantId === restaurant.id;
-                  // Extract first 8 characters from discussion user IDs to match collection member format
-                  const discussionUserIdShort = discussion.userId?.substring(0, 8);
-                  const isMember = collectionMembers.includes(discussionUserIdShort);
-                  const hasValidName = discussion.userName && discussion.userName !== 'Unknown' && discussion.userName !== 'Unknown User';
-                  
-                  if (!matchesRestaurant) return false;
-                  // Only show discussions from collection members
-                  if (!isMember) return false;
-                  return hasValidName;
-                });
-
-                // Get vote reasons from the voting breakdown
-                const voteReasons: any[] = [];
-                if (meta?.voteDetails) {
-                  // Add like vote reasons
-                  meta.voteDetails.likeVoters.forEach((voter: any) => {
-                    const voteUserIdShort = voter.userId?.substring(0, 8);
-                    if (collectionMembers.includes(voteUserIdShort) && voter.reason) {
-                      voteReasons.push({
-                        id: `vote-${voter.userId}-${restaurant.id}`,
-                        userId: voter.userId,
-                        userName: voter.name && voter.name !== 'Unknown' ? voter.name : `User ${voter.userId?.substring(0, 8)}`,
-                        message: voter.reason,
-                        timestamp: voter.timestamp,
-                        type: 'like',
-                        isVoteReason: true
-                      });
-                    }
-                  });
-
-                  // Add dislike vote reasons
-                  meta.voteDetails.dislikeVoters.forEach((voter: any) => {
-                    const voteUserIdShort = voter.userId?.substring(0, 8);
-                    if (collectionMembers.includes(voteUserIdShort) && voter.reason) {
-                      voteReasons.push({
-                        id: `vote-${voter.userId}-${restaurant.id}`,
-                        userId: voter.userId,
-                        userName: voter.name && voter.name !== 'Unknown' ? voter.name : `User ${voter.userId?.substring(0, 8)}`,
-                        message: voter.reason,
-                        timestamp: voter.timestamp,
-                        type: 'dislike',
-                        isVoteReason: true
-                      });
-                    }
-                  });
-                }
-
-                // Combine discussions and vote reasons, sorted by timestamp
-                const allContent = [...filteredDiscussions, ...voteReasons].sort((a, b) => 
-                  new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                );
-
-                return (
-                  <View style={styles.discussionsSection}>
-                    <View style={styles.discussionsHeader}>
-                      <MessageCircle size={14} color="#6B7280" />
-                      <Text style={styles.discussionsLabel}>{`Discussions & Comments (${allContent.length})`}</Text>
-                      <TouchableOpacity 
-                        style={styles.addCommentButton}
-                        onPress={() => setShowCommentModal(restaurant.id)}
-                      >
-                        <Text style={styles.addCommentButtonText}>Add Comment</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {allContent.length > 0 ? (
-                      allContent.slice(0, 5).map((item: any) => (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[styles.discussionItem, item.isVoteReason && styles.voteReasonItem]}
-                          onLongPress={() => {
-                            // Only allow edit/delete for own discussions (not vote reasons)
-                            if (!item.isVoteReason && item.userId === user?.id) {
-                              Alert.alert(
-                                'Discussion Options',
-                                'What would you like to do?',
-                                [
-                                  { text: 'Cancel', style: 'cancel' },
-                                  {
-                                    text: 'Edit',
-                                    onPress: () => {
-                                      setEditDiscussionMessage(item.message);
-                                      setShowEditDiscussionModal({
-                                        discussionId: item.id,
-                                        currentMessage: item.message
-                                      });
-                                    }
-                                  },
-                                  {
-                                    text: 'Delete',
-                                    style: 'destructive',
-                                    onPress: () => handleDeleteDiscussion(item.id)
-                                  }
-                                ]
-                              );
-                            }
-                          }}
-                          activeOpacity={(!item.isVoteReason && item.userId === user?.id) ? 0.7 : 1}
-                        >
-                          <View style={styles.discussionHeader}>
-                            <View style={styles.discussionAvatar}>
-                              <Text style={styles.discussionInitial}>
-                                {item.userName?.split(' ')[0]?.charAt(0).toUpperCase() || 'U'}
-                              </Text>
-                            </View>
-                            <Text style={styles.discussionAuthor}>{item.userName?.split(' ')[0] || 'Unknown'}</Text>
-                            {item.isVoteReason && (
-                              <View style={styles.voteReasonBadge}>
-                                {item.type === 'like' ? (
-                                  <ThumbsUp size={12} color="#10B981" />
-                                ) : (
-                                  <ThumbsDown size={12} color="#EF4444" />
-                                )}
-                              </View>
-                            )}
-                            <Text style={styles.discussionTime}>
-                              {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : 'Unknown date'}
-                            </Text>
-                            {!item.isVoteReason && item.userId === user?.id && (
-                              <Text style={styles.ownDiscussionIndicator}>•</Text>
-                            )}
-                          </View>
-                          <Text style={styles.discussionText} numberOfLines={3}>{item.message}</Text>
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <Text style={styles.noDiscussions}>No discussions yet</Text>
-                    )}
-                  </View>
-                );
-              })()}
-            </View>
-          ))}
-        </View>
-      </View>
-
-
-    </View>
-  );
-}
-
-export default function CollectionDetailScreen() {
-  console.log('[CollectionDetail] Component mounting...');
-  
-  const { id } = useLocalSearchParams<{ id: string }>();
-  
-  console.log('[CollectionDetail] Collection ID from params:', id);
-  
-  // Add null safety for the ID
-  if (!id) {
-    console.log('[CollectionDetail] No ID provided, showing error');
-    return (
-      <View style={styles.errorContainer}>
-        <Text>Collection ID not found</Text>
-      </View>
-    );
-  }
-  
-  const collection = useCollectionById(id) as any;
-  const { user } = useAuth();
-  const { 
-    removeRestaurantFromCollection, 
-    deleteCollection, 
-    leaveCollection,
-    voteRestaurant: originalVoteRestaurant, 
-    addDiscussion: originalAddDiscussion, 
-    addRestaurantComment,
-    getRankedRestaurants, 
-    getRankedRestaurantsWithAllVotes,
-    getGroupRecommendations,
-    getCollectionRestaurants,
-    getCollectionRestaurantsFromDatabase,
-    getCollectionDiscussions,
-    inviteToCollection,
-    updateCollectionSettings,
-    getRestaurantVotingDetails,
-    toggleFavorite,
-    favoriteRestaurants,
-    restaurants,
-    addRestaurantToStore
-  } = useRestaurants();
-
-
-
-
-
-  const addDiscussion = useCallback(async (restaurantId: string, collectionId: string, message: string) => {
-    await originalAddDiscussion(restaurantId, collectionId, message);
-    // Trigger ranking update
-    setRankingUpdateTrigger(prev => prev + 1);
-  }, [originalAddDiscussion]);
-
-  // Handle editing discussion
-  const handleEditDiscussion = useCallback(async (discussionId: string, newMessage: string) => {
-    try {
-      // Update discussion in database
-      await dbHelpers.updateDiscussion(discussionId, newMessage);
-      
-      // Update local state
-      setDiscussions(prev => prev.map(discussion => 
-        discussion.id === discussionId 
-          ? { ...discussion, message: newMessage, updated_at: new Date().toISOString() }
-          : discussion
-      ));
-      
-      setShowEditDiscussionModal(null);
-      setEditDiscussionMessage('');
-    } catch (error) {
-      console.error('[handleEditDiscussion] Error:', error);
-      Alert.alert('Error', 'Failed to update discussion');
-    }
-  }, []);
-
-  // Handle deleting discussion
-  const handleDeleteDiscussion = useCallback(async (discussionId: string) => {
-    Alert.alert(
-      'Delete Discussion',
-      'Are you sure you want to delete this discussion?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Delete discussion from database
-              await dbHelpers.deleteDiscussion(discussionId);
-              
-              // Update local state
-              setDiscussions(prev => prev.filter(discussion => discussion.id !== discussionId));
-            } catch (error) {
-              console.error('[handleDeleteDiscussion] Error:', error);
-              Alert.alert('Error', 'Failed to delete discussion');
-            }
-          }
-        }
-      ]
-    );
-  }, []);
-  
-  const [showVoteModal, setShowVoteModal] = useState<{ restaurantId: string; vote: 'like' | 'dislike' } | null>(null);
-  const [voteReason, setVoteReason] = useState('');
-  const [showDiscussionModal, setShowDiscussionModal] = useState<string | null>(null);
-  const [discussionMessage, setDiscussionMessage] = useState('');
-  const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
-  const [commentMessage, setCommentMessage] = useState('');
-  const [showEditDiscussionModal, setShowEditDiscussionModal] = useState<{ discussionId: string; currentMessage: string } | null>(null);
-  const [editDiscussionMessage, setEditDiscussionMessage] = useState('');
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteMessage, setInviteMessage] = useState('');
-  
-  const [discussions, setDiscussions] = useState<any[]>([]);
-  const [isLoadingDiscussions, setIsLoadingDiscussions] = useState(false);
-  const [activeTab, setActiveTab] = useState<'restaurants' | 'insights'>('restaurants');
-  const [rankingUpdateTrigger, setRankingUpdateTrigger] = useState(0);
-  
-  // Animation state for ranking updates
-  const [restaurantPositions, setRestaurantPositions] = useState<Record<string, { currentRank: number; previousRank: number }>>({});
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [voteFeedback, setVoteFeedback] = useState<{ restaurantId: string; vote: 'like' | 'dislike'; visible: boolean } | null>(null);
-  const animatedValues = useRef<Record<string, Animated.Value>>({});
-  const voteFeedbackOpacity = useRef(new Animated.Value(0)).current;
-  
-  // If collection is not found in the store, fetch it directly from the database
-  const directCollectionQuery = useQuery({
-    queryKey: ['directCollection', id],
-    queryFn: async () => {
-      if (!id) return null;
-      try {
-        console.log('[CollectionDetail] Fetching collection directly from database:', id);
-        const { data, error } = await supabase
-          .from('collections')
-          .select('*')
-          .eq('id', id)
-          .single();
-        
-        if (error) {
-          console.log('[CollectionDetail] Error fetching collection directly:', error.message);
-          return null;
-        }
-        
-        console.log('[CollectionDetail] Successfully fetched collection directly:', data.name);
-        return data;
-      } catch (error) {
-        console.log('[CollectionDetail] Exception fetching collection directly:', error);
-        return null;
-      }
-    },
-    enabled: !!id && !collection,
-    retry: 2,
-    retryDelay: 1000
-  });
-  
-  // Use the direct collection if the store collection is not available
-  const effectiveCollection = collection || directCollectionQuery.data;
-  
-  // Get restaurants for this collection using the simpler function
-  const collectionRestaurants = getCollectionRestaurants(id || '');
-  
-  // Calculate proper member count for ranking
-  const memberCount = getMemberCount(effectiveCollection);
-  
-  console.log('[CollectionDetail] Member count for ranking:', memberCount);
-  
-  const rankedResult = getRankedRestaurants(id, memberCount);
-  const rankedRestaurants = rankedResult?.restaurants || [];
-  const participationData = rankedResult?.participationData;
-
-  // Function to animate restaurant ranking changes
-  const animateRankingUpdate = useCallback((oldRankings: any[], newRankings: any[]) => {
-    if (isAnimating) return; // Prevent multiple animations
-    
-    setIsAnimating(true);
-    
-    // Create animated values for each restaurant
-    newRankings.forEach(({ restaurant, meta }) => {
-      if (!animatedValues.current[restaurant.id]) {
-        animatedValues.current[restaurant.id] = new Animated.Value(0);
-      }
-    });
-    
-    // Find restaurants that changed position
-    const positionChanges: Record<string, { from: number; to: number }> = {};
-    
-    newRankings.forEach(({ restaurant, meta }, newIndex) => {
-      const oldIndex = oldRankings.findIndex(r => r.restaurant.id === restaurant.id);
-      if (oldIndex !== -1 && oldIndex !== newIndex) {
-        positionChanges[restaurant.id] = { from: oldIndex, to: newIndex };
-      }
-    });
-    
-    // Animate position changes with enhanced visual feedback
-    const animations = Object.entries(positionChanges).map(([restaurantId, { from, to }]) => {
-      const animatedValue = animatedValues.current[restaurantId];
-      if (!animatedValue) return null;
-      
-      // Enhanced animation sequence
-      return Animated.sequence([
-        // Highlight the restaurant that changed position
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        // Keep it highlighted briefly
-        Animated.timing(animatedValue, {
+  useEffect(() => {
+    if (visible) {
+      Animated.sequence([
+        Animated.timing(confettiAnim, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
-        // Return to normal
-        Animated.timing(animatedValue, {
+        Animated.delay(1000),
+        Animated.timing(confettiAnim, {
           toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        })
-      ]);
-    }).filter(Boolean) as Animated.CompositeAnimation[];
-    
-    if (animations.length > 0) {
-      Animated.parallel(animations).start(() => {
-        setIsAnimating(false);
-      });
-    } else {
-      setIsAnimating(false);
-    }
-  }, [isAnimating]);
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => onComplete());
 
-  // Wrapper functions that trigger ranking updates with animation
-  const voteRestaurant = useCallback((restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => {
-    // Show immediate visual feedback
-    setVoteFeedback({ restaurantId, vote, visible: true });
-    
-    // Animate feedback visibility
+      // Animate individual confetti pieces
+      confettiPieces.forEach((piece, index) => {
+        const randomX = (Math.random() - 0.5) * 200;
+        const randomY = Math.random() * 300 + 100;
+        const randomRotate = Math.random() * 720;
+
+        Animated.parallel([
+          Animated.timing(piece.translateX, {
+            toValue: randomX,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(piece.translateY, {
+            toValue: randomY,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(piece.rotate, {
+            toValue: randomRotate,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.sequence([
+            Animated.timing(piece.scale, {
+              toValue: 1.2,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(piece.scale, {
+              toValue: 0,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start();
+      });
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+                return (
+    <View style={styles.confettiContainer} pointerEvents="none">
+      {confettiPieces.map((piece) => (
+        <Animated.View
+          key={piece.id}
+          style={[
+            styles.confettiPiece,
+            {
+              transform: [
+                { translateX: piece.translateX },
+                { translateY: piece.translateY },
+                { rotate: piece.rotate.interpolate({
+                  inputRange: [0, 360],
+                  outputRange: ['0deg', '360deg'],
+                }) },
+                { scale: piece.scale },
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.confettiEmoji}>🎉</Text>
+        </Animated.View>
+      ))}
+    </View>
+  );
+};
+
+// Modern Restaurant Card Component
+interface ModernRestaurantCardProps {
+  restaurant: any;
+  index: number;
+  user: any;
+  collectionMembers: string[];
+  onVote: (restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => void;
+  onComment: (restaurantId: string) => void;
+  collectionId: string;
+}
+
+const ModernRestaurantCard: React.FC<ModernRestaurantCardProps> = ({
+  restaurant,
+  index,
+  user,
+                  collectionMembers,
+  onVote,
+  onComment,
+  collectionId,
+}) => {
+  const [isPressed, setIsPressed] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const voteAnim = useRef(new Animated.Value(0)).current;
+  const heartAnim = useRef(new Animated.Value(1)).current;
+  const xAnim = useRef(new Animated.Value(1)).current;
+
+  const meta = restaurant.meta || {};
+  const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => v.userId === user?.id) || false;
+  const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => v.userId === user?.id) || false;
+
+  const likeCount = meta.voteDetails?.likeVoters?.filter((v: any) => {
+                  const voteUserIdShort = v.userId?.substring(0, 8);
+                  return collectionMembers.includes(voteUserIdShort);
+  }).length || 0;
+
+  const dislikeCount = meta.voteDetails?.dislikeVoters?.filter((v: any) => {
+                    const voteUserIdShort = v.userId?.substring(0, 8);
+                    return collectionMembers.includes(voteUserIdShort);
+  }).length || 0;
+
+  const totalVotes = likeCount + dislikeCount;
+  const likePercentage = totalVotes > 0 ? (likeCount / totalVotes) * 100 : 0;
+
+  const handleVote = (vote: 'like' | 'dislike') => {
+    // Animate the vote button
+    const animValue = vote === 'like' ? heartAnim : xAnim;
     Animated.sequence([
-      Animated.timing(voteFeedbackOpacity, {
+      Animated.timing(animValue, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animValue, {
+          toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Show confetti for likes
+    if (vote === 'like') {
+      setShowConfetti(true);
+    }
+
+    // Animate the card
+    Animated.sequence([
+      Animated.timing(voteAnim, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }),
-      Animated.timing(voteFeedbackOpacity, {
+      Animated.timing(voteAnim, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
-        delay: 1000,
       })
-    ]).start(() => {
-      setVoteFeedback(null);
-    });
-    
-    // Store current rankings for animation
-    const currentRankings = rankedResult?.restaurants || [];
-    
-    // Trigger the actual vote
-    originalVoteRestaurant(restaurantId, vote, collectionId, reason);
-    
-    // Trigger ranking update with animation
-    setRankingUpdateTrigger(prev => prev + 1);
-    
-    // Animate the ranking change after a short delay
-    setTimeout(() => {
-      const newRankings = getRankedRestaurants(id, memberCount)?.restaurants || [];
-      animateRankingUpdate(currentRankings, newRankings);
-    }, 500);
-  }, [originalVoteRestaurant, rankedResult, user, id, memberCount, animateRankingUpdate, voteFeedbackOpacity]);
-  
-  // Query to get ranked restaurants with all votes (including user names)
-  const rankedRestaurantsWithAllVotesQuery = useQuery({
-    queryKey: ['rankedRestaurantsWithAllVotes', id, memberCount, rankingUpdateTrigger],
-    queryFn: async () => {
-      if (!id) return { restaurants: [], participationData: null };
-      console.log('[CollectionDetail] Fetching ranked restaurants with all votes for collection:', id);
-      const result = await getRankedRestaurantsWithAllVotes(id, memberCount);
-      console.log('[CollectionDetail] Ranked restaurants result:', {
-        restaurantsCount: result.restaurants?.length || 0,
-        hasParticipationData: !!result.participationData,
-        sampleRestaurant: result.restaurants?.[0] ? {
-          name: result.restaurants[0].restaurant.name,
-          meta: {
-            likes: result.restaurants[0].meta.likes,
-            dislikes: result.restaurants[0].meta.dislikes,
-            voteDetails: result.restaurants[0].meta.voteDetails
-          }
-        } : null
-      });
-      return result;
-    },
-    enabled: !!id,
-    retry: 1,
-    retryDelay: 1000
-  });
-  
-  // Use the ranked restaurants with all votes if available, otherwise fall back to the basic ranking
-  const effectiveRankedRestaurants = rankedRestaurantsWithAllVotesQuery.data?.restaurants || rankedRestaurants;
-  const effectiveParticipationData = rankedRestaurantsWithAllVotesQuery.data?.participationData || participationData;
-  
-  // Fetch restaurants directly from database as a fallback
-  const directRestaurantsQuery = useQuery({
-    queryKey: ['directCollectionRestaurants', id],
-    queryFn: async () => {
-      if (!id) return [];
-      try {
-        console.log('[CollectionDetail] Starting direct restaurants query for ID:', id);
-        const restaurants = await getCollectionRestaurantsFromDatabase(id);
-        console.log('[CollectionDetail] Direct restaurants query result:', restaurants.length);
-        return restaurants;
-      } catch (error) {
-        console.error('[CollectionDetail] Error fetching direct restaurants:', error);
-        return [];
-      }
-    },
-    enabled: !!id && (collectionRestaurants.length === 0 || rankedRestaurants.length === 0),
-    retry: 1,
-    retryDelay: 1000
-  });
-  
-  // Use ranked restaurants with all votes if available, otherwise fall back to direct restaurants
-  const displayRestaurants = effectiveRankedRestaurants.length > 0 
-    ? effectiveRankedRestaurants 
-    : (directRestaurantsQuery.data && directRestaurantsQuery.data.length > 0 
-        ? directRestaurantsQuery.data.map(r => ({ 
-            restaurant: r, 
-            meta: { 
-              likes: 0, 
-              dislikes: 0, 
-              rank: 1,
-              voteDetails: {
-                likeVoters: [],
-                dislikeVoters: []
-              },
-              approvalPercent: 0,
-              discussionCount: 0
-            } 
-          }))
-        : (collectionRestaurants.length > 0 ? collectionRestaurants : []).map(r => ({ 
-            restaurant: r, 
-            meta: { 
-              likes: 0, 
-              dislikes: 0, 
-              rank: 1,
-              voteDetails: {
-                likeVoters: [],
-                dislikeVoters: []
-              },
-              approvalPercent: 0,
-              discussionCount: 0
-            } 
-          })));
+    ]).start();
 
-  // Use display restaurants directly since they should already have proper voting data
-  const restaurantsWithVotingData = displayRestaurants;
-  
-  const recommendations = effectiveCollection ? getGroupRecommendations(id) : [];
-  
-  // Load discussions asynchronously
-  useEffect(() => {
-    const loadDiscussions = async () => {
-    if (id) {
-      setIsLoadingDiscussions(true);
-      console.log('[CollectionDetail] Loading discussions for collection:', id);
-      console.log('[CollectionDetail] getCollectionDiscussions function:', typeof getCollectionDiscussions);
-      console.log('[CollectionDetail] getCollectionDiscussions function details:', {
-        name: getCollectionDiscussions?.name || 'no name',
-        toString: getCollectionDiscussions?.toString?.()?.substring(0, 100) || 'no toString',
-        isFunction: typeof getCollectionDiscussions === 'function',
-        isUndefined: getCollectionDiscussions === undefined,
-        isNull: getCollectionDiscussions === null
-      });
-      
-      if (typeof getCollectionDiscussions !== 'function') {
-        console.error('[CollectionDetail] getCollectionDiscussions is not a function!');
-        setIsLoadingDiscussions(false);
-        return;
-      }
-      
-      console.log('[CollectionDetail] About to call getCollectionDiscussions with id:', id);
-      
-      // Test direct service call
-      console.log('[CollectionDetail] Testing direct service call...');
-      try {
-        console.log('[CollectionDetail] About to call dbHelpers.getCollectionDiscussions...');
-        const directResult = await dbHelpers.getCollectionDiscussions(id);
-        console.log('[CollectionDetail] Direct service call completed successfully');
-        console.log('[CollectionDetail] Direct service call result:', {
-          length: directResult?.length || 0,
-          sample: directResult?.[0] ? {
-            id: directResult[0].id,
-            userId: directResult[0].userId,
-            collectionId: directResult[0].collectionId,
-            restaurantId: directResult[0].restaurantId,
-            rawUserId: directResult[0].user_id,
-            rawCollectionId: directResult[0].collection_id,
-            rawRestaurantId: directResult[0].restaurant_id,
-            allKeys: Object.keys(directResult[0])
-          } : null
-        });
-      } catch (error) {
-        console.error('[CollectionDetail] Direct service call failed:', error);
-        console.error('[CollectionDetail] Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : 'No stack',
-          name: error instanceof Error ? error.name : 'Unknown'
-        });
-      }
-      
-      getCollectionDiscussions(id)
-        .then((data) => {
-          console.log('[CollectionDetail] Loaded discussions:', data?.length || 0);
-          console.log('[CollectionDetail] Raw discussions data:', data);
-          console.log('[CollectionDetail] Data type:', typeof data);
-          console.log('[CollectionDetail] Is array:', Array.isArray(data));
-          
-          if (data && data.length > 0) {
-                      console.log('[CollectionDetail] Sample discussion:', {
-            id: data[0].id,
-            message: data[0].message,
-            userName: data[0].userName,
-            restaurantId: data[0].restaurantId,
-            collectionId: data[0].collectionId,
-            userId: data[0].userId,
-            // Add raw database fields for comparison
-            rawUserId: data[0].user_id,
-            rawCollectionId: data[0].collection_id,
-            rawRestaurantId: data[0].restaurant_id,
-            keys: Object.keys(data[0])
-          });
-          } else {
-            console.log('[CollectionDetail] No discussions found or empty array');
-          }
-          
-          console.log('[CollectionDetail] Setting discussions state with:', data?.length || 0, 'items');
-          setDiscussions(data || []);
-        })
-        .catch((error) => {
-          console.error('[CollectionDetail] Error loading discussions:', error);
-          console.error('[CollectionDetail] Error details:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
-            code: error.code
-          });
-          setDiscussions([]);
-        })
-        .finally(() => {
-          console.log('[CollectionDetail] Finished loading discussions');
-          setIsLoadingDiscussions(false);
-        });
-    } else {
-      console.log('[CollectionDetail] No collection ID provided for discussions loading');
-    }
-    };
-    
-    loadDiscussions();
-  }, [id, getCollectionDiscussions]);
+    onVote(restaurant.id, vote, collectionId, '');
+  };
 
-  // Fetch real discussion data from database
-  const [realDiscussions, setRealDiscussions] = useState<any[]>([]);
 
-  useEffect(() => {
-    const loadRealDiscussions = async () => {
-      if (!id) return;
-      
-      try {
-        const { data: discussionsData, error } = await supabase
-          .from('restaurant_discussions')
-          .select('*')
-          .eq('collection_id', id)
-          .order('created_at', { ascending: false });
-        
-        if (!error && discussionsData) {
-          console.log('[CollectionDetail] Loaded real discussions:', discussionsData.length);
-          setRealDiscussions(discussionsData);
-        } else {
-          console.error('[CollectionDetail] Error loading real discussions:', error);
-          setRealDiscussions([]);
+                return (
+    <Animated.View
+      style={[
+        styles.restaurantCard,
+        {
+          transform: [
+            { scale: scaleAnim },
+            { translateY: voteAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, -8]
+            }) }
+          ]
         }
-      } catch (error) {
-        console.error('[CollectionDetail] Exception loading real discussions:', error);
-        setRealDiscussions([]);
-      }
-    };
-    
-    loadRealDiscussions();
-  }, [id]);
-
-  // Use discussions with proper user names (from getCollectionDiscussions)
-  const effectiveDiscussions = discussions;
-  
-  console.log('[CollectionDetail] Effective discussions for InsightsTab:', {
-    discussionsLength: discussions.length,
-    effectiveDiscussionsLength: effectiveDiscussions.length,
-    discussionsState: discussions,
-    effectiveDiscussionsState: effectiveDiscussions,
-    sampleDiscussion: effectiveDiscussions[0] ? {
-      id: effectiveDiscussions[0].id,
-      userId: effectiveDiscussions[0].userId,
-      userName: effectiveDiscussions[0].userName,
-      message: effectiveDiscussions[0].message?.substring(0, 50),
-      collectionId: effectiveDiscussions[0].collectionId,
-      restaurantId: effectiveDiscussions[0].restaurantId,
-      keys: Object.keys(effectiveDiscussions[0])
-    } : null,
-    allDiscussions: effectiveDiscussions.map(d => ({
-      id: d.id,
-      userId: d.userId,
-      userName: d.userName,
-      collectionId: d.collectionId,
-      restaurantId: d.restaurantId
-    }))
-  });
-
-  // Calculate collection members for privacy filtering
-  const collectionMembers = effectiveCollection?.collaborators && Array.isArray(effectiveCollection.collaborators) 
-    ? effectiveCollection.collaborators.map((member: any) => {
-        if (typeof member === 'string') return member;
-        // Handle different ID formats - extract the actual user ID from memberId or userId
-        if (member?.memberId && member.memberId.startsWith('member_')) {
-          return member.memberId.replace('member_', '');
-        }
-        return member?.userId || member?.id;
-      })
-    : [];
-  
-  console.log('[CollectionDetail] Collection members calculation:', {
-    collaborators: effectiveCollection?.collaborators,
-    collectionMembers,
-    sampleVoteData: effectiveRankedRestaurants[0]?.meta?.voteDetails ? {
-      likeVoters: effectiveRankedRestaurants[0].meta.voteDetails.likeVoters.map((v: any) => ({ 
-        userId: v.userId, 
-        name: v.name,
-        userIdLength: v.userId?.length,
-        userIdStartsWith: v.userId?.substring(0, 10)
-      })),
-      dislikeVoters: effectiveRankedRestaurants[0].meta.voteDetails.dislikeVoters.map((v: any) => ({ 
-        userId: v.userId, 
-        name: v.name,
-        userIdLength: v.userId?.length,
-        userIdStartsWith: v.userId?.substring(0, 10)
-      }))
-    } : null
-  });
-
-  // Determine collection type
-  const getCollectionType = () => {
-    if (!effectiveCollection) return 'private';
-    
-    // Check if it's public
-    if (effectiveCollection.is_public) return 'public';
-    
-    // Check if it's shared (has multiple members)
-    if (collectionMembers.length > 1) return 'shared';
-    
-    // Otherwise it's private
-    return 'private';
-  };
-
-  const isCollectionOwner = () => {
-    if (!user || !effectiveCollection) return false;
-    return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
-  };
-
-  const canManageRestaurants = () => {
-    if (!user || !effectiveCollection) return false;
-    
-    // For public collections, only the creator can add/remove restaurants
-    if (effectiveCollection.is_public) {
-      return effectiveCollection.created_by === user.id || effectiveCollection.creator_id === user.id;
-    }
-    
-    // For private collections, the owner can manage restaurants
-    return isCollectionOwner();
-  };
-
-  const isCollectionMember = () => {
-    if (!user || !effectiveCollection) return false;
-    return collectionMembers.includes(user.id);
-  };
-
-  const collectionType = getCollectionType();
-  const isSharedCollection = collectionType === 'shared';
-  
-  console.log('[CollectionDetail] Effective ranked restaurants:', effectiveRankedRestaurants.length);
-  console.log('[CollectionDetail] Effective participation data:', effectiveParticipationData);
-  console.log('[CollectionDetail] Is shared collection:', isSharedCollection);
-  console.log('[CollectionDetail] Collection members:', collectionMembers.length);
-
-  // Show loading state while collection is being fetched
-  if (!effectiveCollection && directCollectionQuery.isLoading) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text>Loading collection...</Text>
-      </View>
-    );
-  }
-
-  // Show error state if collection is not found
-  if (!effectiveCollection) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text>Collection not found</Text>
-        <Text style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-          ID: {id}
-        </Text>
-      </View>
-    );
-  }
-
-  // Check if user is the owner of the collection (using effectiveCollection)
-
-  const handleDeleteCollection = () => {
-    Alert.alert(
-      'Delete Collection',
-      'Are you sure you want to delete this collection? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCollection(effectiveCollection?.id || '');
-              Alert.alert('Success', 'Collection deleted successfully', [
-                { text: 'OK', onPress: () => router.back() }
-              ]);
-            } catch (error) {
-              console.error('[CollectionDetail] Error deleting collection:', error);
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-              Alert.alert('Error', `Failed to delete collection: ${errorMessage}`);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleLeaveCollection = () => {
-    Alert.alert(
-      'Leave Collection',
-      'Are you sure you want to leave this collection? You can rejoin later if invited.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Leave', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveCollection(effectiveCollection?.id || '');
-              Alert.alert('Success', 'You have left the collection', [
-                { text: 'OK', onPress: () => router.back() }
-              ]);
-            } catch (error) {
-              console.error('[CollectionDetail] Error leaving collection:', error);
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-              Alert.alert('Error', `Failed to leave collection: ${errorMessage}`);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleInviteUser = () => {
-    if (!inviteEmail.trim()) {
-      Alert.alert('Error', 'Please enter an email address');
-      return;
-    }
-    
-            inviteToCollection(effectiveCollection?.id || '', inviteEmail, inviteMessage);
-    setShowInviteModal(false);
-    setInviteEmail('');
-    setInviteMessage('');
-    Alert.alert('Invitation Sent', `Invitation sent to ${inviteEmail}`);
-  };
-
-  const handleAddComment = async (restaurantId: string) => {
-    if (!commentMessage.trim()) {
-      Alert.alert('Error', 'Please enter a comment');
-      return;
-    }
-    
-    try {
-      await addRestaurantComment(restaurantId, id, commentMessage);
+      ]}
+    >
+      <Confetti visible={showConfetti} onComplete={() => setShowConfetti(false)} />
       
-      // Refresh discussions after adding comment
-      const updatedDiscussions = await getCollectionDiscussions(id);
-      setDiscussions(updatedDiscussions || []);
-      
-      setShowCommentModal(null);
-      setCommentMessage('');
-      Alert.alert('Success', 'Comment added successfully');
-    } catch (error) {
-      console.error('[CollectionDetail] Error adding comment:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', `Failed to add comment: ${errorMessage}`);
-    }
-  };
 
-  const handleShareCollection = async () => {
-          const shareUrl = `https://yourapp.com/collection/${effectiveCollection?.id || ''}`;
-      const message = `Check out this restaurant collection: ${effectiveCollection?.name || 'Collection'}\n\n${effectiveCollection?.description || ''}\n\n${shareUrl}`;
-    
-    try {
-      if (Platform.OS === 'web') {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(message);
-          Alert.alert('Copied!', 'Collection link copied to clipboard');
-        } else {
-          const textArea = document.createElement('textarea');
-          textArea.value = message;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          Alert.alert('Copied!', 'Collection link copied to clipboard');
-        }
-      } else {
-        await Share.share({
-          message,
-          url: shareUrl,
-          title: collection.name
-        });
-      }
-    } catch (error) {
-      console.error('Error sharing collection:', error);
-      Alert.alert('Share Collection', message, [
-        { text: 'Copy to Clipboard', onPress: () => {
-          try {
-            if (Platform.OS === 'web') {
-              const textArea = document.createElement('textarea');
-              textArea.value = message;
-              document.body.appendChild(textArea);
-              textArea.select();
-              document.execCommand('copy');
-              document.body.removeChild(textArea);
-            }
-          } catch (e) {
-            console.error('Fallback copy failed:', e);
-          }
-        }},
-        { text: 'OK' }
-      ]);
-    }
-  };
+      {/* Restaurant Image */}
+      <View style={styles.imageContainer}>
+        <Image
+          source={{ uri: restaurant.image_url || 'https://static.vecteezy.com/system/resources/previews/004/141/669/non_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg' }}
+          style={styles.restaurantImage}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay} />
+                          </View>
 
-  const copyInviteLink = async () => {
-          const inviteLink = `https://yourapp.com/invite/${effectiveCollection?.id || ''}`;
-    
-    try {
-      if (Platform.OS === 'web') {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(inviteLink);
-          Alert.alert('Copied!', 'Invite link copied to clipboard');
-        } else {
-          const textArea = document.createElement('textarea');
-          textArea.value = inviteLink;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          Alert.alert('Copied!', 'Invite link copied to clipboard');
-        }
-      } else {
-        await Clipboard.setString(inviteLink);
-        Alert.alert('Copied!', 'Invite link copied to clipboard');
-      }
-    } catch (error) {
-      console.error('Error copying invite link:', error);
-      Alert.alert('Invite Link', inviteLink, [
-        { text: 'Copy to Clipboard', onPress: () => {
-          try {
-            if (Platform.OS === 'web') {
-              const textArea = document.createElement('textarea');
-              textArea.value = inviteLink;
-              document.body.appendChild(textArea);
-              textArea.select();
-              document.execCommand('copy');
-              document.body.removeChild(textArea);
-            }
-          } catch (e) {
-            console.error('Fallback copy failed:', e);
-          }
-        }},
-        { text: 'OK' }
-      ]);
-    }
-  };
-
-  const handleRemoveRestaurant = (restaurantId: string, restaurantName: string) => {
-    Alert.alert(
-      'Remove Restaurant',
-      `Remove ${restaurantName} from this collection?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive',
-          onPress: () => removeRestaurantFromCollection(effectiveCollection?.id || '', restaurantId)
-        }
-      ]
-    );
-  };
-
-  return (
-    <>
-      <Stack.Screen 
-        options={{ 
-          title: effectiveCollection?.name || 'Collection',
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={handleShareCollection}>
-                <Share2 size={20} color="#6B7280" />
-              </TouchableOpacity>
-              {isCollectionOwner() ? (
-                <TouchableOpacity onPress={handleDeleteCollection}>
-                  <Trash2 size={20} color="#FF6B6B" />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={handleLeaveCollection}>
-                  <UserMinus size={20} color="#FF8C00" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )
-        }} 
-      />
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.name}>{effectiveCollection?.name || 'Collection'}</Text>
-          <Text style={styles.description}>{effectiveCollection?.description || ''}</Text>
-          
-          <View style={styles.stats}>
-            <View style={styles.statsLeft}>
-              {/* Only show likes for non-public collections */}
-              {!effectiveCollection?.is_public && (
-                <View style={styles.stat}>
-                  <Heart size={16} color="#FF6B6B" fill="#FF6B6B" />
-                  <Text style={styles.statText}>{effectiveCollection?.likes || 0} likes</Text>
-                </View>
-              )}
-              <View style={styles.stat}>
-                <Users size={16} color="#666" />
-                <Text style={styles.statText}>
-                  {`${getMemberCount(effectiveCollection)} members`}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.collaboratorActions}>
-              <TouchableOpacity 
-                style={styles.inviteButton}
-                onPress={() => setShowInviteModal(true)}
-              >
-                <UserPlus size={14} color="#3B82F6" />
-                <Text style={styles.inviteButtonText}>Invite</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.shareButton}
-                onPress={copyInviteLink}
-              >
-                <Copy size={14} color="#6B7280" />
-                <Text style={styles.shareButtonText}>Copy Link</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-
-        </View>
-
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'restaurants' && styles.activeTab]}
-            onPress={() => setActiveTab('restaurants')}
-          >
-            <Text style={[styles.tabText, activeTab === 'restaurants' && styles.activeTabText]}>
-              Restaurants ({restaurantsWithVotingData.length})
-            </Text>
-          </TouchableOpacity>
-          {isSharedCollection && (
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'insights' && styles.activeTab]}
-            onPress={() => setActiveTab('insights')}
-          >
-            <Text style={[styles.tabText, activeTab === 'insights' && styles.activeTabText]}>
-              Insights
-            </Text>
-          </TouchableOpacity>
-          )}
-        </View>
-
-                {/* Tab Content */}
-        {activeTab === 'restaurants' ? (
-          <View style={styles.restaurantsList}>
-            {restaurantsWithVotingData.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
-            </View>
-          ) : (
-              restaurantsWithVotingData.map(({ restaurant, meta }, index) => {
-              const isFavorite = favoriteRestaurants.includes(restaurant.id);
-                const userLiked = meta.voteDetails?.likeVoters?.some((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  const userShort = user?.id?.substring(0, 8);
-                  return voteUserIdShort === userShort;
-                });
-                const userDisliked = meta.voteDetails?.dislikeVoters?.some((v: any) => {
-                  const voteUserIdShort = v.userId?.substring(0, 8);
-                  const userShort = user?.id?.substring(0, 8);
-                  return voteUserIdShort === userShort;
-                });
-                
-                                 // Only show winning styles if there's 75% participation and this is the top-ranked restaurant
-                const shouldShowWinningStyles = isSharedCollection && 
-                  effectiveParticipationData?.has75PercentParticipation && 
-                  meta?.rank === 1;
-              
-              return (
-                   <Animated.View 
-                     key={restaurant?.id || index} 
-                     style={[
-                  styles.restaurantItem,
-                       shouldShowWinningStyles && styles.winningRestaurantItem,
-                       animatedValues.current[restaurant.id] && {
-                         transform: [{
-                           scale: animatedValues.current[restaurant.id].interpolate({
-                             inputRange: [0, 1],
-                             outputRange: [1, 1.05]
-                           })
-                         }],
-                         shadowOpacity: animatedValues.current[restaurant.id].interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [0.1, 0.4]
-                         }),
-                         shadowRadius: animatedValues.current[restaurant.id].interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [8, 12]
-                         })
-                       }
-                     ]}
-                   >
-                     {/* Vote Feedback Overlay */}
-                     {voteFeedback && voteFeedback.restaurantId === restaurant.id && (
-                       <Animated.View 
-                         style={[
-                           styles.voteFeedbackOverlay,
-                           { opacity: voteFeedbackOpacity }
-                         ]}
-                       >
-                         <View style={[
-                           styles.voteFeedbackContent,
-                           voteFeedback.vote === 'like' ? styles.likeFeedback : styles.dislikeFeedback
-                         ]}>
-                           {voteFeedback.vote === 'like' ? (
-                             <ThumbsUp size={24} color="#FFFFFF" />
-                           ) : (
-                             <ThumbsDown size={24} color="#FFFFFF" />
-                           )}
-                           <Text style={styles.voteFeedbackText}>
-                             {voteFeedback.vote === 'like' ? 'Liked!' : 'Disliked!'}
-                           </Text>
-                         </View>
-                       </Animated.View>
-                     )}
-                     {/* Top Badges Row - Only for shared collections */}
-                     {isSharedCollection && (
-                  <View style={styles.badgesRow}>
-                    <View style={[
-                      styles.rankBadge,
-                           shouldShowWinningStyles && styles.winnerRankBadge,
-                      meta?.rank === 2 && styles.silverRankBadge,
-                      meta?.rank === 3 && styles.bronzeRankBadge
-                    ]}>
-                      <Text style={styles.rankNumber}>#{meta?.rank || index + 1}</Text>
-                    </View>
-                    
-                         {/* Top Choice Badge for Winner - Only with 75% participation */}
-                         {shouldShowWinningStyles && (
-                      <View style={styles.topChoiceBadge}>
-                        <Crown size={12} color="#FFFFFF" />
-                        <Text style={styles.topChoiceText}>TOP CHOICE</Text>
-                      </View>
-                    )}
-                  </View>
-                     )}
-
-                  {/* Restaurant Info Section */}
-                  <TouchableOpacity 
-                    style={styles.restaurantInfoSection}
-                    onPress={() => {
-                      addRestaurantToStore(restaurant);
-                      router.push(`/restaurant/${restaurant.id}` as any);
-                    }}
-                    activeOpacity={0.9}
-                  >
-                    <View style={styles.restaurantImageContainer}>
-                      <Image 
-                        source={{ uri: restaurant.imageUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' }}
-                        style={styles.restaurantImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    
-                    <View style={styles.restaurantInfo}>
-                      <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                      <Text style={styles.restaurantCuisine}>{restaurant.cuisine || 'Restaurant'}</Text>
-                      <Text style={styles.restaurantDetails}>
-                          {restaurant.priceRange} • {restaurant.neighborhood || 'Restaurant'}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.buttonContainer}>
-                      <TouchableOpacity 
-                        style={styles.heartButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(restaurant.id);
-                        }}
-                      >
-                        <Text style={[styles.heartIcon, isFavorite && styles.heartIconActive]}>
-                          {isFavorite ? '♥' : '♡'}
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      {/* Remove Button - Only for collection owners/creators */}
-                      {(() => {
-                        const canManage = canManageRestaurants();
-                        console.log('[CollectionDetail] Can manage restaurants:', canManage, {
-                          user: user?.id,
-                          createdBy: effectiveCollection?.created_by,
-                          creatorId: effectiveCollection?.creator_id,
-                          isPublic: effectiveCollection?.is_public
-                        });
-                        return canManage;
-                      })() && (
-                        <TouchableOpacity 
-                          style={styles.heartButton}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleRemoveRestaurant(restaurant.id, restaurant.name);
-                          }}
-                        >
-                          <X size={20} color="#999" strokeWidth={2} />
-                        </TouchableOpacity>
+      {/* Restaurant Info */}
+      <View style={styles.restaurantInfo}>
+        <Text style={styles.restaurantName} numberOfLines={2}>
+          {restaurant.name}
+                            </Text>
+        <View style={styles.restaurantMeta}>
+          <View style={styles.metaItem}>
+            <MapPin size={14} color="#6B7280" />
+            <Text style={styles.metaText}>{restaurant.address}</Text>
+                          </View>
+          {restaurant.rating && (
+            <View style={styles.metaItem}>
+              <Star size={14} color="#FBBF24" fill="#FBBF24" />
+              <Text style={styles.metaText}>{restaurant.rating}</Text>
+                        </View>
                       )}
                     </View>
-                  </TouchableOpacity>
+                    </View>
 
-                                         {/* Approval Section - Only for shared collections */}
-                     {isSharedCollection && (
-                  <View style={styles.approvalSection}>
-                    <Text style={styles.approvalText}>{meta.approvalPercent}% approval</Text>
-                    <Text style={styles.voteBreakdown}>
-                           {meta.voteDetails?.likeVoters?.filter((v: any) => {
-                             const voteUserIdShort = v.userId?.substring(0, 8);
-                             return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} likes • {meta.voteDetails?.dislikeVoters?.filter((v: any) => {
-                             const voteUserIdShort = v.userId?.substring(0, 8);
-                             return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0} dislikes
-                    </Text>
-                    {(meta.likes > 0 || meta.dislikes > 0 || meta.discussionCount > 0) && (
-                      <View style={styles.consensusBadge}>
-                        <Text style={styles.consensusBadgeText}>
-                          {meta.approvalPercent >= 70 ? 'strong consensus' : meta.approvalPercent >= 50 ? 'moderate consensus' : 'mixed consensus'}
-                        </Text>
-                      </View>
-                    )}
+      {/* Vote Progress Bar */}
+      {totalVotes > 0 && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${likePercentage}%` }]} />
                   </View>
-                     )}
+          <Text style={styles.progressText}>
+            {Math.round(likePercentage)}% love it ({likeCount}/{totalVotes} votes)
+        </Text>
+      </View>
+      )}
 
-                                         {/* Vote Actions - Only for shared collections */}
-                     {isSharedCollection && (
-                  <View style={styles.voteActions}>
-                    <TouchableOpacity 
-                      style={[
-                        styles.voteButton, 
-                        styles.likeButton,
-                        userLiked && styles.likeButtonActive
-                      ]}
-                           onPress={() => voteRestaurant(restaurant.id, 'like', id, '')}
-                           activeOpacity={0.7}
-                    >
-                      <ThumbsUp size={16} color={userLiked ? "#FFFFFF" : "#22C55E"} />
-                           <Text style={[styles.voteCount, userLiked && styles.voteCountActive]}>{meta.voteDetails?.likeVoters?.filter((v: any) => {
-                             const voteUserIdShort = v.userId?.substring(0, 8);
-                             return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0}</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={[
-                        styles.voteButton, 
-                        styles.dislikeButton,
-                        userDisliked && styles.dislikeButtonActive
-                      ]}
-                           onPress={() => voteRestaurant(restaurant.id, 'dislike', id, '')}
-                           activeOpacity={0.7}
-                    >
-                      <ThumbsDown size={16} color={userDisliked ? "#FFFFFF" : "#EF4444"} />
-                           <Text style={[styles.voteCount, userDisliked && styles.voteCountActive]}>{meta.voteDetails?.dislikeVoters?.filter((v: any) => {
-                             const voteUserIdShort = v.userId?.substring(0, 8);
-                             return collectionMembers.includes(voteUserIdShort);
-                           }).length || 0}</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={[styles.voteButton, styles.commentButton]}
-                           onPress={() => setShowCommentModal(restaurant.id)}
-                    >
-                      <MessageCircle size={16} color="#6B7280" />
-                           <Text style={styles.voteCount}>{discussions.filter((d: any) => {
-                             const discussionUserIdShort = d.userId?.substring(0, 8);
-                             return d.restaurantId === restaurant.id && collectionMembers.includes(discussionUserIdShort);
-                           }).length}</Text>
-                    </TouchableOpacity>
-                  </View>
-                     )}
-
-
-                  </Animated.View>
-              );
-            })
-          )}
-                </View>
-        ) : (
-           isSharedCollection ? (
-          <InsightsTab 
-               collection={effectiveCollection}
-               rankedRestaurants={effectiveRankedRestaurants}
-               discussions={effectiveDiscussions}
-            collectionMembers={collectionMembers}
-            styles={styles}
-            setShowCommentModal={setShowCommentModal}
-               user={user}
-               handleEditDiscussion={handleEditDiscussion}
-               handleDeleteDiscussion={handleDeleteDiscussion}
-               setEditDiscussionMessage={setEditDiscussionMessage}
-               setShowEditDiscussionModal={setShowEditDiscussionModal}
-             />
-           ) : (
-             <View style={styles.insightsContainer}>
-               <Text style={styles.sectionTitle}>Insights</Text>
-               <Text style={styles.emptyText}>
-                 Insights and analytics are only available for shared collections with multiple members.
-               </Text>
-             </View>
-           )
-        )}
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
-
-      {/* Vote Modal */}
-      <Modal visible={!!showVoteModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {showVoteModal?.vote === 'like' ? 'Why do you like this?' : 'Why don\'t you like this?'}
-            </Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Share your thoughts (optional)"
-              multiline
-              value={voteReason}
-              onChangeText={setVoteReason}
+      {/* Voting Buttons */}
+      <View style={styles.votingSection}>
+                      <TouchableOpacity 
+          style={[
+            styles.voteButton,
+            styles.likeButton,
+            userLiked && styles.activeVoteButton
+          ]}
+          onPress={() => handleVote('like')}
+          onPressIn={() => {
+            setIsPressed(true);
+            Animated.timing(scaleAnim, {
+              toValue: 0.95,
+              duration: 100,
+              useNativeDriver: true,
+            }).start();
+          }}
+          onPressOut={() => {
+            setIsPressed(false);
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 100,
+              useNativeDriver: true,
+            }).start();
+          }}
+          activeOpacity={0.8}
+        >
+          <Animated.View style={{ transform: [{ scale: heartAnim }] }}>
+            <Heart 
+              size={24} 
+              color={userLiked ? "#FFFFFF" : "#22C55E"} 
+              fill={userLiked ? "#FFFFFF" : "transparent"}
             />
+          </Animated.View>
+          <Text style={[styles.voteCount, userLiked && styles.activeVoteCount]}>
+            {likeCount}
+          </Text>
+                      </TouchableOpacity>
+
+                        <TouchableOpacity
+          style={[
+            styles.voteButton,
+            styles.dislikeButton,
+            userDisliked && styles.activeVoteButton
+          ]}
+          onPress={() => handleVote('dislike')}
+          onPressIn={() => {
+            setIsPressed(true);
+            Animated.timing(scaleAnim, {
+              toValue: 0.95,
+              duration: 100,
+              useNativeDriver: true,
+            }).start();
+          }}
+          onPressOut={() => {
+            setIsPressed(false);
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 100,
+              useNativeDriver: true,
+            }).start();
+          }}
+          activeOpacity={0.8}
+        >
+          <Animated.View style={{ transform: [{ scale: xAnim }] }}>
+            <X 
+              size={24} 
+              color={userDisliked ? "#FFFFFF" : "#EF4444"} 
+            />
+          </Animated.View>
+          <Text style={[styles.voteCount, userDisliked && styles.activeVoteCount]}>
+            {dislikeCount}
+                              </Text>
+                        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.commentButton}
+          onPress={() => onComment(restaurant.id)}
+        >
+          <MessageCircle size={20} color="#8B5CF6" />
+        </TouchableOpacity>
+    </View>
+    </Animated.View>
+  );
+};
+
+// Main Collection Detail Page
+export default function ModernCollectionDetailPage() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
+  const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
+  const [commentMessage, setCommentMessage] = useState('');
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const dotAnimations = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0)
+  ]).current;
+
+  // Data fetching
+  const collection = useCollectionById(id!);
+  const { restaurants } = useRestaurants();
+
+  // Animate dots when currentCardIndex changes
+  useEffect(() => {
+    // Animate demo dots
+    dotAnimations.forEach((anim, index) => {
+      Animated.timing(anim, {
+        toValue: index === currentCardIndex ? 1 : 0,
+          duration: 300,
+          useNativeDriver: false,
+      }).start();
+    });
+  }, [currentCardIndex, dotAnimations]);
+
+  // Debug logging
+  console.log('[ModernCollectionDetailPage] Debug:', {
+    id,
+    hasCollection: !!collection,
+    collectionName: collection?.name,
+    hasRestaurants: !!restaurants,
+    restaurantsCount: restaurants?.length,
+    collectionRestaurantIds: collection?.restaurant_ids?.length
+  });
+
+  // Collection members
+  const collectionMembers = React.useMemo(() => {
+    if (!collection) return [];
+    return getMemberIds(collection as any);
+  }, [collection]);
+
+  // Restaurants with voting data
+  const restaurantsWithVotingData = React.useMemo(() => {
+    if (!collection?.restaurant_ids || !restaurants) return [];
+    
+    return collection.restaurant_ids
+      .map((restaurantId: string) => {
+        const restaurant = restaurants.find(r => r.id === restaurantId);
+        if (!restaurant) return null;
+        
+        const meta = (restaurant as any).meta || {};
+        return { restaurant, meta };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => {
+        const aRank = a.meta?.rank || 999;
+        const bRank = b.meta?.rank || 999;
+        return aRank - bRank;
+      });
+  }, [collection?.restaurant_ids, restaurants]);
+
+  // Create dynamic dot animations for real data
+  const realDataDotAnimations = useRef<Animated.Value[]>([]).current;
+  
+  // Initialize dot animations for real data
+  useEffect(() => {
+    if (restaurantsWithVotingData.length > 0) {
+      // Clear existing animations
+      realDataDotAnimations.length = 0;
+      // Create new animations for each restaurant
+      for (let i = 0; i < restaurantsWithVotingData.length; i++) {
+        realDataDotAnimations.push(new Animated.Value(i === currentCardIndex ? 1 : 0));
+      }
+    }
+  }, [restaurantsWithVotingData.length, realDataDotAnimations, currentCardIndex]);
+
+  // Animate real data dots when currentCardIndex changes
+  useEffect(() => {
+    realDataDotAnimations.forEach((anim, index) => {
+      Animated.timing(anim, {
+        toValue: index === currentCardIndex ? 1 : 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    });
+  }, [currentCardIndex, realDataDotAnimations]);
+
+  // Voting function
+  const voteRestaurant = useCallback(async (restaurantId: string, vote: 'like' | 'dislike', collectionId?: string, reason?: string) => {
+    if (!user || !collectionId) return;
+    
+    try {
+      // Add your voting logic here
+      console.log('Voting:', { restaurantId, vote, collectionId, reason });
+      } catch (error) {
+      console.error('Error voting:', error);
+      Alert.alert('Error', 'Failed to vote. Please try again.');
+    }
+  }, [user]);
+
+  // Comment function
+  const handleComment = useCallback(async (restaurantId: string) => {
+    if (!commentMessage.trim() || !user || !id) return;
+    
+    try {
+      // Add your comment logic here
+      console.log('Commenting:', { restaurantId, comment: commentMessage });
+      setCommentMessage('');
+      setShowCommentModal(null);
+      } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment. Please try again.');
+    }
+  }, [commentMessage, user, id]);
+
+  // Show demo content if data isn't loaded yet
+  if (!collection || !restaurants) {
+  return (
+      <View style={styles.container}>
+              <Stack.Screen
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        {/* Custom Back Button */}
+        <View style={styles.customHeader}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Demo Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.collectionName}>Demo Collection</Text>
+            <Text style={styles.collectionDescription}>This is a demo collection to show the modern design</Text>
             
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.modalButton}
-                onPress={() => {
-                  if (showVoteModal) {
-                    voteRestaurant(showVoteModal.restaurantId, showVoteModal.vote, id, voteReason);
-                  }
-                  setShowVoteModal(null);
-                  setVoteReason('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Submit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowVoteModal(null);
-                  setVoteReason('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            <View style={styles.collectionMeta}>
+              <View style={styles.headerMetaItem}>
+                <Users size={16} color="#9CA3AF" />
+                <Text style={styles.headerMetaText}>3 members</Text>
+      </View>
+              <View style={styles.headerMetaItem}>
+                <Star size={16} color="#9CA3AF" />
+                <Text style={styles.headerMetaText}>2 restaurants</Text>
+      </View>
+              <View style={styles.headerMetaItem}>
+                <Crown size={16} color="#9CA3AF" />
+                <Text style={styles.headerMetaText}>Shared</Text>
+            </View>
             </View>
           </View>
         </View>
-      </Modal>
 
-      {/* Discussion Modal */}
-      <Modal visible={!!showDiscussionModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Comment</Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Share your thoughts..."
-              multiline
-              value={discussionMessage}
-              onChangeText={setDiscussionMessage}
-            />
-            
-            <View style={styles.modalActions}>
+        {/* Demo Restaurants Carousel */}
+        <View style={styles.carouselContainer}>
+          <FlatList
+            ref={flatListRef}
+            data={[
+              {
+                id: 'demo-1',
+                name: 'Demo Restaurant 1',
+                address: '123 Demo Street, Demo City',
+                rating: '4.5',
+                image_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
+                meta: {
+                  voteDetails: {
+                    likeVoters: [{ userId: 'user1', name: 'Demo User' }],
+                    dislikeVoters: []
+                  }
+                }
+              },
+              {
+                id: 'demo-2',
+                name: 'Demo Restaurant 2',
+                address: '456 Demo Avenue, Demo City',
+                rating: '4.2',
+                image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
+                meta: {
+                  voteDetails: {
+                    likeVoters: [],
+                    dislikeVoters: [{ userId: 'user2', name: 'Demo User 2' }]
+                  }
+                }
+              },
+              {
+                id: 'demo-3',
+                name: 'Demo Restaurant 3',
+                address: '789 Demo Boulevard, Demo City',
+                rating: '4.8',
+                image_url: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+                meta: {
+                  voteDetails: {
+                    likeVoters: [{ userId: 'user1', name: 'Demo User' }, { userId: 'user3', name: 'Demo User 3' }],
+                    dislikeVoters: []
+                  }
+                }
+              }
+            ]}
+            renderItem={({ item, index }) => (
+              <View style={styles.carouselItem}>
+                <ModernRestaurantCard
+                  restaurant={item}
+                  index={index}
+                  user={user}
+                  collectionMembers={['user1', 'user2', 'user3']}
+                  onVote={(restaurantId, vote) => console.log('Demo vote:', restaurantId, vote)}
+                  onComment={(restaurantId) => setShowCommentModal(restaurantId)}
+                  collectionId={id || 'demo'}
+                />
+            </View>
+            )}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / width);
+              setCurrentCardIndex(index);
+            }}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / width);
+              setCurrentCardIndex(index);
+            }}
+            style={styles.carousel}
+          />
+          
+          {/* Carousel Navigation Dots */}
+          <View style={styles.carouselDots}>
+            {[0, 1, 2].map((index) => (
               <TouchableOpacity 
-                style={styles.modalButton}
-                onPress={async () => {
-                  if (showDiscussionModal && discussionMessage.trim()) {
-                    try {
-                      await addDiscussion(showDiscussionModal, id, discussionMessage);
-                      
-                      // Refresh discussions after adding
-                      const updatedDiscussions = await getCollectionDiscussions(id);
-                      setDiscussions(updatedDiscussions || []);
-                    } catch (error) {
-                      console.error('[CollectionDetail] Error adding discussion:', error);
-                      Alert.alert('Error', 'Failed to add comment. Please try again.');
+                key={index}
+                onPress={() => {
+                  flatListRef.current?.scrollToIndex({ index, animated: true });
+                  setCurrentCardIndex(index);
+                }}
+              >
+                   <Animated.View 
+                     style={[
+                    styles.carouselDot,
+                    {
+                      width: dotAnimations[index].interpolate({
+                             inputRange: [0, 1],
+                        outputRange: [8, 24],
+                      }),
+                      backgroundColor: dotAnimations[index].interpolate({
+                           inputRange: [0, 1],
+                        outputRange: ['#D1D5DB', '#3B82F6'],
+                      }),
                     }
-                  }
-                  setShowDiscussionModal(null);
-                  setDiscussionMessage('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Submit</Text>
+                  ]}
+                />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowDiscussionModal(null);
-                  setDiscussionMessage('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+            ))}
+                    </View>
+                    
+          {/* Poll Statistics */}
+          <View style={styles.pollStatisticsContainer}>
+            <View style={styles.pollStatisticsHeader}>
+              <Text style={styles.pollStatisticsTitle}>Poll Statistics</Text>
+              <TouchableOpacity onPress={() => router.push(`/collection/${id}/insights`)}>
+                <Text style={styles.pollStatisticsDetails}>Details</Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Invite Modal */}
-      <Modal visible={showInviteModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Invite to Collection</Text>
+                      </View>
+            <View style={styles.voterContainer}>
+              <Text style={styles.voterLabel}>Votes by</Text>
+              <View style={styles.voterAvatars}>
+                {[
+                  { id: 'user1', name: 'Demo User', avatar: '👤' },
+                  { id: 'user2', name: 'Demo User 2', avatar: '👤' },
+                  { id: 'user3', name: 'Demo User 3', avatar: '👤' },
+                  { id: 'user4', name: 'Demo User 4', avatar: '👤' },
+                  { id: 'user5', name: 'Demo User 5', avatar: '👤' }
+                ].map((user, index) => (
+                  <View key={user.id} style={[styles.voterAvatar, { marginLeft: index > 0 ? -8 : 0 }]}>
+                    <Text style={styles.voterAvatarText}>{user.avatar}</Text>
+                  </View>
+                ))}
+                    </View>
+                    </View>
+                    </View>
+                      </View>
+                    
+        {/* Comment Modal */}
+        <Modal
+          visible={!!showCommentModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCommentModal(null)}
+        >
+          <KeyboardAvoidingView style={styles.modalContainer} behavior="padding">
+                    <TouchableOpacity 
+              style={styles.modalBackground}
+              activeOpacity={1}
+              onPress={() => {
+                setShowCommentModal(null);
+                setCommentMessage('');
+              }}
+            >
+              <View style={{ flex: 1 }} />
+                    </TouchableOpacity>
+                    
+            <View style={styles.commentModal}>
+              <View style={styles.commentModalHeader}>
+                <Text style={styles.commentModalTitle}>Add Comment</Text>
+                    <TouchableOpacity 
+                  onPress={() => {
+                    setShowCommentModal(null);
+                    setCommentMessage('');
+                  }}
+                  style={styles.closeButton}
+                >
+                  <X size={24} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+              
             <TextInput
-              style={styles.reasonInput}
-              placeholder="Email address"
-              value={inviteEmail}
-              onChangeText={setInviteEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Personal message (optional)"
+                style={styles.commentInput}
+                placeholder="Share your thoughts about this restaurant..."
+                value={commentMessage}
+                onChangeText={setCommentMessage}
               multiline
-              value={inviteMessage}
-              onChangeText={setInviteMessage}
+                numberOfLines={4}
+                textAlignVertical="top"
             />
             
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalButton} onPress={handleInviteUser}>
-                <Text style={styles.modalButtonText}>Send Invite</Text>
+              <View style={styles.commentModalActions}>
+              <TouchableOpacity 
+                  style={styles.cancelButton}
+                onPress={() => {
+                    setShowCommentModal(null);
+                    setCommentMessage('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
+                  style={[styles.submitButton, !commentMessage.trim() && styles.submitButtonDisabled]}
                 onPress={() => {
-                  setShowInviteModal(false);
-                  setInviteEmail('');
-                  setInviteMessage('');
+                    console.log('Demo comment:', commentMessage);
+                    setCommentMessage('');
+                    setShowCommentModal(null);
                 }}
+                  disabled={!commentMessage.trim()}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.submitButtonText}>Post Comment</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </KeyboardAvoidingView>
       </Modal>
+      </View>
+    );
+  }
 
-      {/* Edit Discussion Modal */}
-      <Modal visible={!!showEditDiscussionModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Discussion</Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="Edit your message..."
-              multiline
-              value={editDiscussionMessage}
-              onChangeText={setEditDiscussionMessage}
+  const isSharedCollection = collection.is_public || collectionMembers.length > 1;
+
+  return (
+    <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      {/* Custom Back Button */}
+      <View style={styles.customHeader}>
+              <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+              </TouchableOpacity>
+            </View>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.collectionName}>{collection.name}</Text>
+          <Text style={styles.collectionDescription}>{collection.description}</Text>
+          
+          <View style={styles.collectionMeta}>
+            <View style={styles.headerMetaItem}>
+              <Users size={16} color="#9CA3AF" />
+              <Text style={styles.headerMetaText}>{collectionMembers.length} members</Text>
+          </View>
+            <View style={styles.headerMetaItem}>
+              <Star size={16} color="#9CA3AF" />
+              <Text style={styles.headerMetaText}>{restaurantsWithVotingData.length} restaurants</Text>
+        </View>
+            {isSharedCollection && (
+              <View style={styles.headerMetaItem}>
+                <Crown size={16} color="#9CA3AF" />
+                <Text style={styles.headerMetaText}>Shared</Text>
+        </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Restaurants Carousel */}
+      <View style={styles.carouselContainer}>
+        {restaurantsWithVotingData.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No restaurants in this collection yet</Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={restaurantsWithVotingData}
+              renderItem={({ item, index }) => {
+                if (!item) return null;
+                const { restaurant, meta } = item;
+                return (
+                  <View style={styles.carouselItem}>
+                    <ModernRestaurantCard
+                      restaurant={{...restaurant, meta}}
+                      index={index}
+                      user={user}
+                      collectionMembers={collectionMembers}
+                      onVote={voteRestaurant}
+                      onComment={(restaurantId) => setShowCommentModal(restaurantId)}
+                      collectionId={id!}
+                    />
+                  </View>
+                );
+              }}
+              keyExtractor={(item, index) => item?.restaurant?.id || index.toString()}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / width);
+                setCurrentCardIndex(index);
+              }}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / width);
+                setCurrentCardIndex(index);
+              }}
+              style={styles.carousel}
             />
             
-            <View style={styles.modalActions}>
+            {/* Carousel Navigation Dots */}
+            <View style={styles.carouselDots}>
+              {restaurantsWithVotingData.map((_, index) => (
               <TouchableOpacity 
-                style={styles.modalButton}
+                  key={index}
                 onPress={() => {
-                  if (showEditDiscussionModal && editDiscussionMessage.trim()) {
-                    handleEditDiscussion(showEditDiscussionModal.discussionId, editDiscussionMessage);
-                  }
-                }}
-              >
-                <Text style={styles.modalButtonText}>Update</Text>
+                    flatListRef.current?.scrollToIndex({ index, animated: true });
+                    setCurrentCardIndex(index);
+                  }}
+                >
+                  <Animated.View
+                    style={[
+                      styles.carouselDot,
+                      realDataDotAnimations[index] ? {
+                        width: realDataDotAnimations[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [8, 24],
+                        }),
+                        backgroundColor: realDataDotAnimations[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['#D1D5DB', '#3B82F6'],
+                        }),
+                      } : {}
+                    ]}
+                  />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowEditDiscussionModal(null);
-                  setEditDiscussionMessage('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+              ))}
             </View>
+            
+            {/* Poll Statistics */}
+            <View style={styles.pollStatisticsContainer}>
+              <View style={styles.pollStatisticsHeader}>
+                <Text style={styles.pollStatisticsTitle}>Poll Statistics</Text>
+                <TouchableOpacity>
+                  <Text style={styles.pollStatisticsDetails}>Details</Text>
+                </TouchableOpacity>
           </View>
+              <View style={styles.voterContainer}>
+                <Text style={styles.voterLabel}>Votes by</Text>
+                <View style={styles.voterAvatars}>
+                  {collectionMembers.slice(0, 5).map((memberId, index) => (
+                    <View key={memberId} style={[styles.voterAvatar, { marginLeft: index > 0 ? -8 : 0 }]}>
+                      <Text style={styles.voterAvatarText}>👤</Text>
         </View>
-      </Modal>
+                  ))}
+                </View>
+              </View>
+            </View>
+            
+          </>
+        )}
+          </View>
 
       {/* Comment Modal */}
-      <Modal visible={!!showCommentModal} transparent animationType="slide">
-        <KeyboardAvoidingView 
-          style={styles.commentModalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          {/* Touchable overlay to close modal when tapping outside */}
-          <TouchableOpacity 
-            style={styles.commentModalBackground}
+      <Modal
+        visible={!!showCommentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCommentModal(null)}
+      >
+        <KeyboardAvoidingView style={styles.modalContainer} behavior="padding">
+              <TouchableOpacity 
+            style={styles.modalBackground}
             activeOpacity={1}
+                onPress={() => {
+              setShowCommentModal(null);
+              setCommentMessage('');
+                }}
+              >
+            <View style={{ flex: 1 }} />
+              </TouchableOpacity>
+          
+          <View style={styles.commentModal}>
+            <View style={styles.commentModalHeader}>
+              <Text style={styles.commentModalTitle}>Add Comment</Text>
+          <TouchableOpacity 
             onPress={() => {
               setShowCommentModal(null);
               setCommentMessage('');
             }}
+                style={styles.closeButton}
           >
-            <View style={{ flex: 1 }} />
+                <X size={24} color="#6B7280" />
           </TouchableOpacity>
+            </View>
           
-          {/* Comment Input Section - matches social media design */}
-          <View style={styles.commentInputSection}>
             <TextInput
-              style={styles.commentInputField}
-              placeholder="Leave a comment"
-              placeholderTextColor="#9CA3AF"
-              multiline
+              style={styles.commentInput}
+              placeholder="Share your thoughts about this restaurant..."
               value={commentMessage}
               onChangeText={setCommentMessage}
-              autoFocus
-              maxLength={500}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
             />
             
-            {/* Action Buttons */}
-            <View style={styles.commentActions}>
+            <View style={styles.commentModalActions}>
               <TouchableOpacity 
-                style={styles.commentCancelButton}
+                style={styles.cancelButton}
                 onPress={() => {
                   setShowCommentModal(null);
                   setCommentMessage('');
                 }}
               >
-                <Text style={styles.commentCancelText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
               <TouchableOpacity 
-                style={[
-                  styles.commentPostButton,
-                  !commentMessage.trim() && styles.commentPostButtonDisabled
-                ]}
-                onPress={() => {
-                  if (showCommentModal && commentMessage.trim()) {
-                    handleAddComment(showCommentModal);
-                  }
-                }}
+                style={[styles.submitButton, !commentMessage.trim() && styles.submitButtonDisabled]}
+                onPress={() => handleComment(showCommentModal!)}
                 disabled={!commentMessage.trim()}
               >
-                <Text style={[
-                  styles.commentPostText,
-                  !commentMessage.trim() && styles.commentPostTextDisabled
-                ]}>Post</Text>
+                <Text style={styles.submitButtonText}>Post Comment</Text>
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#FFFFFF',
   },
-  errorContainer: {
-    flex: 1,
+  customHeader: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    zIndex: 1000,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    marginBottom: 8,
+  backButtonText: {
+    fontSize: 20,
+    color: '#1F2937',
+    fontWeight: '600',
   },
-  name: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  collectionName: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 12,
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  description: {
+  collectionDescription: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-    lineHeight: 22,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  stats: {
+  collectionMeta: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  headerMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerMetaText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  carouselContainer: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  carousel: {
+    flex: 1,
+  },
+  carouselItem: {
+    width: width,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+  },
+  carouselDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 0,
+    backgroundColor: 'transparent',
+    marginTop: 8,
+    gap: 8,
+    position: 'relative',
+    zIndex: 1,
+  },
+  carouselDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(209, 213, 219, 0.8)',
+  },
+  carouselDotActive: {
+    backgroundColor: '#3B82F6',
+    width: 24,
+  },
+  pollStatisticsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  pollStatisticsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  statsLeft: {
-    flexDirection: 'row',
-    gap: 20,
+  pollStatisticsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
   },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  collaboratorsSection: {
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  collaboratorsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  collaboratorsTitle: {
+  pollStatisticsDetails: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#8B5CF6',
+    fontWeight: '500',
   },
-  collaboratorActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  inviteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#EBF4FF',
-    borderRadius: 16,
-    gap: 4,
-  },
-  inviteButtonText: {
-    fontSize: 12,
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  shareButton: {
+  voterContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16
+,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    gap: 4,
+    justifyContent: 'space-between',
   },
-  shareButtonText: {
-    fontSize: 12,
+  voterLabel: {
+    fontSize: 14,
     color: '#6B7280',
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  collaboratorsList: {
+  voterAvatars: {
     flexDirection: 'row',
-  },
-  collaboratorItem: {
     alignItems: 'center',
-    marginRight: 16,
   },
-  collaboratorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  voterAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  collaboratorInitial: {
+  voterAvatarText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  adminBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-  },
-  collaboratorName: {
-    fontSize: 12,
     color: '#6B7280',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  verifiedBadge: {
-    fontSize: 10,
-    color: '#10B981',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#3B82F6',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  activeTabText: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  restaurantsList: {
-    padding: 20,
   },
   emptyState: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#999',
-  },
-  restaurantItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  winningRestaurantItem: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: 24,
-    padding: 32,
-    marginBottom: 32,
-    borderWidth: 3,
-    borderColor: '#F59E0B',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 12,
-    transform: [{ scale: 1.02 }],
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  rankBadge: {
-    width: 36,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#000000',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  restaurantCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  winnerRankBadge: {
-    backgroundColor: '#F59E0B',
-    borderColor: '#D97706',
-    borderWidth: 2,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  silverRankBadge: {
-    backgroundColor: '#6B7280',
-    borderColor: '#4B5563',
-    borderWidth: 2,
-  },
-  bronzeRankBadge: {
-    backgroundColor: '#D97706',
-    borderColor: '#B45309',
-    borderWidth: 2,
-  },
-  rankNumber: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  topChoiceBadge: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  topChoiceText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  restaurantInfoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    shadowRadius: 16,
+    elevation: 8,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     marginBottom: 16,
   },
-  restaurantImageContainer: {
-    width: 80,
-    height: 80,
+  imageContainer: {
+    height: 200,
     borderRadius: 16,
-    marginRight: 16,
     overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
+    marginBottom: 16,
+    position: 'relative',
   },
   restaurantImage: {
     width: '100%',
     height: '100%',
   },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   restaurantInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  restaurantName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  restaurantCuisine: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  restaurantDetails: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '400',
-    marginTop: 2,
-  },
-  heartButton: {
-    padding: 8,
-  },
-  heartIcon: {
-    fontSize: 20,
-    color: '#9CA3AF',
-  },
-  heartIconActive: {
-    color: '#FF6B6B',
-    fontSize: 20,
-  },
-  approvalSection: {
-    marginTop: 12,
     marginBottom: 16,
   },
-  approvalText: {
-    fontSize: 16,
+  restaurantName: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  voteBreakdown: {
-    fontSize: 13,
-    color: '#6B7280',
+    color: '#1F2937',
     marginBottom: 8,
   },
-  consensusBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+  restaurantMeta: {
+    gap: 8,
   },
-  consensusBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textTransform: 'lowercase',
-  },
-  voteActions: {
+  metaItem: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#374151',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#22C55E',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  votingSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   voteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 6,
-    minWidth: 60,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+    minWidth: 100,
     justifyContent: 'center',
   },
   likeButton: {
     backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#22C55E',
   },
   dislikeButton: {
     backgroundColor: '#FEF2F2',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#EF4444',
   },
-  likeButtonActive: {
-    backgroundColor: '#10B981',
-    borderColor: '#059669',
-  },
-  dislikeButtonActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#DC2626',
-  },
-  commentButton: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#9CA3AF',
+  activeVoteButton: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
   },
   voteCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  voteCountActive: {
-    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
+    color: '#374151',
   },
-  removeButton: {
-    marginTop: -8,
-    marginBottom: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-end',
+  activeVoteCount: {
+    color: '#fff',
   },
-  removeButtonText: {
-    fontSize: 13,
-    color: '#FF6B6B',
-    fontWeight: '500',
-  },
-  insightsContainer: {
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-  },
-  analyticsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 16,
-  },
-  analyticsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  analyticCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    minWidth: '45%',
-    flex: 1,
-  },
-  analyticValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  analyticLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  insightsSection: {
-    marginBottom: 24,
-  },
-  insightsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  insightsGrid: {
-    gap: 16,
-  },
-  insightsContent: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  restaurantHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  restaurantImagePlaceholder: {
-    width: '100%',
-    height: '100%',
+  commentButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
-  },
-  restaurantImagePlaceholderText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  restaurantTitleContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  restaurantSubtitle: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  restaurantRank: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  rankText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#92400E',
-  },
-  approvalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  approvalTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  approvalRate: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  memberVotesSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  memberVotesTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  memberVotesList: {
-    gap: 8,
-  },
-  memberVoteItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  memberVoteAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  memberVoteInitial: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  memberVoteName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#1E293B',
-    flex: 1,
-  },
-  voteReason: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontStyle: 'italic',
-    marginLeft: 8,
-    flex: 1,
-  },
-  activitySection: {
-    marginBottom: 16,
-  },
-  activitySectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  discussionsList: {
-    gap: 8,
-  },
-  discussionMessage: {
-    fontSize: 12,
-    color: '#374151',
-    marginLeft: 32,
-    marginBottom: 4,
-  },
-  noVotes: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  discussionsSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  discussionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 6,
-  },
-  discussionsLabel: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  addCommentButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginLeft: 'auto',
-  },
-  addCommentButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  discussionItem: {
-    backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 8,
   },
-  discussionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  discussionAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  discussionInitial: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  discussionAuthor: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-    flex: 1,
-  },
-  discussionTime: {
-    fontSize: 10,
-    color: '#9CA3AF',
-  },
-  ownDiscussionIndicator: {
-    fontSize: 12,
-    color: '#3B82F6',
-    fontWeight: 'bold',
-  },
-  voteReasonItem: {
-    backgroundColor: '#F0F9FF',
-    borderColor: '#E0F2FE',
-  },
-  voteReasonBadge: {
-    marginLeft: 4,
-  },
-  discussionText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#374151',
-  },
-  noDiscussions: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 20,
-    margin: 20,
-    maxWidth: 320,
-    width: '100%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  reasonInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: '#1A1A1A',
-    marginBottom: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  cancelButtonText: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Vote feedback styles
-  voteFeedbackOverlay: {
+  confettiContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
     zIndex: 1000,
   },
-  voteFeedbackContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
+  confettiPiece: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
   },
-  likeFeedback: {
-    backgroundColor: '#22C55E',
+  confettiEmoji: {
+    fontSize: 20,
   },
-  dislikeFeedback: {
-    backgroundColor: '#EF4444',
-  },
-  voteFeedbackText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // New simplified comment modal styles - matches the social media UI
-  commentModalOverlay: {
+  modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
-  commentModalBackground: {
+  modalBackground: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
-  commentInputSection: {
+  commentModal: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20, // Account for safe area on iOS
-  },
-  commentInputField: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#1F2937',
-    minHeight: 60,
+    margin: 20,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    textAlignVertical: 'top',
   },
-  commentActions: {
+  commentModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    marginBottom: 16,
   },
-  commentCancelButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  commentCancelText: {
-    color: '#6B7280',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  commentPostButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 20,
-  },
-  commentPostButtonDisabled: {
-    backgroundColor: '#F3F4F6',
-  },
-  commentPostText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  commentModalTitle: {
+    fontSize: 18,
     fontWeight: '600',
+    color: '#1F2937',
   },
-  commentPostTextDisabled: {
-    color: '#9CA3AF',
+  closeButton: {
+    padding: 4,
   },
-  buttonContainer: {
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 16,
+    minHeight: 100,
+    backgroundColor: '#FFFFFF',
+  },
+  commentModalActions: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
-    gap: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  submitButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+  },
+  submitButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
   },
 });

@@ -107,13 +107,13 @@ export class UnifiedImageService {
       if (typeof restaurant.googlePhotos === 'string') {
         // Google Photos can be a comma-separated string of URLs
         googlePhotoUrls = restaurant.googlePhotos.split(',')
-          .map(url => typeof url === 'string' ? url.trim() : '')
-          .filter(url => url.length > 0);
+          .map((url: any) => typeof url === 'string' ? url.trim() : '')
+          .filter((url: string) => url.length > 0);
       } else if (Array.isArray(restaurant.googlePhotos)) {
         // Google Photos can also be an array of URLs
         googlePhotoUrls = restaurant.googlePhotos
-          .filter(url => typeof url === 'string' && url.trim().length > 0)
-          .map(url => url.trim());
+          .filter((url: any) => typeof url === 'string' && url.trim().length > 0)
+          .map((url: string) => url.trim());
       }
       
       if (googlePhotoUrls.length > 0) {

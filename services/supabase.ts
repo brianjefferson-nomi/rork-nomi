@@ -166,7 +166,6 @@ export interface Database {
           name: string;
           description?: string;
           created_by: string;
-          collection_code: string;
           is_public: boolean;
           occasion?: string;
           equal_voting: boolean;
@@ -189,7 +188,6 @@ export interface Database {
           name: string;
           description?: string;
           created_by: string;
-          collection_code: string;
           is_public?: boolean;
           occasion?: string;
           equal_voting?: boolean;
@@ -212,7 +210,6 @@ export interface Database {
           name?: string;
           description?: string;
           created_by?: string;
-          collection_code?: string;
           is_public?: boolean;
           occasion?: string;
           equal_voting?: boolean;
@@ -431,33 +428,51 @@ export const dbHelpers = {
     // Determine is_public based on collection_type
     const isPublic = planData.collection_type === 'public' || (planData.isPublic ?? true);
     
+    // Ensure we have a valid user ID
+    const userId = planData.userId || 'current-user-id';
+    console.log('[createPlan] Using userId:', userId);
+    
+    // Start with minimal required fields to avoid schema issues
+    const insertData = {
+      name: planData.name,
+      description: planData.description || '',
+      created_by: userId,
+      is_public: isPublic,
+      occasion: planData.occasion || 'general',
+      equal_voting: true,
+      minimum_participation: 1,
+      likes: 0,
+      admin_weighted: false,
+      expertise_weighted: false,
+      allow_vote_changes: true,
+      anonymous_voting: false,
+      vote_visibility: 'public',
+      discussion_enabled: true,
+      auto_ranking_enabled: true,
+      consensus_threshold: 50,
+      restaurant_ids: []
+    };
+    
+    // Remove any undefined or null values that might cause issues
+    Object.keys(insertData).forEach(key => {
+      if ((insertData as any)[key] === undefined || (insertData as any)[key] === null) {
+        delete (insertData as any)[key];
+      }
+    });
+    
+    console.log('[createPlan] Inserting data:', insertData);
+    
     const { data, error } = await supabase
       .from('collections')
-      .insert({
-        name: planData.name,
-        description: planData.description || '',
-        created_by: planData.userId || 'current-user-id', // Use provided userId or fallback
-        collection_code: collectionCode,
-        collection_type: planData.collection_type || 'public',
-        is_public: isPublic, // Keep for backward compatibility
-        occasion: planData.occasion || 'general',
-        equal_voting: true,
-        minimum_participation: 1,
-        likes: 0,
-        admin_weighted: false,
-        expertise_weighted: false,
-        allow_vote_changes: true,
-        anonymous_voting: false,
-        vote_visibility: 'public',
-        discussion_enabled: true,
-        auto_ranking_enabled: true,
-        consensus_threshold: 50,
-        restaurant_ids: []
-      })
+      .insert(insertData)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('[createPlan] Database error:', error);
+      console.error('[createPlan] Insert data that caused error:', insertData);
+      throw error;
+    }
     return data;
   },
 
@@ -798,7 +813,6 @@ export const dbHelpers = {
     
     const enhancedData = {
       ...collectionData,
-      collection_code: collectionCode,
       equal_voting: true,
       minimum_participation: 1,
       likes: 0,

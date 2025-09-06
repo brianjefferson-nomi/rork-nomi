@@ -150,10 +150,25 @@ export function CollectionCard({ collection, onPress, showFollowButton = false, 
       </View>
       
       {/* Follow/Unfollow button in top right corner - only show if user is not already following, a member, or the creator */}
-      {showFollowButton && collection.is_public && onFollowToggle && !(collection.isFollowing || isUserMember || isUserCreator) && (
+      {(() => {
+        const shouldShow = showFollowButton && collection.is_public && onFollowToggle && !(collection.isFollowing || isUserMember || isUserCreator);
+        console.log(`[CollectionCard] Follow button for "${collection.name}":`, {
+          showFollowButton,
+          is_public: collection.is_public,
+          hasOnFollowToggle: !!onFollowToggle,
+          isFollowing: collection.isFollowing,
+          isUserMember,
+          isUserCreator,
+          shouldShow
+        });
+        return shouldShow;
+      })() && (
         <TouchableOpacity 
           style={styles.followButtonTopRight}
-          onPress={() => onFollowToggle(collection.id, false)}
+          onPress={() => {
+            console.log(`[CollectionCard] Follow button pressed for "${collection.name}"`);
+            onFollowToggle?.(collection.id, false);
+          }}
           activeOpacity={0.8}
         >
           <Text style={styles.followButtonText}>
